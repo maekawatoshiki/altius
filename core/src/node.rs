@@ -1,4 +1,4 @@
-use crate::dim::Dimensions;
+use crate::{dim::Dimensions, tensor::Tensor};
 use id_arena::{Arena, Id};
 
 pub type NodeId = Id<Node>;
@@ -17,6 +17,7 @@ pub enum Node {
 pub struct Conv2d {
     pub input_dims: Dimensions,
     pub weight_dims: Dimensions,
+    pub weight: Tensor,
     pub kernel: Dimensions,
     pub stride: Dimensions,
     pub output_dims: Dimensions,
@@ -27,6 +28,7 @@ pub struct Conv2d {
 pub struct Add {
     pub input_a_dims: Dimensions,
     pub input_b_dims: Dimensions,
+    pub input_b: Tensor,
     pub output_dims: Dimensions,
     pub input_node: Option<NodeId>,
 }
@@ -51,6 +53,7 @@ pub struct MaxPool {
 pub struct Reshape {
     pub input_dims: Dimensions,
     pub output_dims: Dimensions,
+    pub data: Option<Tensor>,
     pub input_node: Option<NodeId>,
 }
 

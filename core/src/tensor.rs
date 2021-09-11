@@ -1,10 +1,12 @@
 use crate::dim::Dimensions;
 
+#[derive(Default)]
 pub struct Tensor {
     dims: Dimensions,
     data: TensorData,
 }
 
+#[derive(Default)]
 pub struct TensorData {
     // elem_ty: Type,
     data: Vec<f32>,

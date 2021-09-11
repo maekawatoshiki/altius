@@ -2,7 +2,7 @@ use crate::node::{NodeArena, NodeBuilder, NodeId};
 
 pub struct Model {
     nodes: NodeArena,
-    input_node: Option<NodeId>,
+    pub input_node: Option<NodeId>,
 }
 
 impl Model {
@@ -39,6 +39,7 @@ fn create_model() {
         }
         .into(),
     );
+    m.input_node = Some(conv);
     let add = m.new(
         Add {
             input_a_dims: vec![1, 8, 28, 28].into(),

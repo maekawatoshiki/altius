@@ -1,4 +1,4 @@
-use crate::{dim::Dimensions, tensor::Tensor};
+use crate::dim::Dimensions;
 use id_arena::{Arena, Id};
 
 pub type NodeId = Id<Node>;
@@ -9,6 +9,8 @@ pub enum Node {
     Add(Add),
     Relu(Relu),
     MaxPool(MaxPool),
+    Reshape(Reshape),
+    MatMul(MatMul),
 }
 
 #[derive(Default)]
@@ -18,7 +20,7 @@ pub struct Conv2d {
     pub kernel: Dimensions,
     pub stride: Dimensions,
     pub output_dims: Dimensions,
-    pub next_node: Option<NodeId>,
+    pub input_node: Option<NodeId>,
 }
 
 #[derive(Default)]
@@ -26,14 +28,14 @@ pub struct Add {
     pub input_a_dims: Dimensions,
     pub input_b_dims: Dimensions,
     pub output_dims: Dimensions,
-    pub next_node: Option<NodeId>,
+    pub input_node: Option<NodeId>,
 }
 
 #[derive(Default)]
 pub struct Relu {
     pub input_dims: Dimensions,
     pub output_dims: Dimensions,
-    pub next_node: Option<NodeId>,
+    pub input_node: Option<NodeId>,
 }
 
 #[derive(Default)]
@@ -42,7 +44,23 @@ pub struct MaxPool {
     pub kernel: Dimensions,
     pub stride: Dimensions,
     pub output_dims: Dimensions,
-    pub next_node: Option<NodeId>,
+    pub input_node: Option<NodeId>,
+}
+
+#[derive(Default)]
+pub struct Reshape {
+    pub input_dims: Dimensions,
+    pub output_dims: Dimensions,
+    pub input_node: Option<NodeId>,
+}
+
+#[derive(Default)]
+pub struct MatMul {
+    pub input_a_dims: Dimensions,
+    pub input_b_dims: Dimensions,
+    pub output_dims: Dimensions,
+    pub input_a_node: Option<NodeId>,
+    pub input_b_node: Option<NodeId>,
 }
 
 impl From<Conv2d> for Node {
@@ -66,6 +84,18 @@ impl From<Relu> for Node {
 impl From<MaxPool> for Node {
     fn from(n: MaxPool) -> Node {
         Node::MaxPool(n)
+    }
+}
+
+impl From<Reshape> for Node {
+    fn from(n: Reshape) -> Node {
+        Node::Reshape(n)
+    }
+}
+
+impl From<MatMul> for Node {
+    fn from(n: MatMul) -> Node {
+        Node::MatMul(n)
     }
 }
 

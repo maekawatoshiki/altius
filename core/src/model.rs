@@ -30,7 +30,8 @@ fn create_model() {
     let mut m = Model::new();
     let conv = m.new(
         Conv2d {
-            input_dims: vec![8, 8, 1, 5].into(),
+            input_dims: vec![1, 1, 28, 28].into(),
+            weight_dims: vec![8, 1, 5, 5].into(),
             kernel: vec![5, 5].into(),
             stride: vec![1, 1].into(),
             output_dims: vec![1, 8, 28, 28].into(),
@@ -61,6 +62,44 @@ fn create_model() {
             kernel: vec![2, 2].into(),
             stride: vec![2, 2].into(),
             output_dims: vec![1, 8, 14, 14].into(),
+            ..Default::default()
+        }
+        .into(),
+    );
+    let conv2 = m.new(
+        Conv2d {
+            input_dims: vec![1, 8, 14, 14].into(),
+            weight_dims: vec![16, 8, 5, 5].into(),
+            kernel: vec![5, 5].into(),
+            stride: vec![1, 1].into(),
+            output_dims: vec![1, 8, 28, 28].into(),
+            ..Default::default()
+        }
+        .into(),
+    );
+    let add2 = m.new(
+        Add {
+            input_a_dims: vec![1, 16, 14, 14].into(),
+            input_b_dims: vec![16, 1, 1].into(),
+            output_dims: vec![1, 16, 14, 14].into(),
+            ..Default::default()
+        }
+        .into(),
+    );
+    let relu2 = m.new(
+        Relu {
+            input_dims: vec![1, 16, 14, 14].into(),
+            output_dims: vec![1, 16, 14, 14].into(),
+            ..Default::default()
+        }
+        .into(),
+    );
+    let max_pool2 = m.new(
+        MaxPool {
+            input_dims: vec![1, 16, 14, 14].into(),
+            kernel: vec![3, 3].into(),
+            stride: vec![3, 3].into(),
+            output_dims: vec![1, 16, 4, 4].into(),
             ..Default::default()
         }
         .into(),

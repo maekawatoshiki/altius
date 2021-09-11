@@ -14,6 +14,7 @@ pub enum Node {
 #[derive(Default)]
 pub struct Conv2d {
     pub input_dims: Dimensions,
+    pub weight_dims: Dimensions,
     pub kernel: Dimensions,
     pub stride: Dimensions,
     pub output_dims: Dimensions,

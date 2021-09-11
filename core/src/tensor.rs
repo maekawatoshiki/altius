@@ -1,4 +1,4 @@
-use crate::dim::Dimensions;
+use crate::dim::{Dimension, Dimensions};
 
 #[derive(Default)]
 pub struct Tensor {
@@ -23,6 +23,14 @@ impl Tensor {
     pub fn with_data(mut self, data: TensorData) -> Self {
         self.data = data;
         self
+    }
+
+    pub fn at(&self, indices: &[Dimension]) -> f32 {
+        let mut index = 0;
+        for (idx, d) in indices.iter().zip(self.dims.as_slice().iter()) {
+            index += d * idx;
+        }
+        self.data.data[index]
     }
 
     pub fn verify(&self) -> bool {

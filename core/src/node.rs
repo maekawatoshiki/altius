@@ -11,17 +11,18 @@ pub enum Node {
     MaxPool(MaxPool),
     Reshape(Reshape),
     MatMul(MatMul),
+    Tensor(Tensor),
 }
 
 #[derive(Default)]
 pub struct Conv2d {
     pub input_dims: Dimensions,
     pub weight_dims: Dimensions,
-    pub weight: Tensor,
     pub kernel: Dimensions,
     pub stride: Dimensions,
     pub output_dims: Dimensions,
     pub input_node: Option<NodeId>,
+    pub weight_node: Option<NodeId>,
 }
 
 #[derive(Default)]
@@ -30,7 +31,8 @@ pub struct Add {
     pub input_b_dims: Dimensions,
     pub input_b: Tensor,
     pub output_dims: Dimensions,
-    pub input_node: Option<NodeId>,
+    pub input_a_node: Option<NodeId>,
+    pub input_b_node: Option<NodeId>,
 }
 
 #[derive(Default)]
@@ -53,7 +55,6 @@ pub struct MaxPool {
 pub struct Reshape {
     pub input_dims: Dimensions,
     pub output_dims: Dimensions,
-    pub data: Option<Tensor>,
     pub input_node: Option<NodeId>,
 }
 
@@ -99,6 +100,12 @@ impl From<Reshape> for Node {
 impl From<MatMul> for Node {
     fn from(n: MatMul) -> Node {
         Node::MatMul(n)
+    }
+}
+
+impl From<Tensor> for Node {
+    fn from(n: Tensor) -> Node {
+        Node::Tensor(n)
     }
 }
 

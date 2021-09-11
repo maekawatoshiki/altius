@@ -52,6 +52,12 @@ impl TensorData {
     }
 }
 
+impl From<Vec<f32>> for TensorData {
+    fn from(data: Vec<f32>) -> TensorData {
+        Self { data }
+    }
+}
+
 #[test]
 fn create_tensors() {
     let _ = Tensor::new(Dimensions(vec![1, 1, 28, 28]));

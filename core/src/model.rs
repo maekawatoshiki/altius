@@ -3,6 +3,7 @@ use crate::node::{NodeArena, NodeBuilder, NodeId};
 pub struct Model {
     nodes: NodeArena,
     pub input_node: Option<NodeId>,
+    pub output_node: Option<NodeId>,
 }
 
 impl Model {
@@ -10,6 +11,7 @@ impl Model {
         Self {
             nodes: NodeArena::new(),
             input_node: None,
+            output_node: None,
         }
     }
 }
@@ -24,14 +26,20 @@ impl NodeBuilder for Model {
     }
 }
 
-#[test]
-fn create_model() {
-    use crate::node::*;
+#[cfg(test)]
+fn mnist_model() -> Model {
+    use crate::{node::*, tensor::*};
     let mut m = Model::new();
+    let conv_weight = m.new(
+        Tensor::new(vec![8, 1, 5, 5].into())
+            .with_data(include!("../examples/conv1").into())
+            .into(),
+    );
     let conv = m.new(
         Conv2d {
             input_dims: vec![1, 1, 28, 28].into(),
             weight_dims: vec![8, 1, 5, 5].into(),
+            weight_node: Some(conv_weight),
             kernel: vec![5, 5].into(),
             stride: vec![1, 1].into(),
             output_dims: vec![1, 8, 28, 28].into(),
@@ -40,12 +48,25 @@ fn create_model() {
         .into(),
     );
     m.input_node = Some(conv);
+    let add_input_b = m.new(
+        Tensor::new(vec![8, 1, 1].into())
+            .with_data(
+                include!("../examples/add1")
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .into(),
+            )
+            .into(),
+    );
     let add = m.new(
         Add {
             input_a_dims: vec![1, 8, 28, 28].into(),
             input_b_dims: vec![8, 1, 1].into(),
             output_dims: vec![1, 8, 28, 28].into(),
-            input_node: Some(conv),
+            input_a_node: Some(conv),
+            input_b_node: Some(add_input_b),
             ..Default::default()
         }
         .into(),
@@ -70,6 +91,19 @@ fn create_model() {
         }
         .into(),
     );
+    let conv2_weight = m.new(
+        Tensor::new(vec![16, 8, 5, 5].into())
+            .with_data(
+                include!("../examples/conv2")
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .into(),
+            )
+            .into(),
+    );
     let conv2 = m.new(
         Conv2d {
             input_dims: vec![1, 8, 14, 14].into(),
@@ -78,16 +112,30 @@ fn create_model() {
             stride: vec![1, 1].into(),
             output_dims: vec![1, 8, 28, 28].into(),
             input_node: Some(max_pool),
+            weight_node: Some(conv2_weight),
             ..Default::default()
         }
         .into(),
+    );
+    let add2_input_b = m.new(
+        Tensor::new(vec![16, 1, 1].into())
+            .with_data(
+                include!("../examples/add2")
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .into(),
+            )
+            .into(),
     );
     let add2 = m.new(
         Add {
             input_a_dims: vec![1, 16, 14, 14].into(),
             input_b_dims: vec![16, 1, 1].into(),
             output_dims: vec![1, 16, 14, 14].into(),
-            input_node: Some(conv2),
+            input_a_node: Some(conv2),
+            input_b_node: Some(add2_input_b),
             ..Default::default()
         }
         .into(),
@@ -121,10 +169,24 @@ fn create_model() {
         }
         .into(),
     );
+    let reshape2_input = m.new(
+        Tensor::new(vec![16, 4, 4, 10].into())
+            .with_data(
+                include!("../examples/reshape1")
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .into(),
+            )
+            .into(),
+    );
     let reshape2 = m.new(
         Reshape {
             input_dims: vec![16, 4, 4, 10].into(),
             output_dims: vec![256, 10].into(),
+            input_node: Some(reshape2_input),
             ..Default::default()
         }
         .into(),
@@ -140,14 +202,33 @@ fn create_model() {
         }
         .into(),
     );
-    let _add3 = m.new(
+    let add3_input_b = m.new(
+        Tensor::new(vec![1, 10].into())
+            .with_data(
+                include!("../examples/add3")
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .into(),
+            )
+            .into(),
+    );
+    let add3 = m.new(
         Add {
             input_a_dims: vec![1, 10].into(),
             input_b_dims: vec![1, 10].into(),
             output_dims: vec![1, 10].into(),
-            input_node: Some(mat_mal),
+            input_a_node: Some(mat_mal),
+            input_b_node: Some(add3_input_b),
             ..Default::default()
         }
         .into(),
     );
+    m.output_node = Some(add3);
+    m
+}
+
+#[test]
+fn create_model() {
+    let _ = mnist_model();
 }

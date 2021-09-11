@@ -12,6 +12,7 @@ pub enum Node {
     Reshape(Reshape),
     MatMul(MatMul),
     Tensor(Tensor),
+    Input,
 }
 
 #[derive(Default)]

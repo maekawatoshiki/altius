@@ -26,8 +26,8 @@ impl NodeBuilder for Model {
     }
 }
 
-#[cfg(test)]
-fn mnist_model() -> Model {
+#[test]
+fn mnist_model() {
     use crate::{node::*, tensor::*};
     let mut m = Model::new();
     let conv_weight = m.new(
@@ -47,7 +47,7 @@ fn mnist_model() -> Model {
         }
         .into(),
     );
-    m.input_node = Some(conv);
+    // m.input_node = Some(conv);
     let add_input_b = m.new(
         Tensor::new(vec![8, 1, 1].into())
             .with_data(
@@ -225,10 +225,4 @@ fn mnist_model() -> Model {
         .into(),
     );
     m.output_node = Some(add3);
-    m
-}
-
-#[test]
-fn create_model() {
-    let _ = mnist_model();
 }

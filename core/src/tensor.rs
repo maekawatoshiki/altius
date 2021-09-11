@@ -15,8 +15,8 @@ pub struct TensorData {
 impl Tensor {
     pub fn new(dims: Dimensions) -> Self {
         Self {
+            data: TensorData::new_raw(vec![0.0; dims.total_elems()]),
             dims,
-            data: TensorData::new_empty(),
         }
     }
 
@@ -31,6 +31,26 @@ impl Tensor {
             index += d * idx;
         }
         self.data.data[index]
+    }
+
+    pub fn at_mut(&mut self, indices: &[Dimension]) -> &mut f32 {
+        let mut index = 0;
+        for (idx, d) in indices.iter().zip(self.dims.as_slice().iter()) {
+            index += d * idx;
+        }
+        &mut self.data.data[index]
+    }
+
+    pub fn data(&self) -> &[f32] {
+        &self.data.data
+    }
+
+    pub fn data_mut(&mut self) -> &mut [f32] {
+        &mut self.data.data
+    }
+
+    pub fn dims(&self) -> &Dimensions {
+        &self.dims
     }
 
     pub fn verify(&self) -> bool {

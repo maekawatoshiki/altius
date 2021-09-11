@@ -1,6 +1,6 @@
 pub type Dimension = usize;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Dimensions(pub Vec<Dimension>);
 
 impl Dimensions {

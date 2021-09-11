@@ -32,7 +32,15 @@ fn mnist_model() {
     let mut m = Model::new();
     let conv_weight = m.new(
         Tensor::new(vec![8, 1, 5, 5].into())
-            .with_data(include!("../examples/conv1").into())
+            .with_data(
+                include!("../examples/conv1")
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .into(),
+            )
             .into(),
     );
     let conv = m.new(

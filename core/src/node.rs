@@ -21,6 +21,7 @@ pub struct Conv2d {
     pub weight_dims: Dimensions,
     pub kernel: Dimensions,
     pub stride: Dimensions,
+    pub padding: Dimensions,
     pub output_dims: Dimensions,
     pub input_node: Option<NodeId>,
     pub weight_node: Option<NodeId>,

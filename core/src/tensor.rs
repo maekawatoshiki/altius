@@ -1,12 +1,13 @@
 use crate::dim::{Dimension, Dimensions};
 
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Tensor {
     dims: Dimensions,
+    stride: Dimensions,
     data: TensorData,
 }
 
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TensorData {
     // elem_ty: Type,
     data: Vec<f32>,
@@ -15,6 +16,13 @@ pub struct TensorData {
 impl Tensor {
     pub fn new(dims: Dimensions) -> Self {
         Self {
+            stride: {
+                let mut x = vec![];
+                for i in 0..dims.as_slice().len() {
+                    x.push(dims.as_slice()[i + 1..].iter().product());
+                }
+                x.into()
+            },
             data: TensorData::new_raw(vec![0.0; dims.total_elems()]),
             dims,
         }
@@ -22,12 +30,13 @@ impl Tensor {
 
     pub fn with_data(mut self, data: TensorData) -> Self {
         self.data = data;
+        assert!(self.verify());
         self
     }
 
     pub fn at(&self, indices: &[Dimension]) -> f32 {
         let mut index = 0;
-        for (idx, d) in indices.iter().zip(self.dims.as_slice().iter()) {
+        for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
         }
         self.data.data[index]
@@ -35,7 +44,7 @@ impl Tensor {
 
     pub fn at_mut(&mut self, indices: &[Dimension]) -> &mut f32 {
         let mut index = 0;
-        for (idx, d) in indices.iter().zip(self.dims.as_slice().iter()) {
+        for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
         }
         &mut self.data.data[index]
@@ -46,6 +55,14 @@ impl Tensor {
     }
 
     pub fn data_mut(&mut self) -> &mut [f32] {
+        &mut self.data.data
+    }
+
+    pub fn data_vec(&self) -> &Vec<f32> {
+        &self.data.data
+    }
+
+    pub fn data_vec_mut(&mut self) -> &mut Vec<f32> {
         &mut self.data.data
     }
 

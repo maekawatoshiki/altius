@@ -1,6 +1,6 @@
 pub type Dimension = usize;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Dimensions(pub Vec<Dimension>);
 
 impl Dimensions {
@@ -21,6 +21,12 @@ impl Dimensions {
 
     pub fn as_slice(&self) -> &[Dimension] {
         self.0.as_slice()
+    }
+}
+
+impl From<Vec<Dimension>> for Dimensions {
+    fn from(v: Vec<Dimension>) -> Dimensions {
+        Dimensions(v)
     }
 }
 

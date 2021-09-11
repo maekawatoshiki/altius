@@ -26,7 +26,7 @@ impl NodeBuilder for Model {
 
 #[test]
 fn create_model() {
-    use crate::node::Conv2d;
+    use crate::node::*;
     let mut m = Model::new();
     let conv = m.new(
         Conv2d {
@@ -34,7 +34,34 @@ fn create_model() {
             kernel: vec![5, 5].into(),
             stride: vec![1, 1].into(),
             output_dims: vec![1, 8, 28, 28].into(),
-            ..Conv2d::default()
+            ..Default::default()
+        }
+        .into(),
+    );
+    let add = m.new(
+        Add {
+            input_a_dims: vec![1, 8, 28, 28].into(),
+            input_b_dims: vec![8, 1, 1].into(),
+            output_dims: vec![1, 8, 28, 28].into(),
+            ..Default::default()
+        }
+        .into(),
+    );
+    let relu = m.new(
+        Relu {
+            input_dims: vec![1, 8, 28, 28].into(),
+            output_dims: vec![1, 8, 28, 28].into(),
+            ..Default::default()
+        }
+        .into(),
+    );
+    let max_pool = m.new(
+        MaxPool {
+            input_dims: vec![1, 8, 28, 28].into(),
+            kernel: vec![2, 2].into(),
+            stride: vec![2, 2].into(),
+            output_dims: vec![1, 8, 14, 14].into(),
+            ..Default::default()
         }
         .into(),
     );

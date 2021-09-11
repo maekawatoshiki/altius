@@ -6,6 +6,9 @@ pub type NodeArena = Arena<Node>;
 
 pub enum Node {
     Conv2d(Conv2d),
+    Add(Add),
+    Relu(Relu),
+    MaxPool(MaxPool),
 }
 
 #[derive(Default)]
@@ -17,9 +20,51 @@ pub struct Conv2d {
     pub next_node: Option<NodeId>,
 }
 
+#[derive(Default)]
+pub struct Add {
+    pub input_a_dims: Dimensions,
+    pub input_b_dims: Dimensions,
+    pub output_dims: Dimensions,
+    pub next_node: Option<NodeId>,
+}
+
+#[derive(Default)]
+pub struct Relu {
+    pub input_dims: Dimensions,
+    pub output_dims: Dimensions,
+    pub next_node: Option<NodeId>,
+}
+
+#[derive(Default)]
+pub struct MaxPool {
+    pub input_dims: Dimensions,
+    pub kernel: Dimensions,
+    pub stride: Dimensions,
+    pub output_dims: Dimensions,
+    pub next_node: Option<NodeId>,
+}
+
 impl From<Conv2d> for Node {
     fn from(n: Conv2d) -> Node {
         Node::Conv2d(n)
+    }
+}
+
+impl From<Add> for Node {
+    fn from(n: Add) -> Node {
+        Node::Add(n)
+    }
+}
+
+impl From<Relu> for Node {
+    fn from(n: Relu) -> Node {
+        Node::Relu(n)
+    }
+}
+
+impl From<MaxPool> for Node {
+    fn from(n: MaxPool) -> Node {
+        Node::MaxPool(n)
     }
 }
 

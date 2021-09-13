@@ -1,15 +1,21 @@
-use altius_core::{model::Model, tensor::Tensor};
+use altius_core::{model::Model, node::*, tensor::*};
 use altius_interpreter::Interpreter;
+use rayon::prelude::*;
+use std::cmp::Ordering;
+use std::env::args;
+use std::fs::{self, File};
+use std::io::{self, BufRead};
+use std::path::Path;
 
 fn main() {
-    use rayon::prelude::*;
-    use std::cmp::Ordering;
-    let mnist = mnist();
+    let model_root = &args().collect::<Vec<String>>()[1];
+    let mnist = mnist(model_root);
 
-    let test = include_str!("../../core/examples/MNIST_test.txt");
-    let test_lines: Vec<&str> = test.split("\n").collect();
     let mut inputs = vec![];
-    for line in test_lines {
+    for line in fs::read_to_string(Path::new(model_root).join("MNIST_test.txt"))
+        .unwrap()
+        .split("\n")
+    {
         if line.is_empty() {
             continue;
         }
@@ -24,6 +30,7 @@ fn main() {
         );
         inputs.push((expected, pixels));
     }
+
     let correct: i32 = inputs
         .par_iter()
         .map(|(expected, input)| {
@@ -36,10 +43,10 @@ fn main() {
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
                 .map(|(index, _)| index)
                 .unwrap();
-            // println!("expected: {}, inferred: {}", expected, inferred);
             (*expected == inferred as i32) as i32
         })
         .sum();
+
     // for (_expected, input) in &inputs {
     //     for x in 0..28 {
     //         for y in 0..28 {
@@ -50,24 +57,28 @@ fn main() {
     //     }
     //     // break;
     // }
+
     println!("accuracy: {}", correct as f32 / inputs.len() as f32);
 }
 
-fn mnist() -> Model {
-    use altius_core::{node::*, tensor::*};
+fn read_f32_list_from<P: AsRef<Path>>(filename: P) -> Vec<f32> {
+    let mut list = vec![];
+    for line in io::BufReader::new(File::open(filename).expect("failed to open file")).lines() {
+        list.push(
+            line.unwrap()
+                .parse::<f32>()
+                .expect("failed to parse float value"),
+        );
+    }
+    list
+}
+
+fn mnist(root: &str) -> Model {
     let mut m = Model::new();
     let input = m.new(Node::Input);
     let conv_weight = m.new(
         Tensor::new(vec![8, 1, 5, 5].into())
-            .with_data(
-                include!("../../core/examples/conv1")
-                    .into_iter()
-                    .flatten()
-                    .flatten()
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .into(),
-            )
+            .with_data(read_f32_list_from(Path::new(root).join("conv1").to_str().unwrap()).into())
             .into(),
     );
     let conv = m.new(
@@ -84,17 +95,9 @@ fn mnist() -> Model {
         }
         .into(),
     );
-    // m.input_node = Some(conv);
     let add_input_b = m.new(
         Tensor::new(vec![8, 1, 1].into())
-            .with_data(
-                include!("../../core/examples/add1")
-                    .into_iter()
-                    .flatten()
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .into(),
-            )
+            .with_data(read_f32_list_from(Path::new(root).join("add1").to_str().unwrap()).into())
             .into(),
     );
     let add = m.new(
@@ -130,15 +133,7 @@ fn mnist() -> Model {
     );
     let conv2_weight = m.new(
         Tensor::new(vec![16, 8, 5, 5].into())
-            .with_data(
-                include!("../../core/examples/conv2")
-                    .into_iter()
-                    .flatten()
-                    .flatten()
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .into(),
-            )
+            .with_data(read_f32_list_from(Path::new(root).join("conv2").to_str().unwrap()).into())
             .into(),
     );
     let conv2 = m.new(
@@ -157,14 +152,7 @@ fn mnist() -> Model {
     );
     let add2_input_b = m.new(
         Tensor::new(vec![16, 1, 1].into())
-            .with_data(
-                include!("../../core/examples/add2")
-                    .into_iter()
-                    .flatten()
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .into(),
-            )
+            .with_data(read_f32_list_from(Path::new(root).join("add2").to_str().unwrap()).into())
             .into(),
     );
     let add2 = m.new(
@@ -210,13 +198,7 @@ fn mnist() -> Model {
     let reshape2_input = m.new(
         Tensor::new(vec![16, 4, 4, 10].into())
             .with_data(
-                include!("../../core/examples/reshape1")
-                    .into_iter()
-                    .flatten()
-                    .flatten()
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .into(),
+                read_f32_list_from(Path::new(root).join("reshape1").to_str().unwrap()).into(),
             )
             .into(),
     );
@@ -242,13 +224,7 @@ fn mnist() -> Model {
     );
     let add3_input_b = m.new(
         Tensor::new(vec![1, 10].into())
-            .with_data(
-                include!("../../core/examples/add3")
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .into(),
-            )
+            .with_data(read_f32_list_from(Path::new(root).join("add3").to_str().unwrap()).into())
             .into(),
     );
     let add3 = m.new(

@@ -140,9 +140,8 @@ impl<'a> Interpreter<'a> {
     }
 
     fn run_node_reshape(&mut self, node: &Reshape) -> Tensor {
-        let mut output = Tensor::new(node.output_dims.clone());
-        *output.data_vec_mut() = self.run_node(node.input_node.unwrap()).data_vec().clone();
-        output
+        let input = self.run_node(node.input_node.unwrap());
+        input.reshape_into(node.output_dims.clone())
     }
 
     fn run_node_mat_mul(&mut self, node: &MatMul) -> Tensor {

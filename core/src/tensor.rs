@@ -16,13 +16,7 @@ pub struct TensorData {
 impl Tensor {
     pub fn new(dims: Dimensions) -> Self {
         Self {
-            stride: {
-                let mut x = vec![];
-                for i in 0..dims.as_slice().len() {
-                    x.push(dims.as_slice()[i + 1..].iter().product());
-                }
-                x.into()
-            },
+            stride: compute_strides(&dims),
             data: TensorData::new_raw(vec![0.0; dims.total_elems()]),
             dims,
         }
@@ -30,6 +24,15 @@ impl Tensor {
 
     pub fn with_data(mut self, data: TensorData) -> Self {
         self.data = data;
+        #[cfg(debug_assertions)]
+        assert!(self.verify());
+        self
+    }
+
+    pub fn reshape_into(mut self, dims: Dimensions) -> Self {
+        self.stride = compute_strides(&dims);
+        self.dims = dims;
+        #[cfg(debug_assertions)]
         assert!(self.verify());
         self
     }
@@ -73,6 +76,14 @@ impl Tensor {
     pub fn verify(&self) -> bool {
         self.data.len() == self.dims.total_elems()
     }
+}
+
+fn compute_strides(dims: &Dimensions) -> Dimensions {
+    let mut strides = vec![];
+    for i in 0..dims.as_slice().len() {
+        strides.push(dims.as_slice()[i + 1..].iter().product());
+    }
+    strides.into()
 }
 
 impl TensorData {

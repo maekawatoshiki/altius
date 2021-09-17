@@ -56,15 +56,7 @@ fn mnist_model() {
         }
         .into(),
     );
-    let relu = m.new(
-        Relu {
-            input_dims: vec![1, 8, 28, 28].into(),
-            output_dims: vec![1, 8, 28, 28].into(),
-            input_node: Some(add),
-            ..Default::default()
-        }
-        .into(),
-    );
+    let relu = m.new_relu(add);
     let max_pool = m.new(
         MaxPool {
             input_dims: vec![1, 8, 28, 28].into(),
@@ -102,15 +94,7 @@ fn mnist_model() {
         }
         .into(),
     );
-    let relu2 = m.new(
-        Relu {
-            input_dims: vec![1, 16, 14, 14].into(),
-            output_dims: vec![1, 16, 14, 14].into(),
-            input_node: Some(add2),
-            ..Default::default()
-        }
-        .into(),
-    );
+    let relu2 = m.new_relu(add2);
     let max_pool2 = m.new(
         MaxPool {
             input_dims: vec![1, 16, 14, 14].into(),

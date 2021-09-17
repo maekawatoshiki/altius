@@ -12,7 +12,7 @@ pub enum Node {
     Reshape(Reshape),
     MatMul(MatMul),
     Tensor(Tensor),
-    Input,
+    Input(Dimensions),
 }
 
 #[derive(Default)]
@@ -40,7 +40,6 @@ pub struct Add {
 #[derive(Default)]
 pub struct Relu {
     pub input_dims: Dimensions,
-    pub output_dims: Dimensions,
     pub input_node: Option<NodeId>,
 }
 
@@ -67,6 +66,39 @@ pub struct MatMul {
     pub output_dims: Dimensions,
     pub input_a_node: Option<NodeId>,
     pub input_b_node: Option<NodeId>,
+}
+
+impl Node {
+    pub fn output_dims(&self) -> Option<&Dimensions> {
+        match self {
+            Self::Conv2d(n) => Some(&n.output_dims),
+            Self::Add(n) => Some(&n.output_dims),
+            Self::Relu(n) => Some(n.output_dims()),
+            Self::MaxPool(n) => Some(&n.output_dims),
+            Self::Reshape(n) => Some(&n.output_dims),
+            Self::MatMul(n) => Some(&n.output_dims),
+            Self::Tensor(n) => Some(&n.dims()),
+            Self::Input(d) => Some(&d),
+        }
+    }
+}
+
+impl Relu {
+    pub fn new(input_dims: Dimensions) -> Self {
+        Self {
+            input_dims,
+            ..Relu::default()
+        }
+    }
+
+    pub fn with_input_node(mut self, input_node: NodeId) -> Self {
+        self.input_node = Some(input_node);
+        self
+    }
+
+    pub fn output_dims(&self) -> &Dimensions {
+        &self.input_dims
+    }
 }
 
 impl From<Conv2d> for Node {
@@ -114,7 +146,15 @@ impl From<Tensor> for Node {
 pub trait NodeBuilder {
     fn arena(&self) -> &NodeArena;
     fn arena_mut(&mut self) -> &mut NodeArena;
+
     fn new(&mut self, node: Node) -> NodeId {
         self.arena_mut().alloc(node)
+    }
+
+    fn new_relu(&mut self, input_node_id: NodeId) -> NodeId {
+        let input_node = &self.arena()[input_node_id];
+        let relu =
+            Relu::new(input_node.output_dims().unwrap().clone()).with_input_node(input_node_id);
+        self.new(relu.into())
     }
 }

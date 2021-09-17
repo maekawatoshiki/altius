@@ -21,7 +21,7 @@ impl<'a> Interpreter<'a> {
     pub fn run_node(&mut self, id: NodeId) -> Tensor {
         let node = &self.model.arena()[id];
         match node {
-            Node::Input => self.input.clone(),
+            Node::Input(_) => self.input.clone(),
             Node::Tensor(tensor) => tensor.clone(),
             Node::Conv2d(node) => self.run_node_conv2d(node),
             Node::Relu(node) => self.run_node_relu(node),
@@ -88,7 +88,7 @@ impl<'a> Interpreter<'a> {
     fn run_node_relu(&mut self, node: &Relu) -> Tensor {
         let input = self.run_node(node.input_node.unwrap());
 
-        let mut output = Tensor::new(node.output_dims.clone());
+        let mut output = Tensor::new(node.output_dims().clone());
         for (i, v) in input.data().into_iter().enumerate() {
             output.data_mut()[i] = v.max(0.0);
         }

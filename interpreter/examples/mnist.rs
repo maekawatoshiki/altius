@@ -31,21 +31,33 @@ fn main() {
         inputs.push((expected, pixels));
     }
 
-    let correct: i32 = inputs
-        .par_iter()
-        .map(|(expected, input)| {
-            let mut i = Interpreter::new(&mnist, input.clone());
-            let v = i.run();
-            let inferred = v
-                .data()
-                .iter()
-                .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-                .map(|(index, _)| index)
-                .unwrap();
-            (*expected == inferred as i32) as i32
-        })
-        .sum();
+    let mut correct: i32 = 0;
+    let validation_count = 100;
+    let repeat = 5;
+
+    let start = ::std::time::Instant::now();
+
+    for _ in 0..repeat {
+        correct = inputs
+            .par_iter()
+            .take(validation_count)
+            .map(|(expected, input)| {
+                let mut i = Interpreter::new(&mnist, input.clone());
+                let v = i.run();
+                let inferred = v
+                    .data()
+                    .iter()
+                    .enumerate()
+                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+                    .map(|(index, _)| index)
+                    .unwrap();
+                (*expected == inferred as i32) as i32
+            })
+            .sum();
+    }
+
+    let end = start.elapsed();
+    println!("elapsed: {:?}", end / repeat);
 
     // for (_expected, input) in &inputs {
     //     for x in 0..28 {
@@ -58,7 +70,7 @@ fn main() {
     //     // break;
     // }
 
-    println!("accuracy: {}", correct as f32 / inputs.len() as f32);
+    println!("accuracy: {}", correct as f32 / validation_count as f32);
 }
 
 fn read_f32_list_from<P: AsRef<Path>>(filename: P) -> Vec<f32> {
@@ -75,7 +87,7 @@ fn read_f32_list_from<P: AsRef<Path>>(filename: P) -> Vec<f32> {
 
 fn mnist(root: &str) -> Model {
     let mut m = Model::new();
-    let input = m.new(Node::Input);
+    let input = m.new(Node::Input(vec![1, 1, 28, 28].into()));
     let conv_weight = m.new(
         Tensor::new(vec![8, 1, 5, 5].into())
             .with_data(read_f32_list_from(Path::new(root).join("conv1").to_str().unwrap()).into())
@@ -111,15 +123,7 @@ fn mnist(root: &str) -> Model {
         }
         .into(),
     );
-    let relu = m.new(
-        Relu {
-            input_dims: vec![1, 8, 28, 28].into(),
-            output_dims: vec![1, 8, 28, 28].into(),
-            input_node: Some(add),
-            ..Default::default()
-        }
-        .into(),
-    );
+    let relu = m.new_relu(add);
     let max_pool = m.new(
         MaxPool {
             input_dims: vec![1, 8, 28, 28].into(),
@@ -166,15 +170,7 @@ fn mnist(root: &str) -> Model {
         }
         .into(),
     );
-    let relu2 = m.new(
-        Relu {
-            input_dims: vec![1, 16, 14, 14].into(),
-            output_dims: vec![1, 16, 14, 14].into(),
-            input_node: Some(add2),
-            ..Default::default()
-        }
-        .into(),
-    );
+    let relu2 = m.new_relu(add2);
     let max_pool2 = m.new(
         MaxPool {
             input_dims: vec![1, 16, 14, 14].into(),

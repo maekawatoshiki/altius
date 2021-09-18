@@ -53,6 +53,46 @@ impl Tensor {
         &mut self.data.data[index]
     }
 
+    pub fn at_2d(&self, x: Dimension, y: Dimension) -> f32 {
+        self.data.data[self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y]
+    }
+
+    pub fn at_2d_mut(&mut self, x: Dimension, y: Dimension) -> &mut f32 {
+        &mut self.data.data[self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y]
+    }
+
+    pub fn at_3d(&self, x: Dimension, y: Dimension, z: Dimension) -> f32 {
+        self.data.data[self.stride.as_slice()[0] * x
+            + self.stride.as_slice()[1] * y
+            + self.stride.as_slice()[2] * z]
+    }
+
+    pub fn at_3d_mut(&mut self, x: Dimension, y: Dimension, z: Dimension) -> &mut f32 {
+        &mut self.data.data[self.stride.as_slice()[0] * x
+            + self.stride.as_slice()[1] * y
+            + self.stride.as_slice()[2] * z]
+    }
+
+    pub fn at_4d(&self, x: Dimension, y: Dimension, z: Dimension, u: Dimension) -> f32 {
+        self.data.data[self.stride.as_slice()[0] * x
+            + self.stride.as_slice()[1] * y
+            + self.stride.as_slice()[2] * z
+            + self.stride.as_slice()[3] * u]
+    }
+
+    pub fn at_4d_mut(
+        &mut self,
+        x: Dimension,
+        y: Dimension,
+        z: Dimension,
+        u: Dimension,
+    ) -> &mut f32 {
+        &mut self.data.data[self.stride.as_slice()[0] * x
+            + self.stride.as_slice()[1] * y
+            + self.stride.as_slice()[2] * z
+            + self.stride.as_slice()[3] * u]
+    }
+
     pub fn data(&self) -> &[f32] {
         &self.data.data
     }

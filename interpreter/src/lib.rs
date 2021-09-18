@@ -64,17 +64,17 @@ impl<'a> Interpreter<'a> {
                                     }
 
                                     for fd in 0..in_c_per_g {
-                                        sum += weight.at(&[d, fd, fx as usize, fy as usize])
-                                            * input.at(&[
+                                        sum += weight.at_4d(d, fd, fx as usize, fy as usize)
+                                            * input.at_4d(
                                                 n,
                                                 g * in_c_per_g + fd,
                                                 ox as usize,
                                                 oy as usize,
-                                            ]);
+                                            );
                                     }
                                 }
                             }
-                            *output.at_mut(&[n, d, ax, ay]) = sum;
+                            *output.at_4d_mut(n, d, ax, ay) = sum;
                             y += node.stride.as_slice()[1] as isize
                         }
                         x += node.stride.as_slice()[0] as isize
@@ -122,14 +122,14 @@ impl<'a> Interpreter<'a> {
                                     continue;
                                 }
 
-                                let val = input.at(&[n, z, ox as usize, oy as usize]);
+                                let val = input.at_4d(n, z, ox as usize, oy as usize);
 
                                 if val >= max {
                                     max = val;
                                 }
                             }
                         }
-                        *output.at_mut(&[n, z, ax, ay]) = if max == f32::MIN { 0.0 } else { max };
+                        *output.at_4d_mut(n, z, ax, ay) = if max == f32::MIN { 0.0 } else { max };
                         y += node.stride.as_slice()[1] as isize
                     }
                     x += node.stride.as_slice()[0] as isize
@@ -157,9 +157,9 @@ impl<'a> Interpreter<'a> {
             for j in 0..input_b.dims().as_slice()[1] {
                 let mut t = 0.0;
                 for k in 0..input_b.dims().as_slice()[0] {
-                    t += input_a.at(&[i, k]) * input_b.at(&[k, j]);
+                    t += input_a.at_2d(i, k) * input_b.at_2d(k, j);
                 }
-                *output.at_mut(&[i, j]) = t;
+                *output.at_2d_mut(i, j) = t;
             }
         }
         output
@@ -187,8 +187,8 @@ impl<'a> Interpreter<'a> {
                 for z in 0..node.input_a_dims.as_slice()[1] {
                     for x in 0..node.input_a_dims.as_slice()[2] {
                         for y in 0..node.input_a_dims.as_slice()[3] {
-                            *output.at_mut(&[n, z, x, y]) =
-                                input_a.at(&[n, z, x, y]) + input_b.at(&[z, 0, 0]);
+                            *output.at_4d_mut(n, z, x, y) =
+                                input_a.at_4d(n, z, x, y) + input_b.at_3d(z, 0, 0);
                         }
                     }
                 }

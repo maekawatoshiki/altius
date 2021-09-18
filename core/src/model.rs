@@ -69,18 +69,12 @@ fn mnist_model() {
         .into(),
     );
     let conv2_weight = m.new(Tensor::new(vec![16, 8, 5, 5].into()).into());
-    let conv2 = m.new(
-        Conv2d {
-            input_dims: vec![1, 8, 14, 14].into(),
-            weight_dims: vec![16, 8, 5, 5].into(),
-            kernel: vec![5, 5].into(),
-            stride: vec![1, 1].into(),
-            output_dims: vec![1, 8, 28, 28].into(),
-            input_node: Some(max_pool),
-            weight_node: Some(conv2_weight),
-            ..Default::default()
-        }
-        .into(),
+    let conv2 = m.new_conv2d(
+        max_pool,
+        conv2_weight,
+        vec![5, 5].into(),
+        vec![1, 1].into(),
+        vec![2, 2].into(),
     );
     let add2_input_b = m.new(Tensor::new(vec![16, 1, 1].into()).into());
     let add2 = m.new(

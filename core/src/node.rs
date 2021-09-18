@@ -69,17 +69,53 @@ pub struct MatMul {
 }
 
 impl Node {
-    pub fn output_dims(&self) -> Option<&Dimensions> {
+    pub fn output_dims(&self) -> &Dimensions {
         match self {
-            Self::Conv2d(n) => Some(&n.output_dims),
-            Self::Add(n) => Some(&n.output_dims),
-            Self::Relu(n) => Some(n.output_dims()),
-            Self::MaxPool(n) => Some(&n.output_dims),
-            Self::Reshape(n) => Some(&n.output_dims),
-            Self::MatMul(n) => Some(&n.output_dims),
-            Self::Tensor(n) => Some(&n.dims()),
-            Self::Input(d) => Some(&d),
+            Self::Conv2d(n) => &n.output_dims,
+            Self::Add(n) => &n.output_dims,
+            Self::Relu(n) => n.output_dims(),
+            Self::MaxPool(n) => &n.output_dims,
+            Self::Reshape(n) => &n.output_dims,
+            Self::MatMul(n) => &n.output_dims,
+            Self::Tensor(n) => &n.dims(),
+            Self::Input(d) => &d,
         }
+    }
+}
+
+impl Conv2d {
+    pub fn new(input_dims: Dimensions, kernel: Dimensions) -> Self {
+        Self {
+            input_dims,
+            kernel,
+            ..Conv2d::default()
+        }
+    }
+
+    pub fn with_strides(mut self, strides: Dimensions) -> Self {
+        self.stride = strides;
+        self
+    }
+
+    pub fn with_padding(mut self, padding: Dimensions) -> Self {
+        self.padding = padding;
+        self
+    }
+
+    pub fn with_input_node(mut self, input_node: NodeId) -> Self {
+        self.input_node = Some(input_node);
+        self
+    }
+
+    pub fn with_weight_node(mut self, weight_node: NodeId, weight_dims: Dimensions) -> Self {
+        self.weight_node = Some(weight_node);
+        self.weight_dims = weight_dims;
+        self
+    }
+
+    pub fn with_output_dims(mut self, output_dims: Dimensions) -> Self {
+        self.output_dims = output_dims;
+        self
     }
 }
 
@@ -153,8 +189,40 @@ pub trait NodeBuilder {
 
     fn new_relu(&mut self, input_node_id: NodeId) -> NodeId {
         let input_node = &self.arena()[input_node_id];
-        let relu =
-            Relu::new(input_node.output_dims().unwrap().clone()).with_input_node(input_node_id);
+        let relu = Relu::new(input_node.output_dims().clone()).with_input_node(input_node_id);
         self.new(relu.into())
+    }
+
+    fn new_conv2d(
+        &mut self,
+        input_node_id: NodeId,
+        weight_node_id: NodeId,
+        kernel: Dimensions,
+        strides: Dimensions,
+        padding: Dimensions,
+    ) -> NodeId {
+        let input_node = &self.arena()[input_node_id];
+        let weight_node = &self.arena()[weight_node_id];
+        let output_dims = {
+            let h_in = input_node.output_dims().as_slice()[2];
+            let w_in = input_node.output_dims().as_slice()[3];
+            vec![
+                input_node.output_dims().as_slice()[0],
+                weight_node.output_dims().as_slice()[0],
+                (h_in + 2 * padding.as_slice()[0] - 1 * (kernel.as_slice()[0] - 1) - 1)
+                    / strides.as_slice()[0]
+                    + 1,
+                (w_in + 2 * padding.as_slice()[1] - 1 * (kernel.as_slice()[1] - 1) - 1)
+                    / strides.as_slice()[1]
+                    + 1,
+            ]
+        };
+        let conv2d = Conv2d::new(input_node.output_dims().clone(), kernel)
+            .with_input_node(input_node_id)
+            .with_weight_node(weight_node_id, weight_node.output_dims().clone())
+            .with_strides(strides)
+            .with_padding(padding)
+            .with_output_dims(output_dims.into());
+        self.new(conv2d.into())
     }
 }

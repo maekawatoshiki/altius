@@ -32,7 +32,7 @@ fn main() {
     }
 
     let mut correct: i32 = 0;
-    let validation_count = 100;
+    let validation_count = 10000;
     let repeat = 5;
 
     let start = ::std::time::Instant::now();
@@ -57,7 +57,11 @@ fn main() {
     }
 
     let end = start.elapsed();
-    println!("elapsed: {:?}", end / repeat);
+    println!("elapsed: {:?}", end);
+    println!(
+        "fps: {:?}",
+        end / (validation_count * repeat as usize) as u32
+    );
 
     // for (_expected, input) in &inputs {
     //     for x in 0..28 {
@@ -93,19 +97,12 @@ fn mnist(root: &str) -> Model {
             .with_data(read_f32_list_from(Path::new(root).join("conv1").to_str().unwrap()).into())
             .into(),
     );
-    let conv = m.new(
-        Conv2d {
-            input_dims: vec![1, 1, 28, 28].into(),
-            weight_dims: vec![8, 1, 5, 5].into(),
-            weight_node: Some(conv_weight),
-            kernel: vec![5, 5].into(),
-            stride: vec![1, 1].into(),
-            padding: vec![2, 2].into(),
-            output_dims: vec![1, 8, 28, 28].into(),
-            input_node: Some(input),
-            ..Default::default()
-        }
-        .into(),
+    let conv = m.new_conv2d(
+        input,
+        conv_weight,
+        vec![5, 5].into(),
+        vec![1, 1].into(),
+        vec![2, 2].into(),
     );
     let add_input_b = m.new(
         Tensor::new(vec![8, 1, 1].into())
@@ -140,19 +137,12 @@ fn mnist(root: &str) -> Model {
             .with_data(read_f32_list_from(Path::new(root).join("conv2").to_str().unwrap()).into())
             .into(),
     );
-    let conv2 = m.new(
-        Conv2d {
-            input_dims: vec![1, 8, 14, 14].into(),
-            weight_dims: vec![16, 8, 5, 5].into(),
-            kernel: vec![5, 5].into(),
-            stride: vec![1, 1].into(),
-            padding: vec![2, 2].into(),
-            output_dims: vec![1, 16, 14, 14].into(),
-            input_node: Some(max_pool),
-            weight_node: Some(conv2_weight),
-            ..Default::default()
-        }
-        .into(),
+    let conv2 = m.new_conv2d(
+        max_pool,
+        conv2_weight,
+        vec![5, 5].into(),
+        vec![1, 1].into(),
+        vec![2, 2].into(),
     );
     let add2_input_b = m.new(
         Tensor::new(vec![16, 1, 1].into())

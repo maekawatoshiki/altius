@@ -60,7 +60,7 @@ fn main() {
     println!("elapsed: {:?}", end);
     println!(
         "fps: {:?}",
-        end / (validation_count * repeat as usize) as u32
+        (validation_count as f64 * repeat as f64) / end.as_secs_f64()
     );
 
     // for (_expected, input) in &inputs {

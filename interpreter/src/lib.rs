@@ -86,13 +86,11 @@ impl<'a> Interpreter<'a> {
     }
 
     fn run_node_relu(&mut self, node: &Relu) -> Tensor {
-        let input = self.run_node(node.input_node.unwrap());
-
-        let mut output = Tensor::new(node.output_dims().clone());
-        for (i, v) in input.data().into_iter().enumerate() {
-            output.data_mut()[i] = v.max(0.0);
+        let mut t = self.run_node(node.input_node.unwrap());
+        for v in t.data_mut() {
+            *v = v.max(0.0);
         }
-        output
+        t
     }
 
     fn run_node_max_pool(&mut self, node: &MaxPool) -> Tensor {

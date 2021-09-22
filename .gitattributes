@@ -9,3 +9,4 @@ interpreter/examples/mnist/input7 filter=lfs diff=lfs merge=lfs -text
 interpreter/examples/mnist/add1 filter=lfs diff=lfs merge=lfs -text
 interpreter/examples/mnist/add3 filter=lfs diff=lfs merge=lfs -text
 interpreter/examples/mnist/input2 filter=lfs diff=lfs merge=lfs -text
+interpreter/examples/mnist/mnist-8.onnx filter=lfs diff=lfs merge=lfs -text

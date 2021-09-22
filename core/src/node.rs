@@ -68,6 +68,23 @@ pub struct MatMul {
     pub input_b_node: Option<NodeId>,
 }
 
+macro_rules! accessor {
+    ($name:ident, $name_mut:ident, $tyname:ident) => {
+        pub fn $name(&self) -> Option<&$tyname> {
+            match self {
+                Node::$tyname(node) => Some(node),
+                _ => None,
+            }
+        }
+        pub fn $name_mut(&mut self) -> Option<&mut $tyname> {
+            match self {
+                Node::$tyname(node) => Some(node),
+                _ => None,
+            }
+        }
+    };
+}
+
 impl Node {
     pub fn output_dims(&self) -> &Dimensions {
         match self {
@@ -81,6 +98,15 @@ impl Node {
             Self::Input(d) => &d,
         }
     }
+
+    accessor!(as_conv2d, as_conv2d_mut, Conv2d);
+    accessor!(as_add, as_add_mut, Add);
+    accessor!(as_relu, as_relu_mut, Relu);
+    accessor!(as_max_pool, as_max_pool_mut, MaxPool);
+    accessor!(as_reshape, as_reshape_mut, Reshape);
+    accessor!(as_mat_mul, as_mat_mul_mut, MatMul);
+    accessor!(as_tensor, as_tensor_mut, Tensor);
+    // accessor!(as_input, as_input_mut, Input);
 }
 
 impl Conv2d {
@@ -116,6 +142,28 @@ impl Conv2d {
     pub fn with_output_dims(mut self, output_dims: Dimensions) -> Self {
         self.output_dims = output_dims;
         self
+    }
+
+    pub fn calc_output_dims(
+        input: &Dimensions,
+        weight: &Dimensions,
+        kernel: &Dimensions,
+        strides: &Dimensions,
+        padding: &Dimensions,
+    ) -> Dimensions {
+        let h_in = input.as_slice()[2];
+        let w_in = input.as_slice()[3];
+        vec![
+            input.as_slice()[0],
+            weight.as_slice()[0],
+            (h_in + 2 * padding.as_slice()[0] - 1 * (kernel.as_slice()[0] - 1) - 1)
+                / strides.as_slice()[0]
+                + 1,
+            (w_in + 2 * padding.as_slice()[1] - 1 * (kernel.as_slice()[1] - 1) - 1)
+                / strides.as_slice()[1]
+                + 1,
+        ]
+        .into()
     }
 }
 
@@ -203,20 +251,13 @@ pub trait NodeBuilder {
     ) -> NodeId {
         let input_node = &self.arena()[input_node_id];
         let weight_node = &self.arena()[weight_node_id];
-        let output_dims = {
-            let h_in = input_node.output_dims().as_slice()[2];
-            let w_in = input_node.output_dims().as_slice()[3];
-            vec![
-                input_node.output_dims().as_slice()[0],
-                weight_node.output_dims().as_slice()[0],
-                (h_in + 2 * padding.as_slice()[0] - 1 * (kernel.as_slice()[0] - 1) - 1)
-                    / strides.as_slice()[0]
-                    + 1,
-                (w_in + 2 * padding.as_slice()[1] - 1 * (kernel.as_slice()[1] - 1) - 1)
-                    / strides.as_slice()[1]
-                    + 1,
-            ]
-        };
+        let output_dims = Conv2d::calc_output_dims(
+            input_node.output_dims(),
+            weight_node.output_dims(),
+            &kernel,
+            &strides,
+            &padding,
+        );
         let conv2d = Conv2d::new(input_node.output_dims().clone(), kernel)
             .with_input_node(input_node_id)
             .with_weight_node(weight_node_id, weight_node.output_dims().clone())

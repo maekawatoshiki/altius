@@ -1,13 +1,16 @@
 [package]
-name = "altius-interpreter"
+name = "altius-onnx"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 altius-core = { path = "../core" }
+prost = "0.8.0"
+bytes = "1.1.0"
+rustc-hash = "1.1.0"
 
-[dev-dependencies]
-rayon = "*"
-altius-onnx = { path = "../onnx" }
+
+[build-dependencies]
+prost-build = "0.8.0"

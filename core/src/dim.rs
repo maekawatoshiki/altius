@@ -8,8 +8,12 @@ impl Dimensions {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.len() == 0
+    }
+
     pub fn total_elems(&self) -> usize {
-        if self.len() == 0 {
+        if self.is_empty() {
             return 0;
         }
         let mut elems = 1;

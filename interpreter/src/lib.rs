@@ -33,16 +33,16 @@ impl<'a> Interpreter<'a> {
     }
 
     fn run_node_conv2d(&mut self, node: &Conv2d) -> Tensor {
-        let input = self.run_node(node.input_node.unwrap());
-        let weight = self.run_node(node.weight_node.unwrap());
+        let input = self.run_node(node.inputs[0].unwrap());
+        let weight = self.run_node(node.inputs[1].unwrap());
 
         let dilation = 1;
         let group = 1;
-        let in_c_per_g = node.input_dims.as_slice()[1] / group;
+        let in_c_per_g = node.inputs_dims[0].as_slice()[1] / group;
         let out_c_per_g = node.output_dims.as_slice()[1] / group;
 
         let mut output = Tensor::new(node.output_dims.clone());
-        for n in 0..node.input_dims.as_slice()[0] {
+        for n in 0..node.inputs_dims[0].as_slice()[0] {
             for g in 0..group {
                 for d in (g * out_c_per_g)..((g + 1) * out_c_per_g) {
                     let mut x = -(node.padding.as_slice()[0] as isize);
@@ -57,8 +57,8 @@ impl<'a> Interpreter<'a> {
 
                                     if ox < 0
                                         || oy < 0
-                                        || ox >= node.input_dims.as_slice()[2] as isize
-                                        || oy >= node.input_dims.as_slice()[3] as isize
+                                        || ox >= node.inputs_dims[0].as_slice()[2] as isize
+                                        || oy >= node.inputs_dims[0].as_slice()[3] as isize
                                     {
                                         continue;
                                     }
@@ -86,7 +86,7 @@ impl<'a> Interpreter<'a> {
     }
 
     fn run_node_relu(&mut self, node: &Relu) -> Tensor {
-        let mut t = self.run_node(node.input_node.unwrap());
+        let mut t = self.run_node(node.input.unwrap());
         for v in t.data_mut() {
             *v = v.max(0.0);
         }
@@ -94,7 +94,7 @@ impl<'a> Interpreter<'a> {
     }
 
     fn run_node_max_pool(&mut self, node: &MaxPool) -> Tensor {
-        let input = self.run_node(node.input_node.unwrap());
+        let input = self.run_node(node.input.unwrap());
 
         assert!(node.input_dims.len() == 4);
         assert!(node.output_dims.len() == 4);
@@ -138,17 +138,17 @@ impl<'a> Interpreter<'a> {
     }
 
     fn run_node_reshape(&mut self, node: &Reshape) -> Tensor {
-        let input = self.run_node(node.input_node.unwrap());
+        let input = self.run_node(node.input.unwrap());
         input.reshape_into(node.output_dims.clone())
     }
 
     fn run_node_mat_mul(&mut self, node: &MatMul) -> Tensor {
-        let input_a = self.run_node(node.input_a_node.unwrap());
-        let input_b = self.run_node(node.input_b_node.unwrap());
+        let input_a = self.run_node(node.inputs[0].unwrap());
+        let input_b = self.run_node(node.inputs[1].unwrap());
 
-        assert!(node.input_a_dims.len() == 2);
-        assert!(node.input_b_dims.len() == 2);
-        assert!(node.input_a_dims.as_slice()[1] == node.input_b_dims.as_slice()[0]);
+        assert!(node.inputs_dims[0].len() == 2);
+        assert!(node.inputs_dims[1].len() == 2);
+        assert!(node.inputs_dims[0].as_slice()[1] == node.inputs_dims[1].as_slice()[0]);
 
         let mut output = Tensor::new(node.output_dims.clone());
         for i in 0..input_a.dims().as_slice()[0] {
@@ -164,10 +164,10 @@ impl<'a> Interpreter<'a> {
     }
 
     fn run_node_add(&mut self, node: &Add) -> Tensor {
-        let input_a = self.run_node(node.input_a_node.unwrap());
-        let input_b = self.run_node(node.input_b_node.unwrap());
+        let input_a = self.run_node(node.inputs[0].unwrap());
+        let input_b = self.run_node(node.inputs[1].unwrap());
 
-        if node.input_a_dims == node.input_b_dims {
+        if node.inputs_dims[0] == node.inputs_dims[1] {
             let mut output = Tensor::new(node.output_dims.clone());
             for (i, (a, b)) in input_a.data().iter().zip(input_b.data().iter()).enumerate() {
                 output.data_mut()[i] = a + b;
@@ -175,16 +175,16 @@ impl<'a> Interpreter<'a> {
             return output;
         }
 
-        if node.input_a_dims.len() == 4 && node.input_b_dims.len() == 3 {
-            assert!(node.input_a_dims.as_slice()[1] == node.input_b_dims.as_slice()[0]);
-            assert!(node.input_b_dims.as_slice()[1] == 1);
-            assert!(node.input_b_dims.as_slice()[2] == 1);
+        if node.inputs_dims[0].len() == 4 && node.inputs_dims[1].len() == 3 {
+            assert!(node.inputs_dims[0].as_slice()[1] == node.inputs_dims[1].as_slice()[0]);
+            assert!(node.inputs_dims[1].as_slice()[1] == 1);
+            assert!(node.inputs_dims[1].as_slice()[2] == 1);
 
             let mut output = Tensor::new(node.output_dims.clone());
-            for n in 0..node.input_a_dims.as_slice()[0] {
-                for z in 0..node.input_a_dims.as_slice()[1] {
-                    for x in 0..node.input_a_dims.as_slice()[2] {
-                        for y in 0..node.input_a_dims.as_slice()[3] {
+            for n in 0..node.inputs_dims[0].as_slice()[0] {
+                for z in 0..node.inputs_dims[0].as_slice()[1] {
+                    for x in 0..node.inputs_dims[0].as_slice()[2] {
+                        for y in 0..node.inputs_dims[0].as_slice()[3] {
                             *output.at_4d_mut(n, z, x, y) =
                                 input_a.at_4d(n, z, x, y) + input_b.at_3d(z, 0, 0);
                         }

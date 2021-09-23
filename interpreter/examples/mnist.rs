@@ -32,7 +32,7 @@ fn main() {
     }
 
     let mut correct: i32 = 0;
-    let validation_count = 10000;
+    let validation_count = 1000;
     let repeat = 5;
 
     let start = ::std::time::Instant::now();

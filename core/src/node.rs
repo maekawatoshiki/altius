@@ -7,7 +7,7 @@ pub type NodeArena = Arena<Node>;
 pub type Node2Id = Id<Node2>;
 pub type Node2Arena = Arena<Node2>;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Node2 {
     pub op: Op,
     pub attrs: Vec<Attr>,
@@ -23,8 +23,6 @@ pub enum Op {
     MaxPool,
     Reshape,
     MatMul,
-    Const,
-    Input,
 }
 
 #[derive(Debug, Clone)]
@@ -74,7 +72,9 @@ impl Node2 {
     pub fn new(op: Op) -> Self {
         Self {
             op,
-            ..Self::default()
+            attrs: Vec::new(),
+            inputs: Vec::new(),
+            outputs: Vec::new(),
         }
     }
 
@@ -97,17 +97,75 @@ impl Node2 {
         let id = arena.alloc(self);
         id
     }
+
+    pub fn compute_output_shapes(&self, input_shapes: &[Dimensions]) -> Vec<Dimensions> {
+        let mut shapes = vec![];
+        match self.op {
+            Op::Conv2d => {
+                let Attr::Shape(kernel) = &self.attrs[Self::CONV2D_ATTR_KERNEL];
+                let Attr::Shape(stride) = &self.attrs[Self::CONV2D_ATTR_STRIDE];
+                let Attr::Shape(padding) = &self.attrs[Self::CONV2D_ATTR_PADDING];
+                let input = &input_shapes[Self::CONV2D_IN];
+                let weight = &input_shapes[Self::CONV2D_WEIGHT];
+
+                let h_in = input.as_slice()[2];
+                let w_in = input.as_slice()[3];
+                let output_shape = vec![
+                    input.as_slice()[0],
+                    weight.as_slice()[0],
+                    (h_in + 2 * padding.as_slice()[0] - 1 * (kernel.as_slice()[0] - 1) - 1)
+                        / stride.as_slice()[0]
+                        + 1,
+                    (w_in + 2 * padding.as_slice()[1] - 1 * (kernel.as_slice()[1] - 1) - 1)
+                        / stride.as_slice()[1]
+                        + 1,
+                ];
+                shapes.push(output_shape.into());
+            }
+            Op::Add => {
+                let in_a = &input_shapes[Self::ADD_IN_A];
+                let in_b = &input_shapes[Self::ADD_IN_B];
+                assert_eq!(in_a, in_b);
+                shapes.push(in_a.clone());
+            }
+            Op::MaxPool => {
+                let Attr::Shape(kernel) = &self.attrs[Self::MAXPOOL_ATTR_KERNEL];
+                let Attr::Shape(stride) = &self.attrs[Self::MAXPOOL_ATTR_STRIDE];
+                let input = &input_shapes[Self::MAXPOOL_IN];
+
+                let h_in = input.as_slice()[2];
+                let w_in = input.as_slice()[3];
+                let output_shape = vec![
+                    input.as_slice()[0],
+                    input.as_slice()[1],
+                    (h_in + 2 * 0 - 1 * (kernel.as_slice()[0] - 1) - 1) / stride.as_slice()[0] + 1,
+                    (w_in + 2 * 0 - 1 * (kernel.as_slice()[1] - 1) - 1) / stride.as_slice()[1] + 1,
+                ];
+                shapes.push(output_shape.into());
+                todo!()
+            }
+            Op::Reshape => {
+                let input = &input_shapes[Self::RESHAPE_IN];
+                shapes.push(input.clone());
+            }
+            Op::MatMul => {
+                let in_a = &input_shapes[Self::MATMUL_IN_A];
+                let in_b = &input_shapes[Self::MATMUL_IN_B];
+                assert_eq!(in_a.as_slice()[1], in_b.as_slice()[0]);
+                shapes.push(vec![in_a.as_slice()[0], in_b.as_slice()[1]].into());
+            }
+            Op::ReLU => {
+                let input = &input_shapes[Self::RELU_IN];
+                shapes.push(input.clone());
+            }
+        }
+        shapes
+    }
 }
 
 impl From<Vec<usize>> for Attr {
     fn from(v: Vec<usize>) -> Self {
         Attr::Shape(Dimensions(v))
-    }
-}
-
-impl Default for Op {
-    fn default() -> Self {
-        Op::Input
     }
 }
 

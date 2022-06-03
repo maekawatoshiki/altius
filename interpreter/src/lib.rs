@@ -1,10 +1,10 @@
 use altius_core::{
     model::{Model, Model2},
-    node::{Add, Conv2d, MatMul, MaxPool, Node, Node2Id, NodeBuilder, NodeId, Relu, Reshape},
+    node::{Add, Conv2d, MatMul, MaxPool, Node, NodeBuilder, NodeId, Relu, Reshape},
     tensor::{Tensor, Tensor2},
     value::ValueId,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 pub struct Interpreter2<'a> {
     model: &'a Model2,
@@ -23,16 +23,13 @@ impl<'a> Interpreter2<'a> {
         assert!(self.model.inputs.len() == 1);
         assert!(self.model.outputs.len() == 1);
 
+        // Set input & initializer values.
         self.values.insert(self.model.inputs[0], input);
-        self.init_consts();
+        self.values.extend(self.model.inits.clone().into_iter());
 
-        // let _ = self.topo_sort_nodes();
+        let _sorted_nodes = self.model.topo_sort_nodes();
 
         todo!()
-    }
-
-    fn init_consts(&mut self) {
-        self.values.extend(self.model.consts.clone().into_iter());
     }
 }
 

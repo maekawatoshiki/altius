@@ -1,9 +1,9 @@
 use crate::{
-    node::{Node2Arena, NodeArena, NodeBuilder, NodeId},
+    node::{Node2Arena, Node2Id, NodeArena, NodeBuilder, NodeId},
     tensor::Tensor2,
     value::{ValueArena, ValueId},
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 pub struct Model {
     nodes: NodeArena,
@@ -18,6 +18,20 @@ pub struct Model2 {
     pub consts: FxHashMap<ValueId, Tensor2>,
     pub inputs: Vec<ValueId>,
     pub outputs: Vec<ValueId>,
+}
+
+impl Model2 {
+    pub fn get_value_users(&self) -> FxHashMap<ValueId, FxHashSet<Node2Id>> {
+        let mut value_users: FxHashMap<ValueId, FxHashSet<Node2Id>> = FxHashMap::default();
+
+        for (node_id, node) in self.nodes.iter() {
+            for &input in node.inputs.iter() {
+                value_users.entry(input).or_default().insert(node_id);
+            }
+        }
+
+        value_users
+    }
 }
 
 impl Model {

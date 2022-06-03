@@ -1,4 +1,8 @@
-use crate::{dim::Dimensions, tensor::Tensor, value::ValueId};
+use crate::{
+    dim::Dimensions,
+    tensor::{Tensor, Tensor2},
+    value::ValueId,
+};
 use id_arena::{Arena, Id};
 
 pub type NodeId = Id<Node>;
@@ -98,15 +102,15 @@ impl Node2 {
         id
     }
 
-    pub fn compute_output_shapes(&self, input_shapes: &[Dimensions]) -> Vec<Dimensions> {
+    pub fn compute_output_shapes(&self, inputs: &[Tensor2]) -> Vec<Dimensions> {
         let mut shapes = vec![];
         match self.op {
             Op::Conv2d => {
                 let Attr::Shape(kernel) = &self.attrs[Self::CONV2D_ATTR_KERNEL];
                 let Attr::Shape(stride) = &self.attrs[Self::CONV2D_ATTR_STRIDE];
                 let Attr::Shape(padding) = &self.attrs[Self::CONV2D_ATTR_PADDING];
-                let input = &input_shapes[Self::CONV2D_IN];
-                let weight = &input_shapes[Self::CONV2D_WEIGHT];
+                let input = inputs[Self::CONV2D_IN].dims();
+                let weight = inputs[Self::CONV2D_WEIGHT].dims();
 
                 let h_in = input.as_slice()[2];
                 let w_in = input.as_slice()[3];
@@ -123,15 +127,23 @@ impl Node2 {
                 shapes.push(output_shape.into());
             }
             Op::Add => {
-                let in_a = &input_shapes[Self::ADD_IN_A];
-                // let in_b = &input_shapes[Self::ADD_IN_B];
-                // assert_eq!(in_a, in_b);
+                let in_a = inputs[Self::ADD_IN_A].dims();
+                let in_b = inputs[Self::ADD_IN_B].dims();
+                assert!(
+                    in_a == in_b || {
+                        in_a.len() == 4
+                            && in_b.len() == 3
+                            && in_a.as_slice()[1] == in_b.as_slice()[0]
+                            && in_b.as_slice()[1] == 1
+                            && in_b.as_slice()[2] == 1
+                    }
+                ); // TODO: Support broadcasting.
                 shapes.push(in_a.clone());
             }
             Op::MaxPool => {
                 let Attr::Shape(kernel) = &self.attrs[Self::MAXPOOL_ATTR_KERNEL];
                 let Attr::Shape(stride) = &self.attrs[Self::MAXPOOL_ATTR_STRIDE];
-                let input = &input_shapes[Self::MAXPOOL_IN];
+                let input = &inputs[Self::MAXPOOL_IN].dims();
 
                 let h_in = input.as_slice()[2];
                 let w_in = input.as_slice()[3];
@@ -144,17 +156,23 @@ impl Node2 {
                 shapes.push(output_shape.into());
             }
             Op::Reshape => {
-                let input = &input_shapes[Self::RESHAPE_IN];
-                shapes.push(input.clone());
+                let shape = inputs[Self::RESHAPE_SHAPE]
+                    .data()
+                    .as_i64()
+                    .unwrap()
+                    .iter()
+                    .map(|&x| x as usize)
+                    .collect::<Vec<_>>();
+                shapes.push(shape.into());
             }
             Op::MatMul => {
-                let in_a = &input_shapes[Self::MATMUL_IN_A];
-                let in_b = &input_shapes[Self::MATMUL_IN_B];
+                let in_a = &inputs[Self::MATMUL_IN_A].dims();
+                let in_b = &inputs[Self::MATMUL_IN_B].dims();
                 assert_eq!(in_a.as_slice()[1], in_b.as_slice()[0]);
                 shapes.push(vec![in_a.as_slice()[0], in_b.as_slice()[1]].into());
             }
             Op::ReLU => {
-                let input = &input_shapes[Self::RELU_IN];
+                let input = inputs[Self::RELU_IN].dims();
                 shapes.push(input.clone());
             }
         }

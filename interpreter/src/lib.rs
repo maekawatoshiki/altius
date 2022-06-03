@@ -42,12 +42,7 @@ impl<'a> Interpreter2<'a> {
         for input in node.inputs.iter() {
             inputs.push(self.values[input].clone());
         }
-        let shapes = inputs
-            .iter()
-            .map(Tensor2::dims)
-            .cloned()
-            .collect::<Vec<_>>();
-        let output_shapes = node.compute_output_shapes(&shapes);
+        let output_shapes = node.compute_output_shapes(&inputs);
 
         // TODO: Actual kernel runs here!
 

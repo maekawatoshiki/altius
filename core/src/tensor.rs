@@ -1,5 +1,85 @@
 use crate::dim::{Dimension, Dimensions};
 
+#[derive(Debug, Clone)]
+pub struct Tensor2 {
+    dims: Dimensions,
+    stride: Dimensions,
+    data: TensorData2,
+}
+
+#[derive(Debug, Clone)]
+pub enum TensorData2 {
+    F32(Vec<f32>),
+    I64(Vec<i64>),
+}
+
+impl TensorData2 {
+    pub fn new_raw_f32(data: Vec<f32>) -> Self {
+        Self::F32(data)
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::F32(data) => data.len(),
+            Self::I64(data) => data.len(),
+        }
+    }
+
+    pub fn as_f32(&self) -> Option<&[f32]> {
+        match self {
+            Self::F32(data) => Some(data.as_slice()),
+            _ => None,
+        }
+    }
+
+    pub fn as_i64(&self) -> Option<&[i64]> {
+        match self {
+            Self::I64(data) => Some(data.as_slice()),
+            _ => None,
+        }
+    }
+}
+
+impl Tensor2 {
+    pub fn new(dims: Dimensions) -> Self {
+        Self {
+            stride: compute_strides(&dims),
+            data: TensorData2::F32(vec![]),
+            dims,
+        }
+    }
+
+    pub fn with_data(mut self, data: TensorData2) -> Self {
+        self.data = data;
+        #[cfg(debug_assertions)]
+        assert!(self.verify());
+        self
+    }
+
+    pub fn reshape_into(mut self, dims: Dimensions) -> Self {
+        self.stride = compute_strides(&dims);
+        self.dims = dims;
+        debug_assert!(self.verify());
+        self
+    }
+
+    pub fn verify(&self) -> bool {
+        self.data.len() == self.dims.total_elems()
+    }
+}
+
+impl From<Vec<f32>> for TensorData2 {
+    fn from(data: Vec<f32>) -> Self {
+        Self::F32(data)
+    }
+}
+
+impl From<Vec<i64>> for TensorData2 {
+    fn from(data: Vec<i64>) -> Self {
+        Self::I64(data)
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Tensor {
     dims: Dimensions,

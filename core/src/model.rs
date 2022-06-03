@@ -1,7 +1,9 @@
 use crate::{
     node::{Node2Arena, NodeArena, NodeBuilder, NodeId},
+    tensor::Tensor2,
     value::{ValueArena, ValueId},
 };
+use rustc_hash::FxHashMap;
 
 pub struct Model {
     nodes: NodeArena,
@@ -13,6 +15,7 @@ pub struct Model {
 pub struct Model2 {
     pub nodes: Node2Arena,
     pub values: ValueArena,
+    pub consts: FxHashMap<ValueId, Tensor2>,
     pub inputs: Vec<ValueId>,
     pub outputs: Vec<ValueId>,
 }
@@ -142,6 +145,13 @@ fn mnist_model2() {
 
     m.inputs.push(conv0_in);
     m.outputs.push(add2_out);
+
+    m.consts
+        .insert(add0_const, Tensor2::new(vec![8, 1, 5, 5].into()));
+    m.consts.insert(
+        reshape0_const,
+        Tensor2::new(vec![2].into()).with_data(vec![1, 256].into()),
+    );
 }
 
 #[test]

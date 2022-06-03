@@ -17,7 +17,7 @@ impl Tensor2 {
     pub fn new(dims: Dimensions) -> Self {
         Self {
             stride: compute_strides(&dims),
-            data: TensorData2::F32(vec![]),
+            data: TensorData2::F32(vec![0.0; dims.total_elems()]),
             dims,
         }
     }
@@ -36,12 +36,73 @@ impl Tensor2 {
         self
     }
 
+    pub fn at(&self, indices: &[Dimension]) -> f32 {
+        let mut index = 0;
+        for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
+            index += d * idx;
+        }
+        self.data.as_f32().unwrap()[index]
+    }
+
+    pub fn at_mut(&mut self, indices: &[Dimension]) -> &mut f32 {
+        let mut index = 0;
+        for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
+            index += d * idx;
+        }
+        &mut self.data.as_f32_mut().unwrap()[index]
+    }
+
+    pub fn at_2d(&self, x: Dimension, y: Dimension) -> f32 {
+        self.data.as_f32().unwrap()[self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y]
+    }
+
+    pub fn at_2d_mut(&mut self, x: Dimension, y: Dimension) -> &mut f32 {
+        &mut self.data.as_f32_mut().unwrap()
+            [self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y]
+    }
+
+    pub fn at_3d(&self, x: Dimension, y: Dimension, z: Dimension) -> f32 {
+        self.data.as_f32().unwrap()[self.stride.as_slice()[0] * x
+            + self.stride.as_slice()[1] * y
+            + self.stride.as_slice()[2] * z]
+    }
+
+    pub fn at_3d_mut(&mut self, x: Dimension, y: Dimension, z: Dimension) -> &mut f32 {
+        &mut self.data.as_f32_mut().unwrap()[self.stride.as_slice()[0] * x
+            + self.stride.as_slice()[1] * y
+            + self.stride.as_slice()[2] * z]
+    }
+
+    pub fn at_4d(&self, x: Dimension, y: Dimension, z: Dimension, u: Dimension) -> f32 {
+        self.data.as_f32().unwrap()[self.stride.as_slice()[0] * x
+            + self.stride.as_slice()[1] * y
+            + self.stride.as_slice()[2] * z
+            + self.stride.as_slice()[3] * u]
+    }
+
+    pub fn at_4d_mut(
+        &mut self,
+        x: Dimension,
+        y: Dimension,
+        z: Dimension,
+        u: Dimension,
+    ) -> &mut f32 {
+        &mut self.data.as_f32_mut().unwrap()[self.stride.as_slice()[0] * x
+            + self.stride.as_slice()[1] * y
+            + self.stride.as_slice()[2] * z
+            + self.stride.as_slice()[3] * u]
+    }
+
     pub fn dims(&self) -> &Dimensions {
         &self.dims
     }
 
     pub fn data(&self) -> &TensorData2 {
         &self.data
+    }
+
+    pub fn data_mut(&mut self) -> &mut TensorData2 {
+        &mut self.data
     }
 
     pub fn verify(&self) -> bool {
@@ -68,9 +129,23 @@ impl TensorData2 {
         }
     }
 
+    pub fn as_f32_mut(&mut self) -> Option<&mut [f32]> {
+        match self {
+            Self::F32(data) => Some(data),
+            _ => None,
+        }
+    }
+
     pub fn as_i64(&self) -> Option<&[i64]> {
         match self {
             Self::I64(data) => Some(data.as_slice()),
+            _ => None,
+        }
+    }
+
+    pub fn as_i64_mut(&mut self) -> Option<&mut [i64]> {
+        match self {
+            Self::I64(data) => Some(data),
             _ => None,
         }
     }

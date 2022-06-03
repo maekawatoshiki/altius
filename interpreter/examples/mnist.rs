@@ -34,14 +34,14 @@ fn main() {
     }
 
     let mut correct: i32 = 0;
-    let validation_count = 100;
+    let validation_count = 10000;
     let repeat = 1;
 
     let start = ::std::time::Instant::now();
 
     for _ in 0..repeat {
         correct = inputs
-            .iter()
+            .par_iter()
             .take(validation_count)
             .map(|(expected, input)| {
                 let mut i = Interpreter2::new(&mnist);
@@ -49,6 +49,7 @@ fn main() {
                 let inferred = v
                     .data()
                     .as_f32()
+                    .unwrap()
                     .iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))

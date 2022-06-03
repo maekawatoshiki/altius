@@ -1,6 +1,6 @@
 use altius_core::{
     model::{Model, Model2},
-    node::{Add, Conv2d, MatMul, MaxPool, Node, Node2Id, NodeBuilder, NodeId, Op, Relu, Reshape},
+    node::{Add, Conv2d, MatMul, MaxPool, Node, Node2Id, NodeBuilder, NodeId, Relu, Reshape},
     tensor::{Tensor, Tensor2},
     value::ValueId,
 };
@@ -38,9 +38,21 @@ impl<'a> Interpreter2<'a> {
 
     fn run_node(&mut self, node: Node2Id) {
         let node = &self.model.nodes[node];
-        match node.op {
-            Op::Conv2d => {}
-            _ => {}
+        let mut inputs = vec![];
+        for input in node.inputs.iter() {
+            inputs.push(self.values[input].clone());
+        }
+        let shapes = inputs
+            .iter()
+            .map(Tensor2::dims)
+            .cloned()
+            .collect::<Vec<_>>();
+        let output_shapes = node.compute_output_shapes(&shapes);
+
+        // TODO: Actual kernel runs here!
+
+        for (&output, shape) in node.outputs.iter().zip(output_shapes.into_iter()) {
+            self.values.insert(output, Tensor2::new(shape));
         }
     }
 }

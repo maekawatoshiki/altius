@@ -63,6 +63,10 @@ impl Tensor2 {
         self
     }
 
+    pub fn dims(&self) -> &Dimensions {
+        &self.dims
+    }
+
     pub fn verify(&self) -> bool {
         self.data.len() == self.dims.total_elems()
     }

@@ -1,8 +1,60 @@
+use std::collections::VecDeque;
+
 use altius_core::{
-    model::Model,
+    model::{Model, Model2},
     node::{Add, Conv2d, MatMul, MaxPool, Node, NodeBuilder, NodeId, Relu, Reshape},
-    tensor::Tensor,
+    tensor::{Tensor, Tensor2},
+    value::ValueId,
 };
+use rustc_hash::FxHashMap;
+
+pub struct Interpreter2<'a> {
+    model: &'a Model2,
+    values: FxHashMap<ValueId, Tensor2>,
+}
+
+impl<'a> Interpreter2<'a> {
+    pub fn new(model: &'a Model2) -> Self {
+        Interpreter2 {
+            model,
+            values: FxHashMap::default(),
+        }
+    }
+
+    pub fn run(&mut self, input: Tensor2) -> Tensor2 {
+        assert!(self.model.inputs.len() == 1);
+        assert!(self.model.outputs.len() == 1);
+
+        self.values.insert(self.model.inputs[0], input);
+        self.init_consts();
+
+        let _ = self.topo_sort_nodes();
+
+        todo!()
+    }
+
+    fn init_consts(&mut self) {
+        self.values.extend(self.model.consts.clone().into_iter());
+    }
+
+    fn topo_sort_nodes(&mut self) -> Vec<NodeId> {
+        // let mut nodes = vec![];
+        // let mut num_node_inputs = FxHashMap::default();
+        // let mut que = VecDeque::new();
+        //
+        // for (id, node) in self.model.nodes.iter() {
+        //     // for &input in node.inputs.iter() {}
+        //     // node.inputs
+        //     num_node_inputs.insert(id, node.inputs.len());
+        // }
+        //
+        // while let Some(id) = que.pop_front() {
+        //     nodes.push(id);
+        // }
+
+        todo!()
+    }
+}
 
 pub struct Interpreter<'a> {
     model: &'a Model,

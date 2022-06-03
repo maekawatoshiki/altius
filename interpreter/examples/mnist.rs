@@ -1,6 +1,6 @@
 use altius_core::model::Model2;
 use altius_core::{model::Model, node::*, tensor::*};
-use altius_interpreter::Interpreter;
+use altius_interpreter::Interpreter2;
 use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::env::args;
@@ -10,8 +10,8 @@ use std::path::Path;
 
 fn main() {
     let model_root = &args().collect::<Vec<String>>()[1];
-    let _mnist = mnist2(model_root);
-    let mnist = mnist(model_root);
+    let mnist = mnist2(model_root);
+    // let mnist = mnist(model_root);
 
     let mut inputs = vec![];
     for line in fs::read_to_string(Path::new(model_root).join("MNIST_test.txt"))
@@ -23,7 +23,7 @@ fn main() {
         }
         let nums: Vec<&str> = line.split(",").collect();
         let expected: i32 = nums[0].parse().unwrap();
-        let pixels: Tensor = Tensor::new(vec![1, 1, 28, 28].into()).with_data(
+        let pixels: Tensor2 = Tensor2::new(vec![1, 1, 28, 28].into()).with_data(
             nums[1..]
                 .iter()
                 .map(|s| s.parse::<f32>().unwrap() / 255.0)
@@ -35,19 +35,20 @@ fn main() {
 
     let mut correct: i32 = 0;
     let validation_count = 100;
-    let repeat = 5;
+    let repeat = 1;
 
     let start = ::std::time::Instant::now();
 
     for _ in 0..repeat {
         correct = inputs
-            .par_iter()
+            .iter()
             .take(validation_count)
             .map(|(expected, input)| {
-                let mut i = Interpreter::new(&mnist, input.clone());
-                let v = i.run();
+                let mut i = Interpreter2::new(&mnist);
+                let v = i.run(input.clone());
                 let inferred = v
                     .data()
+                    .as_f32()
                     .iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
@@ -100,7 +101,7 @@ fn mnist2(root: &str) -> Model2 {
     let _conv0 = Node2::new(Op::Conv2d)
         .with_attr(vec![5, 5].into())
         .with_attr(vec![1, 1].into())
-        .with_attr(vec![].into())
+        .with_attr(vec![2, 2].into())
         .with_in(conv0_in)
         .with_in(conv0_weight)
         .with_out(conv0_out)

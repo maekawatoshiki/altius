@@ -13,33 +13,6 @@ pub enum TensorData2 {
     I64(Vec<i64>),
 }
 
-impl TensorData2 {
-    pub fn new_raw_f32(data: Vec<f32>) -> Self {
-        Self::F32(data)
-    }
-
-    pub fn len(&self) -> usize {
-        match self {
-            Self::F32(data) => data.len(),
-            Self::I64(data) => data.len(),
-        }
-    }
-
-    pub fn as_f32(&self) -> Option<&[f32]> {
-        match self {
-            Self::F32(data) => Some(data.as_slice()),
-            _ => None,
-        }
-    }
-
-    pub fn as_i64(&self) -> Option<&[i64]> {
-        match self {
-            Self::I64(data) => Some(data.as_slice()),
-            _ => None,
-        }
-    }
-}
-
 impl Tensor2 {
     pub fn new(dims: Dimensions) -> Self {
         Self {
@@ -67,8 +40,39 @@ impl Tensor2 {
         &self.dims
     }
 
+    pub fn data(&self) -> &TensorData2 {
+        &self.data
+    }
+
     pub fn verify(&self) -> bool {
         self.data.len() == self.dims.total_elems()
+    }
+}
+
+impl TensorData2 {
+    pub fn new_raw_f32(data: Vec<f32>) -> Self {
+        Self::F32(data)
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::F32(data) => data.len(),
+            Self::I64(data) => data.len(),
+        }
+    }
+
+    pub fn as_f32(&self) -> Option<&[f32]> {
+        match self {
+            Self::F32(data) => Some(data.as_slice()),
+            _ => None,
+        }
+    }
+
+    pub fn as_i64(&self) -> Option<&[i64]> {
+        match self {
+            Self::I64(data) => Some(data.as_slice()),
+            _ => None,
+        }
     }
 }
 

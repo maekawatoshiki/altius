@@ -1,0 +1,43 @@
+---
+source: core/src/model.rs
+assertion_line: 236
+expression: order
+---
+[
+    Id {
+        idx: 0,
+    },
+    Id {
+        idx: 1,
+    },
+    Id {
+        idx: 2,
+    },
+    Id {
+        idx: 3,
+    },
+    Id {
+        idx: 4,
+    },
+    Id {
+        idx: 5,
+    },
+    Id {
+        idx: 6,
+    },
+    Id {
+        idx: 7,
+    },
+    Id {
+        idx: 8,
+    },
+    Id {
+        idx: 9,
+    },
+    Id {
+        idx: 10,
+    },
+    Id {
+        idx: 11,
+    },
+]

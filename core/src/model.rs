@@ -4,7 +4,6 @@ use crate::{
     value::{ValueArena, ValueId},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::VecDeque;
 
 pub struct Model {
     nodes: NodeArena,
@@ -39,21 +38,19 @@ impl Model2 {
 
         let mut nodes = vec![];
         let mut num_node_inputs = FxHashMap::default();
-        let mut que = VecDeque::new();
+        let mut que = vec![];
 
-        let inits = self.inits.keys().copied().collect::<FxHashSet<_>>();
+        let mut consts = self.inits.keys().copied().collect::<FxHashSet<_>>();
+        consts.insert(self.inputs[0]);
         for (id, node) in self.nodes.iter() {
-            let inputs = &node.inputs.clone().into_iter().collect::<FxHashSet<_>>() - &inits;
+            let inputs = &node.inputs.clone().into_iter().collect::<FxHashSet<_>>() - &consts;
             num_node_inputs.insert(id, inputs.len());
+            if inputs.is_empty() {
+                que.push(id);
+            }
         }
 
-        for &user in value_users[&self.inputs[0]].iter() {
-            que.push_front(user)
-        }
-
-        assert!(que.len() == 1);
-
-        while let Some(id) = que.pop_front() {
+        while let Some(id) = que.pop() {
             nodes.push(id);
             for output in self.nodes[id].outputs.iter() {
                 if self.outputs.contains(output) {
@@ -62,7 +59,7 @@ impl Model2 {
                 for n in value_users[output].iter() {
                     *num_node_inputs.get_mut(n).unwrap() -= 1;
                     if *num_node_inputs.get(n).unwrap() == 0 {
-                        que.push_front(*n);
+                        que.push(*n);
                     }
                 }
             }
@@ -174,19 +171,19 @@ fn mnist_model2() {
         .with_out(reshape0_out)
         .alloc(&mut m.nodes);
 
-    let reshape1_const = m.values.new_val();
+    let reshape1_const0 = m.values.new_val();
+    let reshape1_const1 = m.values.new_val();
     let reshape1_out = m.values.new_val();
     let _reshape1 = Node2::new(Op::Reshape)
-        .with_in(reshape0_out)
-        .with_in(reshape1_const)
+        .with_in(reshape1_const0)
+        .with_in(reshape1_const1)
         .with_out(reshape1_out)
         .alloc(&mut m.nodes);
 
-    let matmul0_const = m.values.new_val();
     let matmul0_out = m.values.new_val();
     let _matmul0 = Node2::new(Op::MatMul)
+        .with_in(reshape0_out)
         .with_in(reshape1_out)
-        .with_in(matmul0_const)
         .with_out(matmul0_out)
         .alloc(&mut m.nodes);
 
@@ -215,16 +212,18 @@ fn mnist_model2() {
         reshape0_const,
         Tensor2::new(vec![2].into()).with_data(vec![1, 256].into()),
     );
+    m.inits
+        .insert(reshape1_const0, Tensor2::new(vec![16, 4, 4, 10].into()));
     m.inits.insert(
-        reshape1_const,
-        Tensor2::new(vec![2].into()).with_data(vec![256, 10].into()),
-    );
-    m.inits.insert(
-        matmul0_const,
+        reshape1_const1,
         Tensor2::new(vec![2].into()).with_data(vec![256, 10].into()),
     );
 
     let order = m.topo_sort_nodes();
+    // println!(
+    //     "{:#?}",
+    //     order.iter().map(|&n| m.nodes[n].op).collect::<Vec<_>>()
+    // );
     insta::assert_debug_snapshot!(order);
 }
 

@@ -1,9 +1,12 @@
 ---
 source: core/src/model.rs
-assertion_line: 236
+assertion_line: 228
 expression: order
 ---
 [
+    Id {
+        idx: 9,
+    },
     Id {
         idx: 0,
     },
@@ -30,9 +33,6 @@ expression: order
     },
     Id {
         idx: 8,
-    },
-    Id {
-        idx: 9,
     },
     Id {
         idx: 10,

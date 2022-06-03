@@ -38,6 +38,8 @@ impl<'a> Interpreter2<'a> {
     }
 
     fn topo_sort_nodes(&mut self) -> Vec<NodeId> {
+        let value_users = self.model.get_value_users();
+
         // let mut nodes = vec![];
         // let mut num_node_inputs = FxHashMap::default();
         // let mut que = VecDeque::new();

@@ -1,11 +1,10 @@
-use std::collections::VecDeque;
-
 use crate::{
     node::{Node2Arena, Node2Id, NodeArena, NodeBuilder, NodeId},
     tensor::Tensor2,
     value::{ValueArena, ValueId},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::VecDeque;
 
 pub struct Model {
     nodes: NodeArena,
@@ -17,7 +16,7 @@ pub struct Model {
 pub struct Model2 {
     pub nodes: Node2Arena,
     pub values: ValueArena,
-    pub consts: FxHashMap<ValueId, Tensor2>,
+    pub inits: FxHashMap<ValueId, Tensor2>,
     pub inputs: Vec<ValueId>,
     pub outputs: Vec<ValueId>,
 }
@@ -35,14 +34,14 @@ impl Model2 {
         value_users
     }
 
-    pub fn topo_sort_nodes(&mut self) -> Vec<Node2Id> {
+    pub fn topo_sort_nodes(&self) -> Vec<Node2Id> {
         let value_users = self.get_value_users();
 
         let mut nodes = vec![];
         let mut num_node_inputs = FxHashMap::default();
         let mut que = VecDeque::new();
 
-        let inits = self.consts.keys().copied().collect::<FxHashSet<_>>();
+        let inits = self.inits.keys().copied().collect::<FxHashSet<_>>();
         for (id, node) in self.nodes.iter() {
             let inputs = &node.inputs.clone().into_iter().collect::<FxHashSet<_>>() - &inits;
             num_node_inputs.insert(id, inputs.len());
@@ -202,25 +201,25 @@ fn mnist_model2() {
     m.inputs.push(conv0_in);
     m.outputs.push(add2_out);
 
-    m.consts
+    m.inits
         .insert(add0_const, Tensor2::new(vec![8, 1, 5, 5].into()));
-    m.consts
+    m.inits
         .insert(add1_const, Tensor2::new(vec![8, 1, 1].into()));
-    m.consts
+    m.inits
         .insert(add2_const, Tensor2::new(vec![16, 1, 1].into()));
-    m.consts
+    m.inits
         .insert(conv0_weight, Tensor2::new(vec![8, 1, 5, 5].into()));
-    m.consts
+    m.inits
         .insert(conv1_weight, Tensor2::new(vec![16, 8, 5, 5].into()));
-    m.consts.insert(
+    m.inits.insert(
         reshape0_const,
         Tensor2::new(vec![2].into()).with_data(vec![1, 256].into()),
     );
-    m.consts.insert(
+    m.inits.insert(
         reshape1_const,
         Tensor2::new(vec![2].into()).with_data(vec![256, 10].into()),
     );
-    m.consts.insert(
+    m.inits.insert(
         matmul0_const,
         Tensor2::new(vec![2].into()).with_data(vec![256, 10].into()),
     );

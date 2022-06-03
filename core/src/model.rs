@@ -1,9 +1,16 @@
-use crate::node::{NodeArena, NodeBuilder, NodeId};
+use crate::node::{Node2Arena, Node2Id, NodeArena, NodeBuilder, NodeId};
 
 pub struct Model {
     nodes: NodeArena,
     pub input_node: Option<NodeId>,
     pub output_node: Option<NodeId>,
+}
+
+#[derive(Default)]
+pub struct Model2 {
+    pub nodes: Node2Arena,
+    pub inputs: Vec<Node2Id>,
+    pub outputs: Vec<Node2Id>,
 }
 
 impl Model {
@@ -24,6 +31,41 @@ impl NodeBuilder for Model {
     fn arena_mut(&mut self) -> &mut NodeArena {
         &mut self.nodes
     }
+}
+
+#[test]
+#[allow(unused_variables)]
+fn mnist_model2() {
+    use crate::node::{Node2, Op};
+
+    let mut m = Model2::default();
+
+    let conv0 = Node2::new(Op::Conv2d)
+        .with_attr(vec![5, 5].into())
+        .with_attr(vec![1, 1].into())
+        .with_attr(vec![].into())
+        .alloc(&mut m.nodes);
+    let add0 = Node2::new(Op::Add).alloc(&mut m.nodes);
+    let relu0 = Node2::new(Op::ReLU).alloc(&mut m.nodes);
+    let maxpool0 = Node2::new(Op::MaxPool)
+        .with_attr(vec![2, 2].into())
+        .with_attr(vec![2, 2].into())
+        .alloc(&mut m.nodes);
+    let conv1 = Node2::new(Op::Conv2d)
+        .with_attr(vec![5, 5].into())
+        .with_attr(vec![1, 1].into())
+        .with_attr(vec![2, 2].into())
+        .alloc(&mut m.nodes);
+    let add1 = Node2::new(Op::Add).alloc(&mut m.nodes);
+    let relu1 = Node2::new(Op::ReLU).alloc(&mut m.nodes);
+    let maxpool1 = Node2::new(Op::MaxPool)
+        .with_attr(vec![3, 3].into())
+        .with_attr(vec![3, 3].into())
+        .alloc(&mut m.nodes);
+    let reshape0 = Node2::new(Op::Reshape).alloc(&mut m.nodes);
+    let reshape1 = Node2::new(Op::Reshape).alloc(&mut m.nodes);
+    let matmul0 = Node2::new(Op::MatMul).alloc(&mut m.nodes);
+    let add2 = Node2::new(Op::Add).alloc(&mut m.nodes);
 }
 
 #[test]

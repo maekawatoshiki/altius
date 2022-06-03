@@ -1,5 +1,5 @@
 use crate::{
-    node::{Node2Arena, Node2Id, NodeArena, NodeBuilder, NodeId},
+    node::{Node2Arena, NodeArena, NodeBuilder, NodeId},
     value::{ValueArena, ValueId},
 };
 
@@ -15,12 +15,6 @@ pub struct Model2 {
     pub values: ValueArena,
     pub inputs: Vec<ValueId>,
     pub outputs: Vec<ValueId>,
-}
-
-impl Model2 {
-    // pub fn wire(&mut self, from: Node2Id, to: Node2Id) {
-    //     // self.nodes[from].outputs.push(to); self.nodes[to].inputs.push(from);
-    // }
 }
 
 impl Model {
@@ -146,7 +140,8 @@ fn mnist_model2() {
         .with_out(add2_out)
         .alloc(&mut m.nodes);
 
-    // m.add_input(conv0, input);
+    m.inputs.push(conv0_in);
+    m.outputs.push(add2_out);
 }
 
 #[test]

@@ -4,6 +4,28 @@ use id_arena::{Arena, Id};
 pub type NodeId = Id<Node>;
 pub type NodeArena = Arena<Node>;
 
+pub type Node2Id = Id<Node2>;
+pub type Node2Arena = Arena<Node2>;
+
+#[derive(Debug, Clone)]
+pub struct Node2 {
+    pub op: Op,
+    pub inputs: Vec<Node2Id>,
+    pub outputs: Vec<Node2Id>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Op {
+    Conv2d,
+    Add,
+    ReLU,
+    MaxPool,
+    Reshape,
+    MatMul,
+    Const,
+    Input,
+}
+
 pub enum Node {
     Conv2d(Conv2d),
     Add(Add),

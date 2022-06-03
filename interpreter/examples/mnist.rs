@@ -98,9 +98,10 @@ fn mnist(root: &str) -> Model {
     let conv0_weight = m.values.new_val();
     let conv0_out = m.values.new_val();
     let _conv0 = Node::new(Op::Conv2d)
+        .with_attr("SAME_UPPER".into())
         .with_attr(vec![5, 5].into())
         .with_attr(vec![1, 1].into())
-        .with_attr(vec![2, 2].into())
+        .with_attr(vec![].into())
         .with_in(conv0_in)
         .with_in(conv0_weight)
         .with_out(conv0_out)
@@ -131,9 +132,10 @@ fn mnist(root: &str) -> Model {
     let conv1_weight = m.values.new_val();
     let conv1_out = m.values.new_val();
     let _conv1 = Node::new(Op::Conv2d)
+        .with_attr("SAME_UPPER".into())
         .with_attr(vec![5, 5].into())
         .with_attr(vec![1, 1].into())
-        .with_attr(vec![2, 2].into())
+        .with_attr(vec![].into())
         .with_in(maxpool0_out)
         .with_in(conv1_weight)
         .with_out(conv1_out)

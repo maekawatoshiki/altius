@@ -65,14 +65,15 @@ impl Model {
 
 #[test]
 fn mnist_model() {
-    use crate::node::{Node2, Op};
+    use crate::node::{Node, Op};
 
     let mut m = Model::default();
 
     let conv0_in = m.values.new_val(); // Input tensor [1, 1, 28, 28]
     let conv0_weight = m.values.new_val();
     let conv0_out = m.values.new_val();
-    let _conv0 = Node2::new(Op::Conv2d)
+    let _conv0 = Node::new(Op::Conv2d)
+        .with_attr("SAME_UPPER".into())
         .with_attr(vec![5, 5].into())
         .with_attr(vec![1, 1].into())
         .with_attr(vec![].into())
@@ -83,20 +84,20 @@ fn mnist_model() {
 
     let add0_const = m.values.new_val();
     let add0_out = m.values.new_val();
-    let _add0 = Node2::new(Op::Add)
+    let _add0 = Node::new(Op::Add)
         .with_in(conv0_out)
         .with_in(add0_const)
         .with_out(add0_out)
         .alloc(&mut m.nodes);
 
     let relu0_out = m.values.new_val();
-    let _relu0 = Node2::new(Op::ReLU)
+    let _relu0 = Node::new(Op::ReLU)
         .with_in(add0_out)
         .with_out(relu0_out)
         .alloc(&mut m.nodes);
 
     let maxpool0_out = m.values.new_val();
-    let _maxpool0 = Node2::new(Op::MaxPool)
+    let _maxpool0 = Node::new(Op::MaxPool)
         .with_attr(vec![2, 2].into())
         .with_attr(vec![2, 2].into())
         .with_in(relu0_out)
@@ -105,7 +106,8 @@ fn mnist_model() {
 
     let conv1_weight = m.values.new_val();
     let conv1_out = m.values.new_val();
-    let _conv1 = Node2::new(Op::Conv2d)
+    let _conv1 = Node::new(Op::Conv2d)
+        .with_attr("SAME_UPPER".into())
         .with_attr(vec![5, 5].into())
         .with_attr(vec![1, 1].into())
         .with_attr(vec![2, 2].into())
@@ -116,20 +118,20 @@ fn mnist_model() {
 
     let add1_const = m.values.new_val();
     let add1_out = m.values.new_val();
-    let _add1 = Node2::new(Op::Add)
+    let _add1 = Node::new(Op::Add)
         .with_in(conv1_out)
         .with_in(add1_const)
         .with_out(add1_out)
         .alloc(&mut m.nodes);
 
     let relu1_out = m.values.new_val();
-    let _relu1 = Node2::new(Op::ReLU)
+    let _relu1 = Node::new(Op::ReLU)
         .with_in(add1_out)
         .with_out(relu1_out)
         .alloc(&mut m.nodes);
 
     let maxpool1_out = m.values.new_val();
-    let _maxpool1 = Node2::new(Op::MaxPool)
+    let _maxpool1 = Node::new(Op::MaxPool)
         .with_in(relu1_out)
         .with_out(maxpool1_out)
         .with_attr(vec![3, 3].into())
@@ -138,7 +140,7 @@ fn mnist_model() {
 
     let reshape0_const = m.values.new_val();
     let reshape0_out = m.values.new_val();
-    let _reshape0 = Node2::new(Op::Reshape)
+    let _reshape0 = Node::new(Op::Reshape)
         .with_in(maxpool1_out)
         .with_in(reshape0_const)
         .with_out(reshape0_out)
@@ -147,14 +149,14 @@ fn mnist_model() {
     let reshape1_const0 = m.values.new_val();
     let reshape1_const1 = m.values.new_val();
     let reshape1_out = m.values.new_val();
-    let _reshape1 = Node2::new(Op::Reshape)
+    let _reshape1 = Node::new(Op::Reshape)
         .with_in(reshape1_const0)
         .with_in(reshape1_const1)
         .with_out(reshape1_out)
         .alloc(&mut m.nodes);
 
     let matmul0_out = m.values.new_val();
-    let _matmul0 = Node2::new(Op::MatMul)
+    let _matmul0 = Node::new(Op::MatMul)
         .with_in(reshape0_out)
         .with_in(reshape1_out)
         .with_out(matmul0_out)
@@ -162,7 +164,7 @@ fn mnist_model() {
 
     let add2_const = m.values.new_val();
     let add2_out = m.values.new_val();
-    let _add2 = Node2::new(Op::Add)
+    let _add2 = Node::new(Op::Add)
         .with_in(matmul0_out)
         .with_in(add2_const)
         .with_out(add2_out)

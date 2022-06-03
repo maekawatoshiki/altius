@@ -22,15 +22,17 @@ pub enum Op {
     MatMul,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Attr {
     Shape(Dimensions),
+    String(String),
 }
 
 impl Node {
-    pub const CONV2D_ATTR_KERNEL: usize = 0;
-    pub const CONV2D_ATTR_STRIDE: usize = 1;
-    pub const CONV2D_ATTR_PADDING: usize = 2;
+    pub const CONV2D_ATTR_AUTO_PAD: usize = 0;
+    pub const CONV2D_ATTR_KERNEL: usize = 1;
+    pub const CONV2D_ATTR_STRIDE: usize = 2;
+    pub const CONV2D_ATTR_PADDING: usize = 3;
     pub const CONV2D_IN: usize = 0;
     pub const CONV2D_WEIGHT: usize = 1;
     pub const CONV2D_OUT: usize = 0;
@@ -84,27 +86,47 @@ impl Node {
         id
     }
 
-    pub fn compute_output_shapes(&self, inputs: &[Tensor]) -> Vec<Dimensions> {
+    /// Computes the output shape for a node given `inputs`.
+    /// `attrs` could be overwritten. (e.g. paddings given auto_pad)
+    pub fn compute_output_shapes(&self, inputs: &[Tensor], attrs: &mut [Attr]) -> Vec<Dimensions> {
+        assert!(self.attrs == attrs);
+
         let mut shapes = vec![];
         match self.op {
             Op::Conv2d => {
-                let Attr::Shape(kernel) = &self.attrs[Self::CONV2D_ATTR_KERNEL];
-                let Attr::Shape(stride) = &self.attrs[Self::CONV2D_ATTR_STRIDE];
-                let Attr::Shape(padding) = &self.attrs[Self::CONV2D_ATTR_PADDING];
-                let input = inputs[Self::CONV2D_IN].dims();
-                let weight = inputs[Self::CONV2D_WEIGHT].dims();
+                let auto_pad = self.attrs[Self::CONV2D_ATTR_AUTO_PAD].as_string().unwrap();
+                let kernel = self.attrs[Self::CONV2D_ATTR_KERNEL].as_shape().unwrap();
+                let stride = self.attrs[Self::CONV2D_ATTR_STRIDE].as_shape().unwrap();
+                let padding = self.attrs[Self::CONV2D_ATTR_PADDING].as_shape().unwrap();
+                let kernel = kernel.as_slice();
+                let stride = stride.as_slice();
+                let mut padding = padding.as_slice();
+                let input = inputs[Self::CONV2D_IN].dims().as_slice();
+                let weight = inputs[Self::CONV2D_WEIGHT].dims().as_slice();
 
-                let h_in = input.as_slice()[2];
-                let w_in = input.as_slice()[3];
+                if !auto_pad.is_empty() && auto_pad != "NOTSET" {
+                    let out0 = (input[2] as f32 / stride[0] as f32).ceil() as usize;
+                    let out1 = (input[3] as f32 / stride[1] as f32).ceil() as usize;
+                    let pad0 = ((out0 - 1) * stride[0] + ((kernel[0] - 1) * 1 + 1))
+                        .saturating_sub(input[2]);
+                    let pad1 = ((out1 - 1) * stride[1] + ((kernel[1] - 1) * 1 + 1))
+                        .saturating_sub(input[3]);
+                    assert!(auto_pad == "SAME_UPPER");
+                    let new_padding = vec![pad0 / 2, pad1 / 2, pad0 - pad0 / 2, pad1 - pad1 / 2];
+                    attrs[Self::CONV2D_ATTR_PADDING] = Attr::Shape(new_padding.into());
+                    padding = attrs[Self::CONV2D_ATTR_PADDING]
+                        .as_shape()
+                        .unwrap()
+                        .as_slice();
+                }
+
+                let h_in = input[2];
+                let w_in = input[3];
                 let output_shape = vec![
-                    input.as_slice()[0],
-                    weight.as_slice()[0],
-                    (h_in + 2 * padding.as_slice()[0] - 1 * (kernel.as_slice()[0] - 1) - 1)
-                        / stride.as_slice()[0]
-                        + 1,
-                    (w_in + 2 * padding.as_slice()[1] - 1 * (kernel.as_slice()[1] - 1) - 1)
-                        / stride.as_slice()[1]
-                        + 1,
+                    input[0],
+                    weight[0],
+                    (h_in + 2 * padding[0] - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
+                    (w_in + 2 * padding[1] - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
                 ];
                 shapes.push(output_shape.into());
             }
@@ -123,8 +145,8 @@ impl Node {
                 shapes.push(in_a.clone());
             }
             Op::MaxPool => {
-                let Attr::Shape(kernel) = &self.attrs[Self::MAXPOOL_ATTR_KERNEL];
-                let Attr::Shape(stride) = &self.attrs[Self::MAXPOOL_ATTR_STRIDE];
+                let kernel = self.attrs[Self::MAXPOOL_ATTR_KERNEL].as_shape().unwrap();
+                let stride = self.attrs[Self::MAXPOOL_ATTR_STRIDE].as_shape().unwrap();
                 let input = &inputs[Self::MAXPOOL_IN].dims();
 
                 let h_in = input.as_slice()[2];
@@ -162,8 +184,30 @@ impl Node {
     }
 }
 
+impl Attr {
+    pub fn as_shape(&self) -> Option<&Dimensions> {
+        match self {
+            Attr::Shape(ref x) => Some(x),
+            _ => None,
+        }
+    }
+
+    pub fn as_string(&self) -> Option<&String> {
+        match self {
+            Attr::String(ref x) => Some(x),
+            _ => None,
+        }
+    }
+}
+
 impl From<Vec<usize>> for Attr {
     fn from(v: Vec<usize>) -> Self {
         Attr::Shape(Dimensions(v))
+    }
+}
+
+impl<'a> From<&'a str> for Attr {
+    fn from(s: &'a str) -> Self {
+        Attr::String(s.to_string())
     }
 }

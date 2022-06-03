@@ -10,6 +10,7 @@ use std::path::Path;
 
 fn main() {
     let model_root = &args().collect::<Vec<String>>()[1];
+    let _mnist = mnist2(model_root);
     let mnist = mnist(model_root);
 
     let mut inputs = vec![];
@@ -90,7 +91,7 @@ fn read_f32_list_from<P: AsRef<Path>>(filename: P) -> Vec<f32> {
     list
 }
 
-fn mnist2(model_root: &str) -> Model2 {
+fn mnist2(root: &str) -> Model2 {
     let mut m = Model2::default();
 
     let conv0_in = m.values.new_val(); // Input tensor [1, 1, 28, 28]
@@ -168,19 +169,19 @@ fn mnist2(model_root: &str) -> Model2 {
         .with_out(reshape0_out)
         .alloc(&mut m.nodes);
 
-    let reshape1_const = m.values.new_val();
+    let reshape1_const0 = m.values.new_val();
+    let reshape1_const1 = m.values.new_val();
     let reshape1_out = m.values.new_val();
     let _reshape1 = Node2::new(Op::Reshape)
-        .with_in(reshape0_out)
-        .with_in(reshape1_const)
+        .with_in(reshape1_const0)
+        .with_in(reshape1_const1)
         .with_out(reshape1_out)
         .alloc(&mut m.nodes);
 
-    let matmul0_const = m.values.new_val();
     let matmul0_out = m.values.new_val();
     let _matmul0 = Node2::new(Op::MatMul)
+        .with_in(reshape0_out)
         .with_in(reshape1_out)
-        .with_in(matmul0_const)
         .with_out(matmul0_out)
         .alloc(&mut m.nodes);
 
@@ -195,26 +196,43 @@ fn mnist2(model_root: &str) -> Model2 {
     m.inputs.push(conv0_in);
     m.outputs.push(add2_out);
 
-    m.inits
-        .insert(add0_const, Tensor2::new(vec![8, 1, 5, 5].into()));
-    m.inits
-        .insert(add1_const, Tensor2::new(vec![8, 1, 1].into()));
-    m.inits
-        .insert(add2_const, Tensor2::new(vec![16, 1, 1].into()));
-    m.inits
-        .insert(conv0_weight, Tensor2::new(vec![8, 1, 5, 5].into()));
-    m.inits
-        .insert(conv1_weight, Tensor2::new(vec![16, 8, 5, 5].into()));
+    m.inits.insert(
+        add0_const,
+        Tensor2::new(vec![8, 1, 1].into())
+            .with_data(read_f32_list_from(Path::new(root).join("add1").to_str().unwrap()).into()),
+    );
+    m.inits.insert(
+        add1_const,
+        Tensor2::new(vec![16, 1, 1].into())
+            .with_data(read_f32_list_from(Path::new(root).join("add2").to_str().unwrap()).into()),
+    );
+    m.inits.insert(
+        add2_const,
+        Tensor2::new(vec![1, 10].into())
+            .with_data(read_f32_list_from(Path::new(root).join("add3").to_str().unwrap()).into()),
+    );
+    m.inits.insert(
+        conv0_weight,
+        Tensor2::new(vec![8, 1, 5, 5].into())
+            .with_data(read_f32_list_from(Path::new(root).join("conv1").to_str().unwrap()).into()),
+    );
+    m.inits.insert(
+        conv1_weight,
+        Tensor2::new(vec![16, 8, 5, 5].into())
+            .with_data(read_f32_list_from(Path::new(root).join("conv2").to_str().unwrap()).into()),
+    );
     m.inits.insert(
         reshape0_const,
         Tensor2::new(vec![2].into()).with_data(vec![1, 256].into()),
     );
     m.inits.insert(
-        reshape1_const,
-        Tensor2::new(vec![2].into()).with_data(vec![256, 10].into()),
+        reshape1_const0,
+        Tensor2::new(vec![16, 4, 4, 10].into()).with_data(
+            read_f32_list_from(Path::new(root).join("reshape1").to_str().unwrap()).into(),
+        ),
     );
     m.inits.insert(
-        matmul0_const,
+        reshape1_const1,
         Tensor2::new(vec![2].into()).with_data(vec![256, 10].into()),
     );
 

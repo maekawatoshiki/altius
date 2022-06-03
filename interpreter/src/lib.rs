@@ -33,7 +33,7 @@ impl<'a> Interpreter2<'a> {
             self.run_node(node);
         }
 
-        todo!()
+        self.values[&self.model.outputs[0]].clone()
     }
 
     fn run_node(&mut self, node: Node2Id) {

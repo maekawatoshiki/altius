@@ -10,6 +10,7 @@ pub type Node2Arena = Arena<Node2>;
 #[derive(Debug, Clone)]
 pub struct Node2 {
     pub op: Op,
+    pub attrs: Vec<Attr>,
     pub inputs: Vec<Node2Id>,
     pub outputs: Vec<Node2Id>,
 }
@@ -26,6 +27,11 @@ pub enum Op {
     Input,
 }
 
+#[derive(Debug, Clone)]
+pub enum Attr {
+    Shape(Dimensions),
+}
+
 pub enum Node {
     Conv2d(Conv2d),
     Add(Add),
@@ -35,6 +41,35 @@ pub enum Node {
     MatMul(MatMul),
     Tensor(Tensor),
     Input(Dimensions),
+}
+
+impl Node2 {
+    pub const CONV2D_ATTR_KERNEL: usize = 0;
+    pub const CONV2D_ATTR_STRIDE: usize = 1;
+    pub const CONV2D_ATTR_PADDING: usize = 2;
+    pub const CONV2D_IN: usize = 0;
+    pub const CONV2D_WEIGHT: usize = 1;
+    pub const CONV2D_OUT: usize = 0;
+
+    pub const ADD_IN_A: usize = 0;
+    pub const ADD_IN_B: usize = 1;
+    pub const ADD_OUT: usize = 0;
+
+    pub const RELU_IN: usize = 0;
+    pub const RELU_OUT: usize = 0;
+
+    pub const MAXPOOL_ATTR_KERNEL: usize = 0;
+    pub const MAXPOOL_ATTR_STRIDE: usize = 1;
+    pub const MAXPOOL_IN: usize = 0;
+    pub const MAXPOOL_OUT: usize = 0;
+
+    pub const RESHAPE_IN: usize = 0;
+    pub const RESHAPE_SHAPE: usize = 1;
+    pub const RESHAPE_OUT: usize = 0;
+
+    pub const MATMUL_IN_A: usize = 0;
+    pub const MATMUL_IN_B: usize = 1;
+    pub const MATMUL_OUT: usize = 0;
 }
 
 #[derive(Default)]

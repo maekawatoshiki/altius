@@ -83,6 +83,16 @@ impl Node2 {
         self
     }
 
+    pub fn with_in(mut self, id: ValueId) -> Self {
+        self.inputs.push(id);
+        self
+    }
+
+    pub fn with_out(mut self, id: ValueId) -> Self {
+        self.outputs.push(id);
+        self
+    }
+
     pub fn alloc(self, arena: &mut Node2Arena) -> Node2Id {
         let id = arena.alloc(self);
         id

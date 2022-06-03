@@ -1,6 +1,6 @@
 use altius_core::{
     model::{Model, Model2},
-    node::{Add, Conv2d, MatMul, MaxPool, Node, NodeBuilder, NodeId, Relu, Reshape},
+    node::{Add, Conv2d, MatMul, MaxPool, Node, Node2Id, NodeBuilder, NodeId, Op, Relu, Reshape},
     tensor::{Tensor, Tensor2},
     value::ValueId,
 };
@@ -27,9 +27,21 @@ impl<'a> Interpreter2<'a> {
         self.values.insert(self.model.inputs[0], input);
         self.values.extend(self.model.inits.clone().into_iter());
 
-        let _sorted_nodes = self.model.topo_sort_nodes();
+        let nodes = self.model.topo_sort_nodes();
+
+        for node in nodes {
+            self.run_node(node);
+        }
 
         todo!()
+    }
+
+    fn run_node(&mut self, node: Node2Id) {
+        let node = &self.model.nodes[node];
+        match node.op {
+            Op::Conv2d => {}
+            _ => {}
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 ---
 source: core/src/model.rs
-assertion_line: 228
+assertion_line: 200
 expression: order
 ---
 [

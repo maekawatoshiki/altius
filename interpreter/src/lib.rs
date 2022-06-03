@@ -42,15 +42,16 @@ impl<'a> Interpreter2<'a> {
         for input in node.inputs.iter() {
             inputs.push(self.values[input].clone());
         }
-        let output_shapes = node.compute_output_shapes(&inputs);
+        let mut attrs = node.attrs.clone();
+        let output_shapes = node.compute_output_shapes(&inputs, &mut attrs);
         let mut outputs = vec![];
         for output_shape in output_shapes {
             outputs.push(Tensor::new(output_shape));
         }
 
-        // TODO: Actual kernel runs here!
+        // Actual kernel runs here.
         match node.op {
-            Op::Conv2d => self.run_node_conv2d(node, &inputs, &mut outputs),
+            Op::Conv2d => self.run_node_conv2d(&attrs, &inputs, &mut outputs),
             Op::Add => self.run_node_add(node, &inputs, &mut outputs),
             Op::MaxPool => self.run_node_max_pool(node, &inputs, &mut outputs),
             Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),
@@ -58,21 +59,19 @@ impl<'a> Interpreter2<'a> {
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
         }
 
-        // println!("{:?} {:?}", node.op, outputs);
-
         for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
             self.values.insert(val, output);
         }
     }
 
-    fn run_node_conv2d(&mut self, node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    fn run_node_conv2d(&mut self, attrs: &[Attr], inputs: &[Tensor], outputs: &mut [Tensor]) {
         let input = &inputs[Node::CONV2D_IN];
         let weight = &inputs[Node::CONV2D_WEIGHT];
         let output = &mut outputs[0];
 
-        let Attr::Shape(kernel) = &node.attrs[Node::CONV2D_ATTR_KERNEL];
-        let Attr::Shape(padding) = &node.attrs[Node::CONV2D_ATTR_PADDING];
-        let Attr::Shape(stride) = &node.attrs[Node::CONV2D_ATTR_STRIDE];
+        let kernel = attrs[Node::CONV2D_ATTR_KERNEL].as_shape().unwrap();
+        let padding = attrs[Node::CONV2D_ATTR_PADDING].as_shape().unwrap();
+        let stride = attrs[Node::CONV2D_ATTR_STRIDE].as_shape().unwrap();
 
         let dilation = 1;
         let group = 1;
@@ -85,7 +84,7 @@ impl<'a> Interpreter2<'a> {
                 for d in (g * out_c_per_g)..((g + 1) * out_c_per_g) {
                     let mut x = -(padding.as_slice()[0] as isize);
                     for ax in 0..output.dims().as_slice()[2] {
-                        let mut y = -(padding.as_slice()[0] as isize);
+                        let mut y = -(padding.as_slice()[1] as isize);
                         for ay in 0..output.dims().as_slice()[3] {
                             let mut sum = 0.0;
                             for fx in 0..kernel.as_slice()[0] as isize {
@@ -126,8 +125,8 @@ impl<'a> Interpreter2<'a> {
         let input = &inputs[Node::MAXPOOL_IN];
         let output = &mut outputs[Node::MAXPOOL_OUT];
 
-        let Attr::Shape(kernel) = &node.attrs[Node::MAXPOOL_ATTR_KERNEL];
-        let Attr::Shape(stride) = &node.attrs[Node::MAXPOOL_ATTR_STRIDE];
+        let kernel = node.attrs[Node::MAXPOOL_ATTR_KERNEL].as_shape().unwrap();
+        let stride = node.attrs[Node::MAXPOOL_ATTR_STRIDE].as_shape().unwrap();
 
         assert!(input.dims().len() == 4);
         assert!(output.dims().len() == 4);

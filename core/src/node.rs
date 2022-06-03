@@ -7,7 +7,7 @@ pub type NodeArena = Arena<Node>;
 pub type Node2Id = Id<Node2>;
 pub type Node2Arena = Arena<Node2>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Node2 {
     pub op: Op,
     pub attrs: Vec<Attr>,
@@ -70,6 +70,35 @@ impl Node2 {
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
     pub const MATMUL_OUT: usize = 0;
+
+    pub fn new(op: Op) -> Self {
+        Self {
+            op,
+            ..Self::default()
+        }
+    }
+
+    pub fn with_attr(mut self, attr: Attr) -> Self {
+        self.attrs.push(attr);
+        self
+    }
+
+    pub fn alloc(self, arena: &mut Node2Arena) -> Node2Id {
+        let id = arena.alloc(self);
+        id
+    }
+}
+
+impl From<Vec<usize>> for Attr {
+    fn from(v: Vec<usize>) -> Self {
+        Attr::Shape(Dimensions(v))
+    }
+}
+
+impl Default for Op {
+    fn default() -> Self {
+        Op::Input
+    }
 }
 
 #[derive(Default)]

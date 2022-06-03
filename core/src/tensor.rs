@@ -32,8 +32,7 @@ impl Tensor {
     pub fn reshape_into(mut self, dims: Dimensions) -> Self {
         self.stride = compute_strides(&dims);
         self.dims = dims;
-        #[cfg(debug_assertions)]
-        assert!(self.verify());
+        debug_assert!(self.verify());
         self
     }
 

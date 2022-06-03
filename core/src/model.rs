@@ -1,4 +1,7 @@
-use crate::node::{Node2Arena, Node2Id, NodeArena, NodeBuilder, NodeId};
+use crate::{
+    node::{Node2Arena, Node2Id, NodeArena, NodeBuilder, NodeId},
+    value::ValueArena,
+};
 
 pub struct Model {
     nodes: NodeArena,
@@ -9,8 +12,15 @@ pub struct Model {
 #[derive(Default)]
 pub struct Model2 {
     pub nodes: Node2Arena,
+    pub values: ValueArena,
     pub inputs: Vec<Node2Id>,
     pub outputs: Vec<Node2Id>,
+}
+
+impl Model2 {
+    pub fn wire(&mut self, from: Node2Id, to: Node2Id) {
+        // self.nodes[from].outputs.push(to); self.nodes[to].inputs.push(from);
+    }
 }
 
 impl Model {
@@ -40,6 +50,9 @@ fn mnist_model2() {
 
     let mut m = Model2::default();
 
+    let input = Node2::new(Op::Input)
+        .with_attr(vec![1, 1, 28, 28].into())
+        .alloc(&mut m.nodes);
     let conv0 = Node2::new(Op::Conv2d)
         .with_attr(vec![5, 5].into())
         .with_attr(vec![1, 1].into())
@@ -66,6 +79,8 @@ fn mnist_model2() {
     let reshape1 = Node2::new(Op::Reshape).alloc(&mut m.nodes);
     let matmul0 = Node2::new(Op::MatMul).alloc(&mut m.nodes);
     let add2 = Node2::new(Op::Add).alloc(&mut m.nodes);
+
+    // m.add_input(conv0, input);
 }
 
 #[test]

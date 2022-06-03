@@ -1,4 +1,4 @@
-use crate::{dim::Dimensions, tensor::Tensor};
+use crate::{dim::Dimensions, tensor::Tensor, value::ValueId};
 use id_arena::{Arena, Id};
 
 pub type NodeId = Id<Node>;
@@ -11,8 +11,8 @@ pub type Node2Arena = Arena<Node2>;
 pub struct Node2 {
     pub op: Op,
     pub attrs: Vec<Attr>,
-    pub inputs: Vec<Node2Id>,
-    pub outputs: Vec<Node2Id>,
+    pub inputs: Vec<ValueId>,
+    pub outputs: Vec<ValueId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

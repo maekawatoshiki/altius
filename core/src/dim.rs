@@ -22,6 +22,10 @@ impl Dimensions {
     pub fn as_slice(&self) -> &[Dimension] {
         self.0.as_slice()
     }
+
+    pub fn from_i64(dims: &[i64]) -> Self {
+        Self(dims.into_iter().map(|&x| x as Dimension).collect())
+    }
 }
 
 impl From<Vec<Dimension>> for Dimensions {

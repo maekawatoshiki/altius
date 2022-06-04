@@ -8,6 +8,10 @@ edition = "2018"
 [dependencies]
 id-arena = "2.2.1"
 rustc-hash = "1.1.0"
+prost = "^0.10"
+
+[build-dependencies]
+prost-build = "^0.10"
 
 [dev-dependencies]
 insta = "1.14.1"

@@ -8,7 +8,6 @@ use crate::{
     model::Model,
     node::{Node, Op},
     tensor::{Tensor, TensorData},
-    value::ValueArena,
 };
 
 use tensor_proto::DataType;
@@ -26,7 +25,6 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
     let graph = model_proto.graph.ok_or(ModelLoadError::NoGraph)?;
     let mut model = Model::default();
 
-    let mut values = ValueArena::default();
     let mut name_to_val = FxHashMap::default();
 
     // Load initializers.
@@ -40,7 +38,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
         let tensor = Tensor::new(dims.into()).with_data(data);
         let val = *name_to_val
             .entry(init.name())
-            .or_insert_with(|| values.new_val_named(init.name()));
+            .or_insert_with(|| model.values.new_val_named(init.name()));
         model.inits.insert(val, tensor);
     }
 
@@ -48,7 +46,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
     for x in graph.input.iter() {
         let val = *name_to_val
             .entry(x.name())
-            .or_insert_with(|| values.new_val_named(x.name()));
+            .or_insert_with(|| model.values.new_val_named(x.name()));
         if model.inits.contains_key(&val) {
             continue;
         }
@@ -59,7 +57,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
     for x in graph.output.iter() {
         let val = *name_to_val
             .entry(x.name())
-            .or_insert_with(|| values.new_val_named(x.name()));
+            .or_insert_with(|| model.values.new_val_named(x.name()));
         if model.inits.contains_key(&val) {
             continue;
         }
@@ -74,7 +72,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             .map(|input| {
                 *name_to_val
                     .entry(input)
-                    .or_insert_with(|| values.new_val_named(input))
+                    .or_insert_with(|| model.values.new_val_named(input))
             })
             .collect();
         let outputs = node
@@ -83,7 +81,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             .map(|input| {
                 *name_to_val
                     .entry(input)
-                    .or_insert_with(|| values.new_val_named(input))
+                    .or_insert_with(|| model.values.new_val_named(input))
             })
             .collect();
 

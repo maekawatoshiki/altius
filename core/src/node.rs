@@ -76,8 +76,18 @@ impl Node {
         self
     }
 
+    pub fn with_ins(mut self, mut ids: Vec<ValueId>) -> Self {
+        self.inputs.append(&mut ids);
+        self
+    }
+
     pub fn with_out(mut self, id: ValueId) -> Self {
         self.outputs.push(id);
+        self
+    }
+
+    pub fn with_outs(mut self, mut ids: Vec<ValueId>) -> Self {
+        self.outputs.append(&mut ids);
         self
     }
 
@@ -203,6 +213,12 @@ impl Attr {
 impl From<Vec<usize>> for Attr {
     fn from(v: Vec<usize>) -> Self {
         Attr::Shape(Dimensions(v))
+    }
+}
+
+impl From<Dimensions> for Attr {
+    fn from(v: Dimensions) -> Self {
+        Attr::Shape(v)
     }
 }
 

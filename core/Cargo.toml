@@ -9,6 +9,7 @@ edition = "2018"
 id-arena = "2.2.1"
 rustc-hash = "1.1.0"
 prost = "^0.10"
+thiserror = "1.0.31"
 
 [build-dependencies]
 prost-build = "^0.10"

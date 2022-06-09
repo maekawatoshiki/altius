@@ -65,22 +65,23 @@ impl Model {
 
 #[test]
 fn mnist_model() {
-    use crate::node::{Node, Op};
+    use crate::node::{Conv2d, MaxPool, Node, Op};
 
     let mut m = Model::default();
 
     let conv0_in = m.values.new_val(); // Input tensor [1, 1, 28, 28]
     let conv0_weight = m.values.new_val();
     let conv0_out = m.values.new_val();
-    let _conv0 = Node::new(Op::Conv2d)
-        .with_attr("SAME_UPPER".into())
-        .with_attr(vec![5, 5].into())
-        .with_attr(vec![1, 1].into())
-        .with_attr(vec![].into())
-        .with_in(conv0_in)
-        .with_in(conv0_weight)
-        .with_out(conv0_out)
-        .alloc(&mut m.nodes);
+    let _conv0 = Node::new(Op::Conv2d(Conv2d {
+        auto_pad: "SAME_UPPER".into(),
+        kernel_shape: vec![5, 5].into(),
+        strides: vec![1, 1].into(),
+        ..Default::default()
+    }))
+    .with_in(conv0_in)
+    .with_in(conv0_weight)
+    .with_out(conv0_out)
+    .alloc(&mut m.nodes);
 
     let add0_const = m.values.new_val();
     let add0_out = m.values.new_val();
@@ -97,24 +98,26 @@ fn mnist_model() {
         .alloc(&mut m.nodes);
 
     let maxpool0_out = m.values.new_val();
-    let _maxpool0 = Node::new(Op::MaxPool)
-        .with_attr(vec![2, 2].into())
-        .with_attr(vec![2, 2].into())
-        .with_in(relu0_out)
-        .with_out(maxpool0_out)
-        .alloc(&mut m.nodes);
+    let _maxpool0 = Node::new(Op::MaxPool(MaxPool {
+        kernel_shape: vec![2, 2].into(),
+        strides: vec![2, 2].into(),
+    }))
+    .with_in(relu0_out)
+    .with_out(maxpool0_out)
+    .alloc(&mut m.nodes);
 
     let conv1_weight = m.values.new_val();
     let conv1_out = m.values.new_val();
-    let _conv1 = Node::new(Op::Conv2d)
-        .with_attr("SAME_UPPER".into())
-        .with_attr(vec![5, 5].into())
-        .with_attr(vec![1, 1].into())
-        .with_attr(vec![2, 2].into())
-        .with_in(maxpool0_out)
-        .with_in(conv1_weight)
-        .with_out(conv1_out)
-        .alloc(&mut m.nodes);
+    let _conv1 = Node::new(Op::Conv2d(Conv2d {
+        auto_pad: "SAME_UPPER".into(),
+        kernel_shape: vec![5, 5].into(),
+        strides: vec![1, 1].into(),
+        ..Default::default()
+    }))
+    .with_in(maxpool0_out)
+    .with_in(conv1_weight)
+    .with_out(conv1_out)
+    .alloc(&mut m.nodes);
 
     let add1_const = m.values.new_val();
     let add1_out = m.values.new_val();
@@ -131,12 +134,13 @@ fn mnist_model() {
         .alloc(&mut m.nodes);
 
     let maxpool1_out = m.values.new_val();
-    let _maxpool1 = Node::new(Op::MaxPool)
-        .with_in(relu1_out)
-        .with_out(maxpool1_out)
-        .with_attr(vec![3, 3].into())
-        .with_attr(vec![3, 3].into())
-        .alloc(&mut m.nodes);
+    let _maxpool1 = Node::new(Op::MaxPool(MaxPool {
+        kernel_shape: vec![3, 3].into(),
+        strides: vec![3, 3].into(),
+    }))
+    .with_in(relu1_out)
+    .with_out(maxpool1_out)
+    .alloc(&mut m.nodes);
 
     let reshape0_const = m.values.new_val();
     let reshape0_out = m.values.new_val();

@@ -1,6 +1,6 @@
 use altius_core::{
     model::Model,
-    node::{Attr, Node, NodeId, Op},
+    node::{compute_output_shapes, Conv2d, MaxPool, Node, NodeId, Op},
     tensor::Tensor,
     value::ValueId,
 };
@@ -42,18 +42,18 @@ impl<'a> Interpreter2<'a> {
         for input in node.inputs.iter() {
             inputs.push(self.values[input].clone());
         }
-        let mut attrs = node.attrs.clone();
-        let output_shapes = node.compute_output_shapes(&inputs, &mut attrs);
+        let mut op = node.op.clone();
+        let output_shapes = compute_output_shapes(&mut op, &inputs);
         let mut outputs = vec![];
         for output_shape in output_shapes {
             outputs.push(Tensor::new(output_shape));
         }
 
         // Actual kernel runs here.
-        match node.op {
-            Op::Conv2d => self.run_node_conv2d(&attrs, &inputs, &mut outputs),
+        match op {
+            Op::Conv2d(conv) => self.run_node_conv2d(&conv, &inputs, &mut outputs),
             Op::Add => self.run_node_add(node, &inputs, &mut outputs),
-            Op::MaxPool => self.run_node_max_pool(node, &inputs, &mut outputs),
+            Op::MaxPool(maxpool) => self.run_node_max_pool(&maxpool, &inputs, &mut outputs),
             Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),
             Op::MatMul => self.run_node_mat_mul(node, &inputs, &mut outputs),
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
@@ -64,14 +64,14 @@ impl<'a> Interpreter2<'a> {
         }
     }
 
-    fn run_node_conv2d(&mut self, attrs: &[Attr], inputs: &[Tensor], outputs: &mut [Tensor]) {
+    fn run_node_conv2d(&mut self, conv: &Conv2d, inputs: &[Tensor], outputs: &mut [Tensor]) {
         let input = &inputs[Node::CONV2D_IN];
         let weight = &inputs[Node::CONV2D_WEIGHT];
         let output = &mut outputs[0];
 
-        let kernel = attrs[Node::CONV2D_ATTR_KERNEL].as_shape().unwrap();
-        let padding = attrs[Node::CONV2D_ATTR_PADDING].as_shape().unwrap();
-        let stride = attrs[Node::CONV2D_ATTR_STRIDE].as_shape().unwrap();
+        let kernel = conv.kernel_shape.as_slice();
+        let padding = conv.padding.as_slice();
+        let stride = conv.strides.as_slice();
 
         let dilation = 1;
         let group = 1;
@@ -82,13 +82,13 @@ impl<'a> Interpreter2<'a> {
         for n in 0..input.dims().as_slice()[0] {
             for g in 0..group {
                 for d in (g * out_c_per_g)..((g + 1) * out_c_per_g) {
-                    let mut x = -(padding.as_slice()[0] as isize);
+                    let mut x = -(padding[0] as isize);
                     for ax in 0..output.dims().as_slice()[2] {
-                        let mut y = -(padding.as_slice()[1] as isize);
+                        let mut y = -(padding[1] as isize);
                         for ay in 0..output.dims().as_slice()[3] {
                             let mut sum = 0.0;
-                            for fx in 0..kernel.as_slice()[0] as isize {
-                                for fy in 0..kernel.as_slice()[1] as isize {
+                            for fx in 0..kernel[0] as isize {
+                                for fy in 0..kernel[1] as isize {
                                     let ox = x + fx * dilation;
                                     let oy = y + fy * dilation;
 
@@ -112,21 +112,21 @@ impl<'a> Interpreter2<'a> {
                                 }
                             }
                             *output.at_4d_mut(n, d, ax, ay) = sum;
-                            y += stride.as_slice()[1] as isize
+                            y += stride[1] as isize
                         }
-                        x += stride.as_slice()[0] as isize
+                        x += stride[0] as isize
                     }
                 }
             }
         }
     }
 
-    fn run_node_max_pool(&mut self, node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    fn run_node_max_pool(&mut self, maxpool: &MaxPool, inputs: &[Tensor], outputs: &mut [Tensor]) {
         let input = &inputs[Node::MAXPOOL_IN];
         let output = &mut outputs[Node::MAXPOOL_OUT];
 
-        let kernel = node.attrs[Node::MAXPOOL_ATTR_KERNEL].as_shape().unwrap();
-        let stride = node.attrs[Node::MAXPOOL_ATTR_STRIDE].as_shape().unwrap();
+        let kernel = maxpool.kernel_shape.as_slice();
+        let stride = maxpool.strides.as_slice();
 
         assert!(input.dims().len() == 4);
         assert!(output.dims().len() == 4);
@@ -138,8 +138,8 @@ impl<'a> Interpreter2<'a> {
                     let mut y = 0isize; // TODO: pad
                     for ay in 0..output.dims().as_slice()[3] {
                         let mut max = f32::MIN;
-                        for fx in 0..kernel.as_slice()[0] as isize {
-                            for fy in 0..kernel.as_slice()[1] as isize {
+                        for fx in 0..kernel[0] as isize {
+                            for fy in 0..kernel[1] as isize {
                                 let ox = x + fx;
                                 let oy = y + fy;
 
@@ -159,9 +159,9 @@ impl<'a> Interpreter2<'a> {
                             }
                         }
                         *output.at_4d_mut(n, z, ax, ay) = if max == f32::MIN { 0.0 } else { max };
-                        y += stride.as_slice()[1] as isize
+                        y += stride[1] as isize
                     }
-                    x += stride.as_slice()[0] as isize
+                    x += stride[0] as isize
                 }
             }
         }

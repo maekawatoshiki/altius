@@ -6,7 +6,7 @@ use thiserror::Error;
 use crate::{
     dim::Dimensions,
     model::Model,
-    node::{Node, Op},
+    node::{Conv2d, MaxPool, Node, Op},
     tensor::{Tensor, TensorData},
 };
 
@@ -92,14 +92,15 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 );
                 let strides =
                     Dimensions::from_i64(&get_attribute(&node.attribute, "strides").unwrap().ints);
-                let _conv = Node::new(Op::Conv2d)
-                    .with_attr("SAME_UPPER".into())
-                    .with_attr(kernel.into())
-                    .with_attr(strides.into())
-                    .with_attr(vec![].into())
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
+                let _conv = Node::new(Op::Conv2d(Conv2d {
+                    auto_pad: "SAME_UPPER".into(),
+                    kernel_shape: kernel,
+                    strides,
+                    ..Default::default()
+                }))
+                .with_ins(inputs)
+                .with_outs(outputs)
+                .alloc(&mut model.nodes);
             }
             "Add" => {
                 let _add = Node::new(Op::Add)
@@ -119,12 +120,13 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 );
                 let strides =
                     Dimensions::from_i64(&get_attribute(&node.attribute, "strides").unwrap().ints);
-                let _maxpool = Node::new(Op::MaxPool)
-                    .with_attr(kernel.into())
-                    .with_attr(strides.into())
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
+                let _maxpool = Node::new(Op::MaxPool(MaxPool {
+                    kernel_shape: kernel,
+                    strides,
+                }))
+                .with_ins(inputs)
+                .with_outs(outputs)
+                .alloc(&mut model.nodes);
             }
             "Reshape" => {
                 let _reshape = Node::new(Op::Reshape)

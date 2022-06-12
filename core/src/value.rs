@@ -16,4 +16,8 @@ impl ValueArena {
     pub fn new_val_named(&mut self, name: impl Into<String>) -> ValueId {
         self.0.alloc(Value(Some(name.into())))
     }
+
+    pub fn inner(&self) -> &Arena<Value> {
+        &self.0
+    }
 }

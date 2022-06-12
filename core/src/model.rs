@@ -15,6 +15,16 @@ pub struct Model {
 }
 
 impl Model {
+    pub fn lookup_named_value(&self, name: &str) -> Option<ValueId> {
+        self.values.inner().iter().find_map(|(id, value)| {
+            if value.0.as_ref().map_or(false, |nm| nm == name) {
+                Some(id)
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn get_value_users(&self) -> FxHashMap<ValueId, FxHashSet<NodeId>> {
         let mut value_users: FxHashMap<ValueId, FxHashSet<NodeId>> = FxHashMap::default();
 
@@ -34,8 +44,7 @@ impl Model {
         let mut num_node_inputs = FxHashMap::default();
         let mut que = vec![];
 
-        let mut consts = self.inits.keys().copied().collect::<FxHashSet<_>>();
-        consts.insert(self.inputs[0]);
+        let consts = self.inputs.iter().copied().collect::<FxHashSet<_>>();
         for (id, node) in self.nodes.iter() {
             let inputs = &node.inputs.clone().into_iter().collect::<FxHashSet<_>>() - &consts;
             num_node_inputs.insert(id, inputs.len());
@@ -175,6 +184,14 @@ fn mnist_model() {
         .alloc(&mut m.nodes);
 
     m.inputs.push(conv0_in);
+    m.inputs.push(add0_const);
+    m.inputs.push(add1_const);
+    m.inputs.push(add2_const);
+    m.inputs.push(conv0_weight);
+    m.inputs.push(conv1_weight);
+    m.inputs.push(reshape0_const);
+    m.inputs.push(reshape1_const0);
+    m.inputs.push(reshape1_const1);
     m.outputs.push(add2_out);
 
     m.inits

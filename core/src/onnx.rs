@@ -47,9 +47,6 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
         let val = *name_to_val
             .entry(x.name())
             .or_insert_with(|| model.values.new_val_named(x.name()));
-        if model.inits.contains_key(&val) {
-            continue;
-        }
         model.inputs.push(val);
     }
 
@@ -58,9 +55,6 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
         let val = *name_to_val
             .entry(x.name())
             .or_insert_with(|| model.values.new_val_named(x.name()));
-        if model.inits.contains_key(&val) {
-            continue;
-        }
         model.outputs.push(val);
     }
 

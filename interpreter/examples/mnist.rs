@@ -36,13 +36,15 @@ fn main() {
 
     let start = ::std::time::Instant::now();
 
+    let input_value = mnist.lookup_named_value("Input3").unwrap();
+
     for _ in 0..repeat {
         correct = inputs
             .par_iter()
             .take(validation_count)
             .map(|(expected, input)| {
                 let mut i = Interpreter2::new(&mnist);
-                let v = i.run(input.clone());
+                let v = i.run(vec![(input_value, input.clone())]);
                 let inferred = v
                     .data()
                     .as_f32()

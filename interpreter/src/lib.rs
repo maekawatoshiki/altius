@@ -19,12 +19,14 @@ impl<'a> Interpreter2<'a> {
         }
     }
 
-    pub fn run(&mut self, input: Tensor) -> &Tensor {
-        assert!(self.model.inputs.len() == 1);
+    pub fn run(&mut self, inputs: Vec<(ValueId, Tensor)>) -> &Tensor {
+        // assert!(self.model.inputs.len() == 1);
         assert!(self.model.outputs.len() == 1);
 
         // Set input & initializer values.
-        self.values.insert(self.model.inputs[0], input);
+        for (id, tensor) in inputs {
+            self.values.insert(id, tensor);
+        }
         self.values.extend(self.model.inits.clone().into_iter());
 
         let nodes = self.model.topo_sort_nodes();

@@ -138,7 +138,10 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 .alloc(&mut model.nodes);
             }
             "Mul" => {
-                todo!()
+                let _mul = Node::new(Op::Mul)
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
             }
             "GlobalAveragePool" => {
                 todo!()

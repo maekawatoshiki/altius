@@ -20,6 +20,7 @@ pub enum Op {
     MaxPool(MaxPool),
     GlobalAveragePool,
     Reshape,
+    Flatten(Flatten),
     MatMul,
     HardSigmoid(HardSigmoid),
 }
@@ -42,6 +43,11 @@ pub struct MaxPool {
 pub struct HardSigmoid {
     pub alpha: f32,
     pub beta: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Flatten {
+    pub axis: i64,
 }
 
 impl Node {
@@ -69,6 +75,9 @@ impl Node {
     pub const RESHAPE_IN: usize = 0;
     pub const RESHAPE_SHAPE: usize = 1;
     pub const RESHAPE_OUT: usize = 0;
+
+    pub const FLATTEN_IN: usize = 0;
+    pub const FLATTEN_OUT: usize = 0;
 
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
@@ -207,6 +216,13 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 .map(|&x| x as usize)
                 .collect::<Vec<_>>();
             shapes.push(shape.into());
+        }
+        Op::Flatten(flatten) => {
+            let dims = inputs[Node::FLATTEN_IN].dims().as_slice();
+            assert!(flatten.axis >= 0);
+            let x: Dimensions = dims[..flatten.axis as usize].to_vec().into();
+            let y: Dimensions = dims[flatten.axis as usize..].to_vec().into();
+            shapes.push(vec![x.total_elems(), y.total_elems()].into())
         }
         Op::MatMul => {
             let in_a = &inputs[Node::MATMUL_IN_A].dims();

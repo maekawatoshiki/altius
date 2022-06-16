@@ -190,16 +190,18 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         Op::Mul => {
             let in_a = inputs[Node::MUL_IN_A].dims();
             let in_b = inputs[Node::MUL_IN_B].dims();
+            println!("{:?} {:?}", in_a, in_b);
             assert!(
                 in_a == in_b || {
                     in_a.len() == 4
-                        && in_b.len() == 3
-                        && in_a.as_slice()[1] == in_b.as_slice()[0]
-                        && in_b.as_slice()[1] == 1
-                        && in_b.as_slice()[2] == 1
+                        && in_b.len() == 4
+                        && in_a.as_slice()[0] == in_b.as_slice()[0]
+                        && in_a.as_slice()[1] == in_b.as_slice()[1]
+                        && in_a.as_slice()[2] == 1
+                        && in_a.as_slice()[3] == 1
                 }
             ); // TODO: Support broadcasting.
-            shapes.push(in_a.clone());
+            shapes.push(in_b.clone());
         }
         Op::MaxPool(maxpool) => {
             let kernel = &maxpool.kernel_shape;

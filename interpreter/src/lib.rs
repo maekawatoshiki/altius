@@ -1,6 +1,6 @@
 use altius_core::{
     model::Model,
-    node::{compute_output_shapes, Conv2d, MaxPool, Node, NodeId, Op},
+    node::{compute_output_shapes, Conv2d, HardSigmoid, MaxPool, Node, NodeId, Op},
     tensor::Tensor,
     value::ValueId,
 };
@@ -31,6 +31,8 @@ impl<'a> Interpreter2<'a> {
 
         let nodes = self.model.topo_sort_nodes();
 
+        // println!("sorted nodes: {:?}", nodes);
+
         for node in nodes {
             self.run_node(node);
         }
@@ -55,15 +57,15 @@ impl<'a> Interpreter2<'a> {
         match op {
             Op::Conv2d(conv) => self.run_node_conv2d(&conv, &inputs, &mut outputs),
             Op::Add => self.run_node_add(node, &inputs, &mut outputs),
-            Op::Mul => todo!(),
+            Op::Mul => self.run_node_mul(node, &inputs, &mut outputs),
             Op::MaxPool(maxpool) => self.run_node_max_pool(&maxpool, &inputs, &mut outputs),
-            Op::GlobalAveragePool => todo!(),
+            Op::GlobalAveragePool => self.run_node_gavg_pool(node, &inputs, &mut outputs),
             Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),
             Op::Flatten(_) => todo!(),
             Op::MatMul => self.run_node_mat_mul(node, &inputs, &mut outputs),
             Op::Gemm(_) => todo!(),
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
-            Op::HardSigmoid(_) => todo!(),
+            Op::HardSigmoid(hs) => self.run_node_hard_sigomid(&hs, &inputs, &mut outputs),
         }
 
         for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
@@ -124,6 +126,26 @@ impl<'a> Interpreter2<'a> {
                         x += stride[0] as isize
                     }
                 }
+            }
+        }
+    }
+
+    fn run_node_gavg_pool(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        let input = &inputs[Node::GLOBALAVERAGEPOOL_IN];
+        let output = &mut outputs[Node::GLOBALAVERAGEPOOL_OUT];
+
+        assert!(input.dims().len() == 4);
+        assert!(output.dims().len() == 4);
+
+        for n in 0..input.dims().as_slice()[0] {
+            for c in 0..input.dims().as_slice()[1] {
+                for h in 0..input.dims().as_slice()[2] {
+                    for w in 0..input.dims().as_slice()[3] {
+                        *output.at_4d_mut(n, c, 0, 0) += input.at_4d(n, c, h, w);
+                    }
+                }
+                *output.at_4d_mut(n, c, 0, 0) /=
+                    (input.dims().as_slice()[2] * input.dims().as_slice()[3]) as f32;
             }
         }
     }
@@ -214,6 +236,29 @@ impl<'a> Interpreter2<'a> {
         }
     }
 
+    fn run_node_mul(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        let input_a = &inputs[Node::MUL_IN_A];
+        let input_b = &inputs[Node::MUL_IN_B];
+        let output = &mut outputs[Node::MUL_OUT];
+
+        if input_a.dims() == input_b.dims() {
+            for (i, (a, b)) in input_a
+                .data()
+                .as_f32()
+                .unwrap()
+                .iter()
+                .zip(input_b.data().as_f32().unwrap().iter())
+                .enumerate()
+            {
+                output.data_mut().as_f32_mut().unwrap()[i] = a * b;
+            }
+
+            return;
+        }
+
+        todo!()
+    }
+
     fn run_node_mat_mul(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
         let input_a = &inputs[Node::MATMUL_IN_A];
         let input_b = &inputs[Node::MATMUL_IN_B];
@@ -246,6 +291,26 @@ impl<'a> Interpreter2<'a> {
             .zip(output.data_mut().as_f32_mut().unwrap().iter_mut())
         {
             *o = i.max(0.0);
+        }
+    }
+
+    fn run_node_hard_sigomid(
+        &mut self,
+        hs: &HardSigmoid,
+        inputs: &[Tensor],
+        outputs: &mut [Tensor],
+    ) {
+        let input = &inputs[Node::HARDSIGMOID_IN];
+        let output = &mut outputs[Node::HARDSIGMOID_OUT];
+
+        for (i, o) in input
+            .data()
+            .as_f32()
+            .unwrap()
+            .iter()
+            .zip(output.data_mut().as_f32_mut().unwrap().iter_mut())
+        {
+            *o = (hs.alpha * i + hs.beta).min(1.0).max(0.0);
         }
     }
 

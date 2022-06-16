@@ -6,7 +6,7 @@ use thiserror::Error;
 use crate::{
     dim::Dimensions,
     model::Model,
-    node::{Conv2d, MaxPool, Node, Op},
+    node::{Conv2d, HardSigmoid, MaxPool, Node, Op},
     tensor::{Tensor, TensorData},
 };
 
@@ -128,7 +128,28 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);
             }
-            _ => todo!(),
+            "HardSigmoid" => {
+                let _hardsigmoid = Node::new(Op::HardSigmoid(HardSigmoid {
+                    alpha: get_attribute(&node.attribute, "alpha").map_or(0.2, |a| a.f()),
+                    beta: get_attribute(&node.attribute, "beta").map_or(0.5, |a| a.f()),
+                }))
+                .with_ins(inputs)
+                .with_outs(outputs)
+                .alloc(&mut model.nodes);
+            }
+            "Mul" => {
+                todo!()
+            }
+            "GlobalAveragePool" => {
+                todo!()
+            }
+            "Flatten" => {
+                todo!()
+            }
+            "Gemm" => {
+                todo!()
+            }
+            op => todo!("{}", op),
         }
     }
 

@@ -22,6 +22,7 @@ pub enum Op {
     Reshape,
     Flatten(Flatten),
     MatMul,
+    Gemm(Gemm),
     HardSigmoid(HardSigmoid),
 }
 
@@ -48,6 +49,14 @@ pub struct HardSigmoid {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Flatten {
     pub axis: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Gemm {
+    pub alpha: f32,
+    pub beta: f32,
+    pub trans_a: bool,
+    pub trans_b: bool,
 }
 
 impl Node {
@@ -82,6 +91,10 @@ impl Node {
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
     pub const MATMUL_OUT: usize = 0;
+
+    pub const GEMM_IN_A: usize = 0;
+    pub const GEMM_IN_B: usize = 1;
+    pub const GEMM_OUT: usize = 0;
 
     pub const HARDSIGMOID_IN: usize = 0;
     pub const HARDSIGMOID_OUT: usize = 0;
@@ -229,6 +242,22 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             let in_b = &inputs[Node::MATMUL_IN_B].dims();
             assert_eq!(in_a.as_slice()[1], in_b.as_slice()[0]);
             shapes.push(vec![in_a.as_slice()[0], in_b.as_slice()[1]].into());
+        }
+        Op::Gemm(gemm) => {
+            let in_a = &inputs[Node::GEMM_IN_A].dims().as_slice();
+            let (in_a0, in_a1) = if gemm.trans_a {
+                (in_a[1], in_a[0])
+            } else {
+                (in_a[0], in_a[1])
+            };
+            let in_b = &inputs[Node::GEMM_IN_B].dims().as_slice();
+            let (in_b0, in_b1) = if gemm.trans_b {
+                (in_b[1], in_b[0])
+            } else {
+                (in_b[0], in_b[1])
+            };
+            assert_eq!(in_a1, in_b0);
+            shapes.push(vec![in_a0, in_b1].into());
         }
         Op::ReLU => {
             let input = inputs[Node::RELU_IN].dims();

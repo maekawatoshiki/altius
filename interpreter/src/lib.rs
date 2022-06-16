@@ -256,6 +256,29 @@ impl<'a> Interpreter2<'a> {
             return;
         }
 
+        let in_a = input_a.dims().as_slice();
+        let in_b = input_b.dims().as_slice();
+        if in_a.len() == 4
+            && in_b.len() == 4
+            && in_a[0] == in_b[0]
+            && in_a[1] == in_b[1]
+            && in_a[2] == 1
+            && in_a[3] == 1
+        {
+            for n in 0..in_a[0] {
+                for z in 0..in_a[1] {
+                    for x in 0..in_b[2] {
+                        for y in 0..in_b[3] {
+                            *output.at_4d_mut(n, z, x, y) =
+                                input_a.at_4d(n, z, 0, 0) * input_b.at_4d(n, z, x, y);
+                        }
+                    }
+                }
+            }
+
+            return;
+        }
+
         todo!()
     }
 

@@ -61,6 +61,7 @@ impl<'a> Interpreter2<'a> {
             Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),
             Op::Flatten(_) => todo!(),
             Op::MatMul => self.run_node_mat_mul(node, &inputs, &mut outputs),
+            Op::Gemm(_) => todo!(),
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(_) => todo!(),
         }

@@ -81,7 +81,7 @@ impl<'a> Interpreter2<'a> {
         let stride = conv.strides.as_slice();
 
         let dilation = 1;
-        let group = 1;
+        let group = conv.group as usize;
         let in_c_per_g = input.dims().as_slice()[1] / group;
         let out_c_per_g = output.dims().as_slice()[1] / group;
 

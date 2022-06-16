@@ -80,10 +80,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 );
                 let strides =
                     Dimensions::from_i64(&get_attribute(&node.attribute, "strides").unwrap().ints);
+                let group = get_attribute(&node.attribute, "group").map_or(1, |a| a.i());
                 let _conv = Node::new(Op::Conv2d(Conv2d {
                     auto_pad: "SAME_UPPER".into(),
                     kernel_shape: kernel,
                     strides,
+                    group,
                     ..Default::default()
                 }))
                 .with_ins(inputs)

@@ -18,6 +18,7 @@ pub enum Op {
     Mul,
     ReLU,
     MaxPool(MaxPool),
+    GlobalAveragePool,
     Reshape,
     MatMul,
     HardSigmoid(HardSigmoid),
@@ -61,6 +62,9 @@ impl Node {
 
     pub const MAXPOOL_IN: usize = 0;
     pub const MAXPOOL_OUT: usize = 0;
+
+    pub const GLOBALAVERAGEPOOL_IN: usize = 0;
+    pub const GLOBALAVERAGEPOOL_OUT: usize = 0;
 
     pub const RESHAPE_IN: usize = 0;
     pub const RESHAPE_SHAPE: usize = 1;
@@ -188,6 +192,11 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 (w_in + 2 * 0 - 1 * (kernel.as_slice()[1] - 1) - 1) / stride.as_slice()[1] + 1,
             ];
             shapes.push(output_shape.into());
+        }
+        Op::GlobalAveragePool => {
+            let input = &inputs[Node::GLOBALAVERAGEPOOL_IN].dims().as_slice();
+            assert!(input.len() == 4);
+            shapes.push(vec![input[0], input[1], 1, 1].into());
         }
         Op::Reshape => {
             let shape = inputs[Node::RESHAPE_SHAPE]

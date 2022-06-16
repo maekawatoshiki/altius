@@ -1,6 +1,6 @@
 use prost::Message;
 use rustc_hash::FxHashMap;
-use std::{fs, io, path::Path};
+use std::{fs, io, mem::transmute, path::Path};
 use thiserror::Error;
 
 use crate::{
@@ -29,13 +29,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
 
     // Load initializers.
     for init in graph.initializer.iter() {
-        let dims = init.dims.iter().map(|&x| x as usize).collect::<Vec<_>>();
-        let data = match DataType::from_i32(init.data_type()).unwrap() {
-            DataType::Float => TensorData::F32(init.float_data.clone()),
-            DataType::Int64 => TensorData::I64(init.int64_data.clone()),
-            _ => todo!(),
-        };
-        let tensor = Tensor::new(dims.into()).with_data(data);
+        let tensor = get_tensor(init);
         let val = *name_to_val
             .entry(init.name())
             .or_insert_with(|| model.values.new_val_named(init.name()));
@@ -146,6 +140,28 @@ fn get_attribute<'a>(
     name: &'static str,
 ) -> Option<&'a AttributeProto> {
     attrs.iter().find(|x| x.name() == name)
+}
+
+fn get_tensor(tensor: &TensorProto) -> Tensor {
+    let dims = tensor.dims.iter().map(|&x| x as usize).collect::<Vec<_>>();
+    let data = match DataType::from_i32(tensor.data_type()).unwrap() {
+        DataType::Float if tensor.raw_data().is_empty() => {
+            TensorData::F32(tensor.float_data.clone())
+        }
+        DataType::Float => TensorData::F32(
+            unsafe { transmute::<&[u8], &[f32]>(tensor.raw_data()) }[..tensor.raw_data().len() / 4]
+                .to_vec(),
+        ),
+        DataType::Int64 if tensor.raw_data().is_empty() => {
+            TensorData::I64(tensor.int64_data.clone())
+        }
+        DataType::Int64 => TensorData::I64(
+            unsafe { transmute::<&[u8], &[i64]>(tensor.raw_data()) }[..tensor.raw_data().len() / 8]
+                .to_vec(),
+        ),
+        _ => todo!(),
+    };
+    Tensor::new(dims.into()).with_data(data)
 }
 
 pub fn load_onnx_model_proto(path: impl AsRef<Path>) -> Result<ModelProto, io::Error> {

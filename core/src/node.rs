@@ -15,6 +15,7 @@ pub struct Node {
 pub enum Op {
     Conv2d(Conv2d),
     Add,
+    Mul,
     ReLU,
     MaxPool(MaxPool),
     Reshape,
@@ -50,6 +51,10 @@ impl Node {
     pub const ADD_IN_A: usize = 0;
     pub const ADD_IN_B: usize = 1;
     pub const ADD_OUT: usize = 0;
+
+    pub const MUL_IN_A: usize = 0;
+    pub const MUL_IN_B: usize = 1;
+    pub const MUL_OUT: usize = 0;
 
     pub const RELU_IN: usize = 0;
     pub const RELU_OUT: usize = 0;
@@ -144,6 +149,20 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         Op::Add => {
             let in_a = inputs[Node::ADD_IN_A].dims();
             let in_b = inputs[Node::ADD_IN_B].dims();
+            assert!(
+                in_a == in_b || {
+                    in_a.len() == 4
+                        && in_b.len() == 3
+                        && in_a.as_slice()[1] == in_b.as_slice()[0]
+                        && in_b.as_slice()[1] == 1
+                        && in_b.as_slice()[2] == 1
+                }
+            ); // TODO: Support broadcasting.
+            shapes.push(in_a.clone());
+        }
+        Op::Mul => {
+            let in_a = inputs[Node::MUL_IN_A].dims();
+            let in_b = inputs[Node::MUL_IN_B].dims();
             assert!(
                 in_a == in_b || {
                     in_a.len() == 4

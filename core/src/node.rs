@@ -29,6 +29,7 @@ pub enum Op {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Conv2d {
     pub auto_pad: String,
+    pub group: i64,
     pub kernel_shape: Dimensions,
     pub strides: Dimensions,
     pub padding: Dimensions,

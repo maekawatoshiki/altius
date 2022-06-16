@@ -11,7 +11,7 @@ pub struct Node {
     pub outputs: Vec<ValueId>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Op {
     Conv2d(Conv2d),
     Add,
@@ -19,6 +19,7 @@ pub enum Op {
     MaxPool(MaxPool),
     Reshape,
     MatMul,
+    HardSigmoid(HardSigmoid),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -33,6 +34,12 @@ pub struct Conv2d {
 pub struct MaxPool {
     pub kernel_shape: Dimensions,
     pub strides: Dimensions,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct HardSigmoid {
+    pub alpha: f32,
+    pub beta: f32,
 }
 
 impl Node {
@@ -57,6 +64,9 @@ impl Node {
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
     pub const MATMUL_OUT: usize = 0;
+
+    pub const HARDSIGMOID_IN: usize = 0;
+    pub const HARDSIGMOID_OUT: usize = 0;
 
     pub fn new(op: Op) -> Self {
         Self {
@@ -178,6 +188,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         }
         Op::ReLU => {
             let input = inputs[Node::RELU_IN].dims();
+            shapes.push(input.clone());
+        }
+        Op::HardSigmoid(_) => {
+            let input = inputs[Node::HARDSIGMOID_IN].dims();
             shapes.push(input.clone());
         }
     }

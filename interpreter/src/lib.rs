@@ -57,6 +57,7 @@ impl<'a> Interpreter2<'a> {
             Op::Add => self.run_node_add(node, &inputs, &mut outputs),
             Op::Mul => todo!(),
             Op::MaxPool(maxpool) => self.run_node_max_pool(&maxpool, &inputs, &mut outputs),
+            Op::GlobalAveragePool => todo!(),
             Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),
             Op::MatMul => self.run_node_mat_mul(node, &inputs, &mut outputs),
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),

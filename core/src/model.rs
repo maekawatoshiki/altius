@@ -44,7 +44,8 @@ impl Model {
         let mut num_node_inputs = FxHashMap::default();
         let mut que = vec![];
 
-        let consts = self.inputs.iter().copied().collect::<FxHashSet<_>>();
+        let consts = &self.inputs.iter().copied().collect::<FxHashSet<_>>()
+            | &self.inits.keys().copied().collect::<FxHashSet<_>>();
         for (id, node) in self.nodes.iter() {
             let inputs = &node.inputs.clone().into_iter().collect::<FxHashSet<_>>() - &consts;
             num_node_inputs.insert(id, inputs.len());

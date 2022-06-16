@@ -24,7 +24,6 @@ impl Tensor {
 
     pub fn with_data(mut self, data: TensorData) -> Self {
         self.data = data;
-        #[cfg(debug_assertions)]
         assert!(self.verify());
         self
     }
@@ -32,7 +31,7 @@ impl Tensor {
     pub fn reshape_into(mut self, dims: Dimensions) -> Self {
         self.stride = compute_strides(&dims);
         self.dims = dims;
-        debug_assert!(self.verify());
+        assert!(self.verify());
         self
     }
 

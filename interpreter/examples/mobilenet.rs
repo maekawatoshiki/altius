@@ -21,7 +21,7 @@ fn main() {
     let input = Tensor::new(vec![1, 3, 224, 224].into()).with_data(image.into_raw_vec().into());
 
     let mut i = Interpreter2::new(&model);
-    let out = i.run(vec![(input_value, input.clone())]);
+    let out = i.run(vec![(input_value, input)]);
     let mut out = out
         .data()
         .as_f32()

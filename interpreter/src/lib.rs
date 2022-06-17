@@ -48,11 +48,12 @@ impl<'a> Interpreter2<'a> {
         }
         let mut op = node.op.clone();
         let output_shapes = compute_output_shapes(&mut op, &inputs);
-        // println!("{:?}", output_shapes);
         let mut outputs = vec![];
         for output_shape in output_shapes {
             outputs.push(Tensor::new(output_shape));
         }
+
+        log::debug!("Op: {op:?}");
 
         // Actual kernel runs here.
         match op {

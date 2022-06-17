@@ -75,18 +75,24 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
 
         match node.op_type() {
             "Conv" => {
-                let kernel = Dimensions::from_i64(
+                let auto_pad = get_attribute(&node.attribute, "auto_pad")
+                    .map_or("NOTSET".to_string(), |a| {
+                        unsafe { std::str::from_utf8_unchecked(a.s()) }.to_string()
+                    });
+                let kernel_shape = Dimensions::from_i64(
                     &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,
                 );
                 let strides =
                     Dimensions::from_i64(&get_attribute(&node.attribute, "strides").unwrap().ints);
+                let padding = get_attribute(&node.attribute, "pads")
+                    .map_or(vec![0, 0].into(), |a| Dimensions::from_i64(&a.ints));
                 let group = get_attribute(&node.attribute, "group").map_or(1, |a| a.i());
                 let _conv = Node::new(Op::Conv2d(Conv2d {
-                    auto_pad: "SAME_UPPER".into(),
-                    kernel_shape: kernel,
+                    auto_pad,
+                    kernel_shape,
                     strides,
                     group,
-                    ..Default::default()
+                    padding,
                 }))
                 .with_ins(inputs)
                 .with_outs(outputs)

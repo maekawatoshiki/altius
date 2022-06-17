@@ -63,6 +63,7 @@ pub struct Gemm {
 impl Node {
     pub const CONV2D_IN: usize = 0;
     pub const CONV2D_WEIGHT: usize = 1;
+    pub const CONV2D_BIAS: usize = 2;
     pub const CONV2D_OUT: usize = 0;
 
     pub const ADD_IN_A: usize = 0;
@@ -95,6 +96,7 @@ impl Node {
 
     pub const GEMM_IN_A: usize = 0;
     pub const GEMM_IN_B: usize = 1;
+    pub const GEMM_IN_C: usize = 2;
     pub const GEMM_OUT: usize = 0;
 
     pub const HARDSIGMOID_IN: usize = 0;
@@ -190,7 +192,6 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         Op::Mul => {
             let in_a = inputs[Node::MUL_IN_A].dims();
             let in_b = inputs[Node::MUL_IN_B].dims();
-            println!("{:?} {:?}", in_a, in_b);
             assert!(
                 in_a == in_b || {
                     in_a.len() == 4

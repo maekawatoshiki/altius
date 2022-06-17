@@ -1,6 +1,6 @@
 use altius_core::{
     model::Model,
-    node::{compute_output_shapes, Conv2d, HardSigmoid, MaxPool, Node, NodeId, Op},
+    node::{compute_output_shapes, Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Node, NodeId, Op},
     tensor::Tensor,
     value::ValueId,
 };
@@ -48,6 +48,7 @@ impl<'a> Interpreter2<'a> {
         }
         let mut op = node.op.clone();
         let output_shapes = compute_output_shapes(&mut op, &inputs);
+        // println!("{:?}", output_shapes);
         let mut outputs = vec![];
         for output_shape in output_shapes {
             outputs.push(Tensor::new(output_shape));
@@ -61,9 +62,9 @@ impl<'a> Interpreter2<'a> {
             Op::MaxPool(maxpool) => self.run_node_max_pool(&maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => self.run_node_gavg_pool(node, &inputs, &mut outputs),
             Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),
-            Op::Flatten(_) => todo!(),
+            Op::Flatten(flatten) => self.run_node_flatten(&flatten, &inputs, &mut outputs),
             Op::MatMul => self.run_node_mat_mul(node, &inputs, &mut outputs),
-            Op::Gemm(_) => todo!(),
+            Op::Gemm(gemm) => self.run_node_gemm(&gemm, &inputs, &mut outputs),
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(hs) => self.run_node_hard_sigomid(&hs, &inputs, &mut outputs),
         }
@@ -76,6 +77,10 @@ impl<'a> Interpreter2<'a> {
     fn run_node_conv2d(&mut self, conv: &Conv2d, inputs: &[Tensor], outputs: &mut [Tensor]) {
         let input = &inputs[Node::CONV2D_IN];
         let weight = &inputs[Node::CONV2D_WEIGHT];
+        let bias = inputs.get(Node::CONV2D_BIAS).map_or(
+            Tensor::new(vec![weight.dims().as_slice()[0]].into()),
+            Clone::clone,
+        );
         let output = &mut outputs[0];
 
         let kernel = conv.kernel_shape.as_slice();
@@ -95,7 +100,7 @@ impl<'a> Interpreter2<'a> {
                     for ax in 0..output.dims().as_slice()[2] {
                         let mut y = -(padding[1] as isize);
                         for ay in 0..output.dims().as_slice()[3] {
-                            let mut sum = 0.0;
+                            let mut sum = bias.at(&[d]);
                             for fx in 0..kernel[0] as isize {
                                 for fy in 0..kernel[1] as isize {
                                     let ox = x + fx * dilation;
@@ -302,6 +307,49 @@ impl<'a> Interpreter2<'a> {
         }
     }
 
+    fn run_node_gemm(&mut self, gemm: &Gemm, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        let input_a = &inputs[Node::GEMM_IN_A];
+        let input_b = &inputs[Node::GEMM_IN_B];
+        let input_c = &inputs[Node::GEMM_IN_C];
+        let output = &mut outputs[Node::GEMM_OUT];
+
+        let dim_a = input_a.dims().as_slice();
+        let dim_b = input_b.dims().as_slice();
+        assert!(dim_a.len() == 2);
+        assert!(dim_b.len() == 2);
+        let (dim_a0, dim_a1) = if gemm.trans_a {
+            (dim_a[1], dim_a[0])
+        } else {
+            (dim_a[0], dim_a[1])
+        };
+        let (dim_b0, dim_b1) = if gemm.trans_b {
+            (dim_b[1], dim_b[0])
+        } else {
+            (dim_b[0], dim_b[1])
+        };
+        assert!(dim_a1 == dim_b0);
+        let input_a = if gemm.trans_a {
+            input_a.to_transposed_2d()
+        } else {
+            input_a.clone()
+        };
+        let input_b = if gemm.trans_b {
+            input_b.to_transposed_2d()
+        } else {
+            input_b.clone()
+        };
+
+        for i in 0..dim_a0 {
+            for j in 0..dim_b1 {
+                let mut t = 0.0;
+                for k in 0..dim_b0 {
+                    t += input_a.at_2d(i, k) * input_b.at_2d(k, j)
+                }
+                *output.at_2d_mut(i, j) = t * gemm.alpha + input_c.at(&[j]) * gemm.beta;
+            }
+        }
+    }
+
     fn run_node_relu(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
         let input = &inputs[Node::RELU_IN];
         let output = &mut outputs[Node::RELU_OUT];
@@ -351,5 +399,11 @@ impl<'a> Interpreter2<'a> {
                 .collect::<Vec<_>>()
                 .into(),
         );
+    }
+
+    fn run_node_flatten(&mut self, _flatten: &Flatten, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        let input = &inputs[Node::FLATTEN_IN];
+        let output = &mut outputs[Node::FLATTEN_OUT];
+        *output = input.clone().reshape_into(output.dims().clone());
     }
 }

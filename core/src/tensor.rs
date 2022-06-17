@@ -35,6 +35,17 @@ impl Tensor {
         self
     }
 
+    pub fn to_transposed_2d(&self) -> Self {
+        assert!(self.dims.len() == 2);
+        let mut out = Tensor::new(vec![self.dims.as_slice()[1], self.dims.as_slice()[0]].into());
+        for x in 0..self.dims.as_slice()[0] {
+            for y in 0..self.dims.as_slice()[1] {
+                *out.at_2d_mut(y, x) = self.at_2d(x, y);
+            }
+        }
+        out
+    }
+
     pub fn at(&self, indices: &[Dimension]) -> f32 {
         let mut index = 0;
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {

@@ -136,8 +136,8 @@ impl Node {
     }
 }
 
-/// Computes the output shape for a node given `inputs`.
-/// `attrs` could be overwritten. (e.g. paddings given auto_pad)
+/// Computes the output shape for `op`.
+/// `op` could be overwritten. (e.g. paddings given auto_pad)
 pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> {
     let mut shapes = vec![];
     match op {

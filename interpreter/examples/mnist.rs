@@ -5,8 +5,10 @@ use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
+use std::time::Instant;
 
 fn main() {
+    env_logger::init();
     let mnist_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
     let mnist = load_onnx(mnist_root.join("mnist-8.onnx")).unwrap();
 
@@ -34,7 +36,7 @@ fn main() {
     let validation_count = 10000;
     let repeat = 1;
 
-    let start = ::std::time::Instant::now();
+    let start = Instant::now();
 
     let input_value = mnist.lookup_named_value("Input3").unwrap();
 

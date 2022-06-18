@@ -136,6 +136,24 @@ impl Node {
     }
 }
 
+impl Op {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Op::Conv2d(_) => "Conv2d",
+            Op::Add => "Add",
+            Op::Mul => "Mul",
+            Op::ReLU => "ReLU",
+            Op::MaxPool(_) => "MaxPool",
+            Op::GlobalAveragePool => "GlobalAveragePool",
+            Op::Reshape => "Reshape",
+            Op::Flatten(_) => "Flatten",
+            Op::MatMul => "MatMul",
+            Op::Gemm(_) => "Gemm",
+            Op::HardSigmoid(_) => "HardSigmoid",
+        }
+    }
+}
+
 /// Computes the output shape for `op`.
 /// `op` could be overwritten. (e.g. paddings given auto_pad)
 pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> {

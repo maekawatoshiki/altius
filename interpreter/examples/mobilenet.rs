@@ -2,9 +2,19 @@ use altius_core::{onnx::load_onnx, tensor::Tensor};
 use altius_interpreter::Interpreter2;
 use std::cmp::Ordering;
 use std::path::Path;
+use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "compile")]
+pub struct Opt {
+    #[structopt(long = "profile", help = "Enable profiling")]
+    pub profile: bool,
+}
 
 fn main() {
     env_logger::init();
+
+    let opt = Opt::from_args();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
     let model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
     let input_value = model.lookup_named_value("input").unwrap();
@@ -20,7 +30,7 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 224, 224].into()).with_data(image.into_raw_vec().into());
 
-    let mut i = Interpreter2::new(&model);
+    let mut i = Interpreter2::new(&model).with_profiling(opt.profile);
     let out = i.run(vec![(input_value, input)]);
     let mut out = out
         .data()

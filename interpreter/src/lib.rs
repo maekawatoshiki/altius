@@ -5,10 +5,13 @@ use altius_core::{
     value::ValueId,
 };
 use rustc_hash::FxHashMap;
+use std::time::{Duration, Instant};
 
 pub struct Interpreter2<'a> {
     model: &'a Model,
     values: FxHashMap<ValueId, Tensor>,
+    profile: FxHashMap<&'static str, Duration>,
+    enable_profiling: bool,
 }
 
 impl<'a> Interpreter2<'a> {
@@ -16,7 +19,14 @@ impl<'a> Interpreter2<'a> {
         Interpreter2 {
             model,
             values: FxHashMap::default(),
+            profile: FxHashMap::default(),
+            enable_profiling: false,
         }
+    }
+
+    pub fn with_profiling(mut self, enable: bool) -> Self {
+        self.enable_profiling = enable;
+        self
     }
 
     pub fn run(&mut self, inputs: Vec<(ValueId, Tensor)>) -> &Tensor {
@@ -37,6 +47,10 @@ impl<'a> Interpreter2<'a> {
             self.run_node(node);
         }
 
+        if self.enable_profiling {
+            log::debug!("Profile: {:#?}", self.profile);
+        }
+
         &self.values[&self.model.outputs[0]]
     }
 
@@ -53,21 +67,26 @@ impl<'a> Interpreter2<'a> {
             outputs.push(Tensor::new(output_shape));
         }
 
-        log::debug!("Op: {op:?}");
+        let start = Instant::now();
 
         // Actual kernel runs here.
         match op {
-            Op::Conv2d(conv) => self.run_node_conv2d(&conv, &inputs, &mut outputs),
+            Op::Conv2d(ref conv) => self.run_node_conv2d(conv, &inputs, &mut outputs),
             Op::Add => self.run_node_add(node, &inputs, &mut outputs),
             Op::Mul => self.run_node_mul(node, &inputs, &mut outputs),
-            Op::MaxPool(maxpool) => self.run_node_max_pool(&maxpool, &inputs, &mut outputs),
+            Op::MaxPool(ref maxpool) => self.run_node_max_pool(maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => self.run_node_gavg_pool(node, &inputs, &mut outputs),
             Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),
-            Op::Flatten(flatten) => self.run_node_flatten(&flatten, &inputs, &mut outputs),
+            Op::Flatten(ref flatten) => self.run_node_flatten(flatten, &inputs, &mut outputs),
             Op::MatMul => self.run_node_mat_mul(node, &inputs, &mut outputs),
-            Op::Gemm(gemm) => self.run_node_gemm(&gemm, &inputs, &mut outputs),
+            Op::Gemm(ref gemm) => self.run_node_gemm(gemm, &inputs, &mut outputs),
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
-            Op::HardSigmoid(hs) => self.run_node_hard_sigomid(&hs, &inputs, &mut outputs),
+            Op::HardSigmoid(ref hs) => self.run_node_hard_sigomid(hs, &inputs, &mut outputs),
+        }
+
+        let elapsed = start.elapsed();
+        if self.enable_profiling {
+            *self.profile.entry(op.name()).or_insert(Duration::ZERO) += elapsed;
         }
 
         for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {

@@ -243,9 +243,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         }
         Op::Reshape => {
             let shape = inputs[Node::RESHAPE_SHAPE]
-                .data()
-                .as_i64()
-                .unwrap()
+                .data::<i64>()
                 .iter()
                 .map(|&x| x as usize)
                 .collect::<Vec<_>>();

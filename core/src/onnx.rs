@@ -1,13 +1,13 @@
 use prost::Message;
 use rustc_hash::FxHashMap;
-use std::{fs, io, mem::transmute, path::Path};
+use std::{fs, io, path::Path};
 use thiserror::Error;
 
 use crate::{
     dim::Dimensions,
     model::Model,
     node::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Node, Op},
-    tensor::{Tensor, TensorData},
+    tensor::{Tensor, TensorElemType},
 };
 
 use tensor_proto::DataType;
@@ -191,24 +191,27 @@ fn get_attribute<'a>(
 }
 
 fn get_tensor(tensor: &TensorProto) -> Tensor {
-    let data = match DataType::from_i32(tensor.data_type()).unwrap() {
-        DataType::Float if tensor.raw_data().is_empty() => {
-            TensorData::F32(tensor.float_data.clone())
-        }
-        DataType::Float => TensorData::F32(
-            unsafe { transmute::<&[u8], &[f32]>(tensor.raw_data()) }[..tensor.raw_data().len() / 4]
-                .to_vec(),
+    match DataType::from_i32(tensor.data_type()).unwrap() {
+        DataType::Float if tensor.raw_data().is_empty() => Tensor::new(
+            Dimensions::from_i64(&tensor.dims),
+            tensor.float_data.clone(),
         ),
-        DataType::Int64 if tensor.raw_data().is_empty() => {
-            TensorData::I64(tensor.int64_data.clone())
-        }
-        DataType::Int64 => TensorData::I64(
-            unsafe { transmute::<&[u8], &[i64]>(tensor.raw_data()) }[..tensor.raw_data().len() / 8]
-                .to_vec(),
+        DataType::Float => Tensor::new_from_raw(
+            Dimensions::from_i64(&tensor.dims),
+            TensorElemType::F32,
+            tensor.raw_data().to_vec(),
+        ),
+        DataType::Int64 if tensor.raw_data().is_empty() => Tensor::new(
+            Dimensions::from_i64(&tensor.dims),
+            tensor.int64_data.clone(),
+        ),
+        DataType::Int64 => Tensor::new_from_raw(
+            Dimensions::from_i64(&tensor.dims),
+            TensorElemType::I64,
+            tensor.raw_data().to_vec(),
         ),
         _ => todo!(),
-    };
-    Tensor::new(Dimensions::from_i64(&tensor.dims)).with_data(data)
+    }
 }
 
 pub fn load_onnx_model_proto(path: impl AsRef<Path>) -> Result<ModelProto, io::Error> {

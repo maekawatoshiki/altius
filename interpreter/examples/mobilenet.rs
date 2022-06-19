@@ -28,17 +28,11 @@ fn main() {
         let std = [0.229, 0.224, 0.225][c];
         (resized[(x as _, y as _)][c] as f32 / 255.0 - mean) / std
     });
-    let input = Tensor::new(vec![1, 3, 224, 224].into()).with_data(image.into_raw_vec().into());
+    let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec().into());
 
     let mut i = Interpreter2::new(&model).with_profiling(opt.profile);
     let out = i.run(vec![(input_value, input)]);
-    let mut out = out
-        .data()
-        .as_f32()
-        .unwrap()
-        .iter()
-        .enumerate()
-        .collect::<Vec<_>>();
+    let mut out = out.data::<f32>().iter().enumerate().collect::<Vec<_>>();
     out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
     println!("top5: {:?}", &out[..5]);
 }

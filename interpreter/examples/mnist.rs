@@ -22,7 +22,8 @@ fn main() {
         }
         let nums: Vec<&str> = line.split(",").collect();
         let expected: i32 = nums[0].parse().unwrap();
-        let pixels: Tensor = Tensor::new(vec![1, 1, 28, 28].into()).with_data(
+        let pixels: Tensor = Tensor::new(
+            vec![1, 1, 28, 28].into(),
             nums[1..]
                 .iter()
                 .map(|s| s.parse::<f32>().unwrap() / 255.0)
@@ -48,9 +49,7 @@ fn main() {
                 let mut i = Interpreter2::new(&mnist);
                 let v = i.run(vec![(input_value, input.clone())]);
                 let inferred = v
-                    .data()
-                    .as_f32()
-                    .unwrap()
+                    .data::<f32>()
                     .iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))

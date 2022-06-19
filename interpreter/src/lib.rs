@@ -1,4 +1,5 @@
 use altius_core::{
+    dim::Dimensions,
     model::Model,
     node::{compute_output_shapes, Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Node, NodeId, Op},
     tensor::Tensor,
@@ -64,7 +65,7 @@ impl<'a> Interpreter2<'a> {
         let output_shapes = compute_output_shapes(&mut op, &inputs);
         let mut outputs = vec![];
         for output_shape in output_shapes {
-            outputs.push(Tensor::new(output_shape));
+            outputs.push(Tensor::zeros::<f32>(output_shape));
         }
 
         let start = Instant::now();
@@ -98,7 +99,7 @@ impl<'a> Interpreter2<'a> {
         let input = &inputs[Node::CONV2D_IN];
         let weight = &inputs[Node::CONV2D_WEIGHT];
         let bias = inputs.get(Node::CONV2D_BIAS).map_or(
-            Tensor::new(vec![weight.dims().as_slice()[0]].into()),
+            Tensor::zeros::<f32>(vec![weight.dims().as_slice()[0]].into()),
             Clone::clone,
         );
         let output = &mut outputs[0];
@@ -228,14 +229,12 @@ impl<'a> Interpreter2<'a> {
 
         if input_a.dims() == input_b.dims() {
             for (i, (a, b)) in input_a
-                .data()
-                .as_f32()
-                .unwrap()
+                .data::<f32>()
                 .iter()
-                .zip(input_b.data().as_f32().unwrap().iter())
+                .zip(input_b.data::<f32>().iter())
                 .enumerate()
             {
-                output.data_mut().as_f32_mut().unwrap()[i] = a + b;
+                output.data_mut::<f32>()[i] = a + b;
             }
 
             return;
@@ -268,14 +267,12 @@ impl<'a> Interpreter2<'a> {
 
         if input_a.dims() == input_b.dims() {
             for (i, (a, b)) in input_a
-                .data()
-                .as_f32()
-                .unwrap()
+                .data::<f32>()
                 .iter()
-                .zip(input_b.data().as_f32().unwrap().iter())
+                .zip(input_b.data::<f32>().iter())
                 .enumerate()
             {
-                output.data_mut().as_f32_mut().unwrap()[i] = a * b;
+                output.data_mut::<f32>()[i] = a * b;
             }
 
             return;
@@ -375,11 +372,9 @@ impl<'a> Interpreter2<'a> {
         let output = &mut outputs[Node::RELU_OUT];
 
         for (i, o) in input
-            .data()
-            .as_f32()
-            .unwrap()
+            .data::<f32>()
             .iter()
-            .zip(output.data_mut().as_f32_mut().unwrap().iter_mut())
+            .zip(output.data_mut::<f32>().iter_mut())
         {
             *o = i.max(0.0);
         }
@@ -395,11 +390,9 @@ impl<'a> Interpreter2<'a> {
         let output = &mut outputs[Node::HARDSIGMOID_OUT];
 
         for (i, o) in input
-            .data()
-            .as_f32()
-            .unwrap()
+            .data::<f32>()
             .iter()
-            .zip(output.data_mut().as_f32_mut().unwrap().iter_mut())
+            .zip(output.data_mut::<f32>().iter_mut())
         {
             *o = (hs.alpha * i + hs.beta).min(1.0).max(0.0);
         }
@@ -409,16 +402,9 @@ impl<'a> Interpreter2<'a> {
         let input = &inputs[Node::RESHAPE_IN];
         let shape = &inputs[Node::RESHAPE_SHAPE];
         let output = &mut outputs[Node::RESHAPE_OUT];
-        *output = input.clone().reshape_into(
-            shape
-                .data()
-                .as_i64()
-                .unwrap()
-                .iter()
-                .map(|&x| x as usize)
-                .collect::<Vec<_>>()
-                .into(),
-        );
+        *output = input
+            .clone()
+            .reshape_into(Dimensions::from_i64(shape.data::<i64>()));
     }
 
     fn run_node_flatten(&mut self, _flatten: &Flatten, inputs: &[Tensor], outputs: &mut [Tensor]) {

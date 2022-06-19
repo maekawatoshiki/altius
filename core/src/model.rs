@@ -196,24 +196,24 @@ fn mnist_model() {
     m.outputs.push(add2_out);
 
     m.inits
-        .insert(add0_const, Tensor::new(vec![8, 1, 5, 5].into()));
+        .insert(add0_const, Tensor::zeros::<f32>(vec![8, 1, 5, 5].into()));
     m.inits
-        .insert(add1_const, Tensor::new(vec![8, 1, 1].into()));
+        .insert(add1_const, Tensor::zeros::<f32>(vec![8, 1, 1].into()));
     m.inits
-        .insert(add2_const, Tensor::new(vec![16, 1, 1].into()));
+        .insert(add2_const, Tensor::zeros::<f32>(vec![16, 1, 1].into()));
     m.inits
-        .insert(conv0_weight, Tensor::new(vec![8, 1, 5, 5].into()));
+        .insert(conv0_weight, Tensor::zeros::<f32>(vec![8, 1, 5, 5].into()));
     m.inits
-        .insert(conv1_weight, Tensor::new(vec![16, 8, 5, 5].into()));
+        .insert(conv1_weight, Tensor::zeros::<f32>(vec![16, 8, 5, 5].into()));
+    m.inits
+        .insert(reshape0_const, Tensor::new(vec![2].into(), vec![1i64, 256]));
     m.inits.insert(
-        reshape0_const,
-        Tensor::new(vec![2].into()).with_data(vec![1, 256].into()),
+        reshape1_const0,
+        Tensor::zeros::<f32>(vec![16, 4, 4, 10].into()),
     );
-    m.inits
-        .insert(reshape1_const0, Tensor::new(vec![16, 4, 4, 10].into()));
     m.inits.insert(
         reshape1_const1,
-        Tensor::new(vec![2].into()).with_data(vec![256, 10].into()),
+        Tensor::new(vec![2].into(), vec![256i64, 10]),
     );
 
     let order = m.topo_sort_nodes();

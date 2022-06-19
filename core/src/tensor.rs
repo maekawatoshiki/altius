@@ -132,6 +132,10 @@ impl TensorData {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn as_f32(&self) -> Option<&[f32]> {
         match self {
             Self::F32(data) => Some(data.as_slice()),
@@ -163,7 +167,7 @@ impl TensorData {
 
 fn compute_strides(dims: &Dimensions) -> Dimensions {
     let mut strides = vec![];
-    for i in 0..dims.as_slice().len() {
+    for i in 0..dims.len() {
         strides.push(dims.as_slice()[i + 1..].iter().product());
     }
     strides.into()

@@ -8,15 +8,12 @@ impl Dimensions {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn total_elems(&self) -> usize {
-        if self.len() == 0 {
-            return 0;
-        }
-        let mut elems = 1;
-        for d in &self.0 {
-            elems *= d;
-        }
-        elems
+        self.0.iter().product()
     }
 
     pub fn as_slice(&self) -> &[Dimension] {
@@ -24,7 +21,7 @@ impl Dimensions {
     }
 
     pub fn from_i64(dims: &[i64]) -> Self {
-        Self(dims.into_iter().map(|&x| x as Dimension).collect())
+        Self(dims.iter().map(|&x| x as Dimension).collect())
     }
 }
 

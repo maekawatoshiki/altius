@@ -131,8 +131,7 @@ impl Node {
     }
 
     pub fn alloc(self, arena: &mut NodeArena) -> NodeId {
-        let id = arena.alloc(self);
-        id
+        arena.alloc(self)
     }
 }
 

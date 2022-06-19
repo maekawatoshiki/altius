@@ -191,7 +191,6 @@ fn get_attribute<'a>(
 }
 
 fn get_tensor(tensor: &TensorProto) -> Tensor {
-    let dims = tensor.dims.iter().map(|&x| x as usize).collect::<Vec<_>>();
     let data = match DataType::from_i32(tensor.data_type()).unwrap() {
         DataType::Float if tensor.raw_data().is_empty() => {
             TensorData::F32(tensor.float_data.clone())
@@ -209,7 +208,7 @@ fn get_tensor(tensor: &TensorProto) -> Tensor {
         ),
         _ => todo!(),
     };
-    Tensor::new(dims.into()).with_data(data)
+    Tensor::new(Dimensions::from_i64(&tensor.dims)).with_data(data)
 }
 
 pub fn load_onnx_model_proto(path: impl AsRef<Path>) -> Result<ModelProto, io::Error> {

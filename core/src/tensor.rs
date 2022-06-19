@@ -4,28 +4,55 @@ use crate::dim::{Dimension, Dimensions};
 pub struct Tensor {
     dims: Dimensions,
     stride: Dimensions,
-    data: TensorData,
+    data: Vec<u8>,
+    elem_ty: TensorElemType,
 }
 
-#[derive(Debug, Clone)]
-pub enum TensorData {
-    F32(Vec<f32>),
-    I64(Vec<i64>),
+#[derive(Debug, Clone, Copy)]
+pub enum TensorElemType {
+    F32,
+    I64,
+}
+
+pub trait TensorElemTypeExt {
+    fn get_type() -> TensorElemType;
 }
 
 impl Tensor {
-    pub fn new(dims: Dimensions) -> Self {
+    pub fn new<T: TensorElemTypeExt>(dims: Dimensions, data: Vec<T>) -> Self {
+        let data = std::mem::ManuallyDrop::new(data);
         Self {
             stride: compute_strides(&dims),
-            data: TensorData::F32(vec![0.0; dims.total_elems()]),
+            elem_ty: T::get_type(),
+            data: unsafe {
+                Vec::from_raw_parts(
+                    data.as_ptr() as *mut u8,
+                    data.len() * std::mem::size_of::<T>(),
+                    data.capacity() * std::mem::size_of::<T>(),
+                )
+            },
             dims,
         }
     }
 
-    pub fn with_data(mut self, data: TensorData) -> Self {
-        self.data = data;
-        assert!(self.verify());
-        self
+    pub fn new_from_raw(dims: Dimensions, elem_ty: TensorElemType, data: Vec<u8>) -> Self {
+        let data = std::mem::ManuallyDrop::new(data);
+        Self {
+            stride: compute_strides(&dims),
+            elem_ty,
+            data: unsafe {
+                Vec::from_raw_parts(data.as_ptr() as *mut u8, data.len(), data.capacity())
+            },
+            dims,
+        }
+    }
+
+    pub fn zeros<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
+        let total_elems = dims.total_elems();
+        match T::get_type() {
+            TensorElemType::F32 => Self::new(dims, vec![0.0f32; total_elems]),
+            TensorElemType::I64 => Self::new(dims, vec![0i64; total_elems]),
+        }
     }
 
     pub fn reshape_into(mut self, dims: Dimensions) -> Self {
@@ -37,7 +64,8 @@ impl Tensor {
 
     pub fn to_transposed_2d(&self) -> Self {
         assert!(self.dims.len() == 2);
-        let mut out = Tensor::new(vec![self.dims.as_slice()[1], self.dims.as_slice()[0]].into());
+        let mut out =
+            Tensor::zeros::<f32>(vec![self.dims.as_slice()[1], self.dims.as_slice()[0]].into());
         for x in 0..self.dims.as_slice()[0] {
             for y in 0..self.dims.as_slice()[1] {
                 *out.at_2d_mut(y, x) = self.at_2d(x, y);
@@ -51,7 +79,7 @@ impl Tensor {
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
         }
-        self.data.as_f32().unwrap()[index]
+        self.data::<f32>()[index]
     }
 
     pub fn at_mut(&mut self, indices: &[Dimension]) -> &mut f32 {
@@ -59,32 +87,33 @@ impl Tensor {
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
         }
-        &mut self.data.as_f32_mut().unwrap()[index]
+        &mut self.data_mut::<f32>()[index]
     }
 
     pub fn at_2d(&self, x: Dimension, y: Dimension) -> f32 {
-        self.data.as_f32().unwrap()[self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y]
+        self.data::<f32>()[self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y]
     }
 
     pub fn at_2d_mut(&mut self, x: Dimension, y: Dimension) -> &mut f32 {
-        &mut self.data.as_f32_mut().unwrap()
-            [self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y]
+        let offset = self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y;
+        &mut self.data_mut::<f32>()[offset]
     }
 
     pub fn at_3d(&self, x: Dimension, y: Dimension, z: Dimension) -> f32 {
-        self.data.as_f32().unwrap()[self.stride.as_slice()[0] * x
+        self.data::<f32>()[self.stride.as_slice()[0] * x
             + self.stride.as_slice()[1] * y
             + self.stride.as_slice()[2] * z]
     }
 
     pub fn at_3d_mut(&mut self, x: Dimension, y: Dimension, z: Dimension) -> &mut f32 {
-        &mut self.data.as_f32_mut().unwrap()[self.stride.as_slice()[0] * x
+        let offset = self.stride.as_slice()[0] * x
             + self.stride.as_slice()[1] * y
-            + self.stride.as_slice()[2] * z]
+            + self.stride.as_slice()[2] * z;
+        &mut self.data_mut::<f32>()[offset]
     }
 
     pub fn at_4d(&self, x: Dimension, y: Dimension, z: Dimension, u: Dimension) -> f32 {
-        self.data.as_f32().unwrap()[self.stride.as_slice()[0] * x
+        self.data::<f32>()[self.stride.as_slice()[0] * x
             + self.stride.as_slice()[1] * y
             + self.stride.as_slice()[2] * z
             + self.stride.as_slice()[3] * u]
@@ -97,71 +126,58 @@ impl Tensor {
         z: Dimension,
         u: Dimension,
     ) -> &mut f32 {
-        &mut self.data.as_f32_mut().unwrap()[self.stride.as_slice()[0] * x
+        let offset = self.stride.as_slice()[0] * x
             + self.stride.as_slice()[1] * y
             + self.stride.as_slice()[2] * z
-            + self.stride.as_slice()[3] * u]
+            + self.stride.as_slice()[3] * u;
+        &mut self.data_mut::<f32>()[offset]
     }
 
     pub fn dims(&self) -> &Dimensions {
         &self.dims
     }
 
-    pub fn data(&self) -> &TensorData {
-        &self.data
+    pub fn data<T>(&self) -> &[T] {
+        unsafe {
+            std::slice::from_raw_parts(
+                self.data.as_ptr() as *const T,
+                self.data.len() / std::mem::size_of::<T>(),
+            )
+        }
     }
 
-    pub fn data_mut(&mut self) -> &mut TensorData {
-        &mut self.data
+    pub fn data_mut<T>(&mut self) -> &mut [T] {
+        unsafe {
+            std::slice::from_raw_parts_mut(
+                self.data.as_ptr() as *mut T,
+                self.data.len() / std::mem::size_of::<T>(),
+            )
+        }
     }
 
     pub fn verify(&self) -> bool {
-        self.data.len() == self.dims.total_elems()
+        self.data.len() / self.elem_ty.size() == self.dims.total_elems()
     }
 }
 
-impl TensorData {
-    pub fn new_raw_f32(data: Vec<f32>) -> Self {
-        Self::F32(data)
-    }
-
-    pub fn len(&self) -> usize {
+impl TensorElemType {
+    pub fn size(&self) -> usize {
         match self {
-            Self::F32(data) => data.len(),
-            Self::I64(data) => data.len(),
+            TensorElemType::F32 => std::mem::size_of::<f32>(),
+            TensorElemType::I64 => std::mem::size_of::<i64>(),
         }
     }
+}
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+impl TensorElemTypeExt for f32 {
+    fn get_type() -> TensorElemType {
+        TensorElemType::F32
     }
+}
 
-    pub fn as_f32(&self) -> Option<&[f32]> {
-        match self {
-            Self::F32(data) => Some(data.as_slice()),
-            _ => None,
-        }
-    }
-
-    pub fn as_f32_mut(&mut self) -> Option<&mut [f32]> {
-        match self {
-            Self::F32(data) => Some(data),
-            _ => None,
-        }
-    }
-
-    pub fn as_i64(&self) -> Option<&[i64]> {
-        match self {
-            Self::I64(data) => Some(data.as_slice()),
-            _ => None,
-        }
-    }
-
-    pub fn as_i64_mut(&mut self) -> Option<&mut [i64]> {
-        match self {
-            Self::I64(data) => Some(data),
-            _ => None,
-        }
+impl TensorElemTypeExt for i64 {
+    fn get_type() -> TensorElemType {
+        TensorElemType::I64
     }
 }
 
@@ -173,23 +189,15 @@ fn compute_strides(dims: &Dimensions) -> Dimensions {
     strides.into()
 }
 
-impl From<Vec<f32>> for TensorData {
-    fn from(data: Vec<f32>) -> Self {
-        Self::F32(data)
-    }
-}
-
-impl From<Vec<i64>> for TensorData {
-    fn from(data: Vec<i64>) -> Self {
-        Self::I64(data)
-    }
-}
-
 #[test]
 fn create_tensors() {
-    let _ = Tensor::new(Dimensions(vec![1, 1, 28, 28]));
-    let t = Tensor::new(Dimensions(vec![4, 4])).with_data(TensorData::F32(vec![
-        1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
-    ]));
+    let _ = Tensor::zeros::<f32>(Dimensions(vec![1, 1, 28, 28]));
+    let t = Tensor::new(
+        vec![4, 4].into(),
+        vec![
+            1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+            16.0,
+        ],
+    );
     assert!(t.verify());
 }

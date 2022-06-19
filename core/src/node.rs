@@ -162,12 +162,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             let auto_pad = &conv.auto_pad;
             let kernel = &conv.kernel_shape;
             let stride = &conv.strides;
-            let padding = &conv.padding;
-            let kernel = kernel.as_slice();
-            let stride = stride.as_slice();
-            let mut padding = padding.as_slice();
-            let input = inputs[Node::CONV2D_IN].dims().as_slice();
-            let weight = inputs[Node::CONV2D_WEIGHT].dims().as_slice();
+            let mut padding = &conv.padding;
+            let input = inputs[Node::CONV2D_IN].dims();
+            let weight = inputs[Node::CONV2D_WEIGHT].dims();
 
             if !auto_pad.is_empty() && auto_pad != "NOTSET" {
                 let out0 = (input[2] as f32 / stride[0] as f32).ceil() as usize;
@@ -179,7 +176,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 assert!(auto_pad == "SAME_UPPER");
                 let new_padding = vec![pad0 / 2, pad1 / 2, pad0 - pad0 / 2, pad1 - pad1 / 2];
                 conv.padding = new_padding.into();
-                padding = conv.padding.as_slice();
+                padding = &conv.padding;
             }
 
             let h_in = input[2];
@@ -199,9 +196,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 in_a == in_b || {
                     in_a.len() == 4
                         && in_b.len() == 3
-                        && in_a.as_slice()[1] == in_b.as_slice()[0]
-                        && in_b.as_slice()[1] == 1
-                        && in_b.as_slice()[2] == 1
+                        && in_a[1] == in_b[0]
+                        && in_b[1] == 1
+                        && in_b[2] == 1
                 }
             ); // TODO: Support broadcasting.
             shapes.push(in_a.clone());
@@ -213,10 +210,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 in_a == in_b || {
                     in_a.len() == 4
                         && in_b.len() == 4
-                        && in_a.as_slice()[0] == in_b.as_slice()[0]
-                        && in_a.as_slice()[1] == in_b.as_slice()[1]
-                        && in_a.as_slice()[2] == 1
-                        && in_a.as_slice()[3] == 1
+                        && in_a[0] == in_b[0]
+                        && in_a[1] == in_b[1]
+                        && in_a[2] == 1
+                        && in_a[3] == 1
                 }
             ); // TODO: Support broadcasting.
             shapes.push(in_b.clone());
@@ -226,18 +223,18 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             let stride = &maxpool.strides;
             let input = &inputs[Node::MAXPOOL_IN].dims();
 
-            let h_in = input.as_slice()[2];
-            let w_in = input.as_slice()[3];
+            let h_in = input[2];
+            let w_in = input[3];
             let output_shape = vec![
-                input.as_slice()[0],
-                input.as_slice()[1],
-                (h_in + 2 * 0 - 1 * (kernel.as_slice()[0] - 1) - 1) / stride.as_slice()[0] + 1,
-                (w_in + 2 * 0 - 1 * (kernel.as_slice()[1] - 1) - 1) / stride.as_slice()[1] + 1,
+                input[0],
+                input[1],
+                (h_in + 2 * 0 - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
+                (w_in + 2 * 0 - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
             shapes.push(output_shape.into());
         }
         Op::GlobalAveragePool => {
-            let input = &inputs[Node::GLOBALAVERAGEPOOL_IN].dims().as_slice();
+            let input = &inputs[Node::GLOBALAVERAGEPOOL_IN].dims();
             assert!(input.len() == 4);
             shapes.push(vec![input[0], input[1], 1, 1].into());
         }
@@ -250,7 +247,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             shapes.push(shape.into());
         }
         Op::Flatten(flatten) => {
-            let dims = inputs[Node::FLATTEN_IN].dims().as_slice();
+            let dims = inputs[Node::FLATTEN_IN].dims();
             assert!(flatten.axis >= 0);
             let x: Dimensions = dims[..flatten.axis as usize].to_vec().into();
             let y: Dimensions = dims[flatten.axis as usize..].to_vec().into();
@@ -259,17 +256,17 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         Op::MatMul => {
             let in_a = &inputs[Node::MATMUL_IN_A].dims();
             let in_b = &inputs[Node::MATMUL_IN_B].dims();
-            assert_eq!(in_a.as_slice()[1], in_b.as_slice()[0]);
-            shapes.push(vec![in_a.as_slice()[0], in_b.as_slice()[1]].into());
+            assert_eq!(in_a[1], in_b[0]);
+            shapes.push(vec![in_a[0], in_b[1]].into());
         }
         Op::Gemm(gemm) => {
-            let in_a = &inputs[Node::GEMM_IN_A].dims().as_slice();
+            let in_a = &inputs[Node::GEMM_IN_A].dims();
             let (in_a0, in_a1) = if gemm.trans_a {
                 (in_a[1], in_a[0])
             } else {
                 (in_a[0], in_a[1])
             };
-            let in_b = &inputs[Node::GEMM_IN_B].dims().as_slice();
+            let in_b = &inputs[Node::GEMM_IN_B].dims();
             let (in_b0, in_b1) = if gemm.trans_b {
                 (in_b[1], in_b[0])
             } else {

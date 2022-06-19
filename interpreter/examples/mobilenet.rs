@@ -1,6 +1,7 @@
 use altius_core::{onnx::load_onnx, tensor::Tensor};
 use altius_interpreter::Interpreter2;
 use std::cmp::Ordering;
+use std::fs;
 use std::path::Path;
 use structopt::StructOpt;
 
@@ -19,9 +20,7 @@ fn main() {
     let model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
     let input_value = model.lookup_named_value("input").unwrap();
 
-    let image = image::open(root.join("grace_hopper.jpg"))
-        .unwrap()
-        .to_rgb8();
+    let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
     let resized = image::imageops::resize(&image, 224, 224, image::imageops::FilterType::Triangle);
     let image = ndarray::Array4::from_shape_fn((1, 3, 224, 224), |(_, c, y, x)| {
         let mean = [0.485, 0.456, 0.406][c];
@@ -34,5 +33,9 @@ fn main() {
     let out = i.run(vec![(input_value, input)]);
     let mut out = out.data::<f32>().iter().enumerate().collect::<Vec<_>>();
     out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+
+    let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
+    let classes = classes.split("\n").collect::<Vec<_>>();
+    println!("inferred: {}", classes[out[0].0]);
     println!("top5: {:?}", &out[..5]);
 }

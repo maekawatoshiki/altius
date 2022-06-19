@@ -1,3 +1,8 @@
+use std::{
+    ops::{Index, IndexMut},
+    slice::SliceIndex,
+};
+
 pub type Dimension = usize;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -22,6 +27,26 @@ impl Dimensions {
 
     pub fn from_i64(dims: &[i64]) -> Self {
         Self(dims.iter().map(|&x| x as Dimension).collect())
+    }
+}
+
+impl<I> Index<I> for Dimensions
+where
+    I: SliceIndex<[Dimension]>,
+{
+    type Output = <I as SliceIndex<[Dimension]>>::Output;
+
+    fn index(&self, index: I) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl<I> IndexMut<I> for Dimensions
+where
+    I: SliceIndex<[Dimension]>,
+{
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }
 

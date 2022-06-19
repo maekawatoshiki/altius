@@ -99,28 +99,28 @@ impl<'a> Interpreter2<'a> {
         let input = &inputs[Node::CONV2D_IN];
         let weight = &inputs[Node::CONV2D_WEIGHT];
         let bias = inputs.get(Node::CONV2D_BIAS).map_or(
-            Tensor::zeros::<f32>(vec![weight.dims().as_slice()[0]].into()),
+            Tensor::zeros::<f32>(vec![weight.dims()[0]].into()),
             Clone::clone,
         );
         let output = &mut outputs[0];
 
-        let kernel = conv.kernel_shape.as_slice();
-        let padding = conv.padding.as_slice();
-        let stride = conv.strides.as_slice();
+        let kernel = &conv.kernel_shape;
+        let padding = &conv.padding;
+        let stride = &conv.strides;
 
         let dilation = 1;
         let group = conv.group as usize;
-        let in_c_per_g = input.dims().as_slice()[1] / group;
-        let out_c_per_g = output.dims().as_slice()[1] / group;
+        let in_c_per_g = input.dims()[1] / group;
+        let out_c_per_g = output.dims()[1] / group;
 
         // let mut output = Tensor::new(node.output_dims.clone());
-        for n in 0..input.dims().as_slice()[0] {
+        for n in 0..input.dims()[0] {
             for g in 0..group {
                 for d in (g * out_c_per_g)..((g + 1) * out_c_per_g) {
                     let mut x = -(padding[0] as isize);
-                    for ax in 0..output.dims().as_slice()[2] {
+                    for ax in 0..output.dims()[2] {
                         let mut y = -(padding[1] as isize);
-                        for ay in 0..output.dims().as_slice()[3] {
+                        for ay in 0..output.dims()[3] {
                             let mut sum = bias.at(&[d]);
                             for fx in 0..kernel[0] as isize {
                                 for fy in 0..kernel[1] as isize {
@@ -129,8 +129,8 @@ impl<'a> Interpreter2<'a> {
 
                                     if ox < 0
                                         || oy < 0
-                                        || ox >= input.dims().as_slice()[2] as isize
-                                        || oy >= input.dims().as_slice()[3] as isize
+                                        || ox >= input.dims()[2] as isize
+                                        || oy >= input.dims()[3] as isize
                                     {
                                         continue;
                                     }
@@ -163,15 +163,14 @@ impl<'a> Interpreter2<'a> {
         assert!(input.dims().len() == 4);
         assert!(output.dims().len() == 4);
 
-        for n in 0..input.dims().as_slice()[0] {
-            for c in 0..input.dims().as_slice()[1] {
-                for h in 0..input.dims().as_slice()[2] {
-                    for w in 0..input.dims().as_slice()[3] {
+        for n in 0..input.dims()[0] {
+            for c in 0..input.dims()[1] {
+                for h in 0..input.dims()[2] {
+                    for w in 0..input.dims()[3] {
                         *output.at_4d_mut(n, c, 0, 0) += input.at_4d(n, c, h, w);
                     }
                 }
-                *output.at_4d_mut(n, c, 0, 0) /=
-                    (input.dims().as_slice()[2] * input.dims().as_slice()[3]) as f32;
+                *output.at_4d_mut(n, c, 0, 0) /= (input.dims()[2] * input.dims()[3]) as f32;
             }
         }
     }
@@ -180,18 +179,18 @@ impl<'a> Interpreter2<'a> {
         let input = &inputs[Node::MAXPOOL_IN];
         let output = &mut outputs[Node::MAXPOOL_OUT];
 
-        let kernel = maxpool.kernel_shape.as_slice();
-        let stride = maxpool.strides.as_slice();
+        let kernel = &maxpool.kernel_shape;
+        let stride = &maxpool.strides;
 
         assert!(input.dims().len() == 4);
         assert!(output.dims().len() == 4);
 
-        for n in 0..output.dims().as_slice()[0] {
-            for z in 0..input.dims().as_slice()[1] {
+        for n in 0..output.dims()[0] {
+            for z in 0..input.dims()[1] {
                 let mut x = 0isize; // TODO: pad
-                for ax in 0..output.dims().as_slice()[2] {
+                for ax in 0..output.dims()[2] {
                     let mut y = 0isize; // TODO: pad
-                    for ay in 0..output.dims().as_slice()[3] {
+                    for ay in 0..output.dims()[3] {
                         let mut max = f32::MIN;
                         for fx in 0..kernel[0] as isize {
                             for fy in 0..kernel[1] as isize {
@@ -200,8 +199,8 @@ impl<'a> Interpreter2<'a> {
 
                                 if ox < 0
                                     || oy < 0
-                                    || ox >= input.dims().as_slice()[2] as isize
-                                    || oy >= input.dims().as_slice()[3] as isize
+                                    || ox >= input.dims()[2] as isize
+                                    || oy >= input.dims()[3] as isize
                                 {
                                     continue;
                                 }
@@ -241,14 +240,14 @@ impl<'a> Interpreter2<'a> {
         }
 
         if input_a.dims().len() == 4 && input_b.dims().len() == 3 {
-            assert!(input_a.dims().as_slice()[1] == input_b.dims().as_slice()[0]);
-            assert!(input_b.dims().as_slice()[1] == 1);
-            assert!(input_b.dims().as_slice()[2] == 1);
+            assert!(input_a.dims()[1] == input_b.dims()[0]);
+            assert!(input_b.dims()[1] == 1);
+            assert!(input_b.dims()[2] == 1);
 
-            for n in 0..input_a.dims().as_slice()[0] {
-                for z in 0..input_a.dims().as_slice()[1] {
-                    for x in 0..input_a.dims().as_slice()[2] {
-                        for y in 0..input_a.dims().as_slice()[3] {
+            for n in 0..input_a.dims()[0] {
+                for z in 0..input_a.dims()[1] {
+                    for x in 0..input_a.dims()[2] {
+                        for y in 0..input_a.dims()[3] {
                             *output.at_4d_mut(n, z, x, y) =
                                 input_a.at_4d(n, z, x, y) + input_b.at_3d(z, 0, 0);
                         }
@@ -278,8 +277,8 @@ impl<'a> Interpreter2<'a> {
             return;
         }
 
-        let in_a = input_a.dims().as_slice();
-        let in_b = input_b.dims().as_slice();
+        let in_a = input_a.dims();
+        let in_b = input_b.dims();
         if in_a.len() == 4
             && in_b.len() == 4
             && in_a[0] == in_b[0]
@@ -311,12 +310,12 @@ impl<'a> Interpreter2<'a> {
 
         assert!(input_a.dims().len() == 2);
         assert!(input_b.dims().len() == 2);
-        assert!(input_a.dims().as_slice()[1] == input_b.dims().as_slice()[0]);
+        assert!(input_a.dims()[1] == input_b.dims()[0]);
 
-        for i in 0..input_a.dims().as_slice()[0] {
-            for j in 0..input_b.dims().as_slice()[1] {
+        for i in 0..input_a.dims()[0] {
+            for j in 0..input_b.dims()[1] {
                 let mut t = 0.0;
-                for k in 0..input_b.dims().as_slice()[0] {
+                for k in 0..input_b.dims()[0] {
                     t += input_a.at_2d(i, k) * input_b.at_2d(k, j);
                 }
                 *output.at_2d_mut(i, j) = t;
@@ -330,8 +329,8 @@ impl<'a> Interpreter2<'a> {
         let input_c = &inputs[Node::GEMM_IN_C];
         let output = &mut outputs[Node::GEMM_OUT];
 
-        let dim_a = input_a.dims().as_slice();
-        let dim_b = input_b.dims().as_slice();
+        let dim_a = input_a.dims();
+        let dim_b = input_b.dims();
         assert!(dim_a.len() == 2);
         assert!(dim_b.len() == 2);
         let (dim_a0, dim_a1) = if gemm.trans_a {

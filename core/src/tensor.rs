@@ -64,10 +64,9 @@ impl Tensor {
 
     pub fn to_transposed_2d(&self) -> Self {
         assert!(self.dims.len() == 2);
-        let mut out =
-            Tensor::zeros::<f32>(vec![self.dims.as_slice()[1], self.dims.as_slice()[0]].into());
-        for x in 0..self.dims.as_slice()[0] {
-            for y in 0..self.dims.as_slice()[1] {
+        let mut out = Tensor::zeros::<f32>(vec![self.dims[1], self.dims[0]].into());
+        for x in 0..self.dims[0] {
+            for y in 0..self.dims[1] {
                 *out.at_2d_mut(y, x) = self.at_2d(x, y);
             }
         }
@@ -91,32 +90,26 @@ impl Tensor {
     }
 
     pub fn at_2d(&self, x: Dimension, y: Dimension) -> f32 {
-        self.data::<f32>()[self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y]
+        self.data::<f32>()[self.stride[0] * x + self.stride[1] * y]
     }
 
     pub fn at_2d_mut(&mut self, x: Dimension, y: Dimension) -> &mut f32 {
-        let offset = self.stride.as_slice()[0] * x + self.stride.as_slice()[1] * y;
+        let offset = self.stride[0] * x + self.stride[1] * y;
         &mut self.data_mut::<f32>()[offset]
     }
 
     pub fn at_3d(&self, x: Dimension, y: Dimension, z: Dimension) -> f32 {
-        self.data::<f32>()[self.stride.as_slice()[0] * x
-            + self.stride.as_slice()[1] * y
-            + self.stride.as_slice()[2] * z]
+        self.data::<f32>()[self.stride[0] * x + self.stride[1] * y + self.stride[2] * z]
     }
 
     pub fn at_3d_mut(&mut self, x: Dimension, y: Dimension, z: Dimension) -> &mut f32 {
-        let offset = self.stride.as_slice()[0] * x
-            + self.stride.as_slice()[1] * y
-            + self.stride.as_slice()[2] * z;
+        let offset = self.stride[0] * x + self.stride[1] * y + self.stride[2] * z;
         &mut self.data_mut::<f32>()[offset]
     }
 
     pub fn at_4d(&self, x: Dimension, y: Dimension, z: Dimension, u: Dimension) -> f32 {
-        self.data::<f32>()[self.stride.as_slice()[0] * x
-            + self.stride.as_slice()[1] * y
-            + self.stride.as_slice()[2] * z
-            + self.stride.as_slice()[3] * u]
+        self.data::<f32>()
+            [self.stride[0] * x + self.stride[1] * y + self.stride[2] * z + self.stride[3] * u]
     }
 
     pub fn at_4d_mut(
@@ -126,10 +119,8 @@ impl Tensor {
         z: Dimension,
         u: Dimension,
     ) -> &mut f32 {
-        let offset = self.stride.as_slice()[0] * x
-            + self.stride.as_slice()[1] * y
-            + self.stride.as_slice()[2] * z
-            + self.stride.as_slice()[3] * u;
+        let offset =
+            self.stride[0] * x + self.stride[1] * y + self.stride[2] * z + self.stride[3] * u;
         &mut self.data_mut::<f32>()[offset]
     }
 
@@ -184,7 +175,7 @@ impl TensorElemTypeExt for i64 {
 fn compute_strides(dims: &Dimensions) -> Dimensions {
     let mut strides = vec![];
     for i in 0..dims.len() {
-        strides.push(dims.as_slice()[i + 1..].iter().product());
+        strides.push(dims[i + 1..].iter().product());
     }
     strides.into()
 }

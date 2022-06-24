@@ -104,24 +104,6 @@ impl<'a> Interpreter2<'a> {
         );
         let output = &mut outputs[0];
 
-        {
-            use convolutions_rs::convolutions;
-            use ndarray::Array4;
-
-            let kernel_weights: Array4<f32> = Array4::from_shape_vec(
-                [
-                    weight.dims()[0],
-                    weight.dims()[1],
-                    weight.dims()[2],
-                    weight.dims()[3],
-                ],
-                weight.data::<f32>().to_vec(),
-            )
-            .unwrap();
-
-            // convolutions::conv2d(kernel_weights, bias, im2d, padding, stride)
-        }
-
         let kernel = &conv.kernel_shape;
         let padding = &conv.padding;
         let stride = &conv.strides;
@@ -130,6 +112,62 @@ impl<'a> Interpreter2<'a> {
         let group = conv.group as usize;
         let in_c_per_g = input.dims()[1] / group;
         let out_c_per_g = output.dims()[1] / group;
+
+        for g in 0..group {
+            let h_in = input.dims()[2];
+            let w_in = input.dims()[3];
+            use convolutions_rs::convolutions;
+            use convolutions_rs::Padding;
+            use ndarray::{Array3, Array4};
+
+            let in_c_per_g = input.dims()[1] / conv.group as usize;
+            let n = 0;
+            // let g = 0;
+            // let c = 0;
+            // println!("s> {}", in_c_per_g * input.dims()[2] * input.dims()[3]);
+            let input: Array3<f32> = Array3::from_shape_vec(
+                [in_c_per_g, input.dims()[2], input.dims()[3]],
+                input
+                    .data_batch::<f32>(n, g * in_c_per_g, in_c_per_g)
+                    .to_vec(),
+            )
+            .unwrap();
+
+            let kernel_weights: Array4<f32> = Array4::from_shape_vec(
+                [
+                    weight.dims()[0],
+                    weight.dims()[1], // * conv.group as usize,
+                    weight.dims()[2],
+                    weight.dims()[3],
+                ],
+                weight.data::<f32>().to_vec(),
+            )
+            .unwrap();
+
+            // println!("{:#?}", conv.padding);
+
+            let h = (h_in + 2 * padding[0] - 1 * (kernel[0] - 1) - 1) / stride[0] + 1;
+            let w = (w_in + 2 * padding[1] - 1 * (kernel[1] - 1) - 1) / stride[1] + 1;
+            println!("{} {} {} {}", h_in, w_in, h, w);
+            println!("input: {:?}", input.shape());
+            println!("kernel: {:?}", kernel_weights.shape());
+            println!("group: {}", conv.group);
+
+            convolutions::conv2d(
+                &kernel_weights,
+                None,
+                &input,
+                if h == h_in {
+                    Padding::Same
+                } else {
+                    Padding::Valid
+                },
+                stride[0],
+            );
+            println!("OK")
+        }
+
+        return;
 
         // let mut output = Tensor::new(node.output_dims.clone());
         for n in 0..input.dims()[0] {

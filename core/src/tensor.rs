@@ -146,6 +146,19 @@ impl Tensor {
         }
     }
 
+    pub fn data_batch<T>(&self, b: usize, c: usize, q: usize) -> &[T] {
+        let a = self.stride[0] * b + self.stride[1] * c;
+        let b = self.stride[0] * b + self.stride[1] * (c + q);
+        println!("> {}", b - a);
+        unsafe {
+            std::slice::from_raw_parts(
+                self.data.as_ptr() as *const T,
+                // self.data.len() / std::mem::size_of::<T>(),
+                b - a,
+            )
+        }
+    }
+
     pub fn verify(&self) -> bool {
         self.data.len() / self.elem_ty.size() == self.dims.total_elems()
     }

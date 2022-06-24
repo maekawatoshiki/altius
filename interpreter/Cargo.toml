@@ -9,7 +9,7 @@ edition = "2018"
 altius-core = { path = "../core" }
 log = "0.4.17"
 rustc-hash = "1.1.0"
-ndarray = "0.15.4"
+ndarray = "0.15.3"
 convolutions-rs = { git = "https://github.com/Conzel/convolutions-rs" }
 
 [dev-dependencies]

@@ -104,6 +104,24 @@ impl<'a> Interpreter2<'a> {
         );
         let output = &mut outputs[0];
 
+        {
+            use convolutions_rs::convolutions;
+            use ndarray::Array4;
+
+            let kernel_weights: Array4<f32> = Array4::from_shape_vec(
+                [
+                    weight.dims()[0],
+                    weight.dims()[1],
+                    weight.dims()[2],
+                    weight.dims()[3],
+                ],
+                weight.data::<f32>().to_vec(),
+            )
+            .unwrap();
+
+            // convolutions::conv2d(kernel_weights, bias, im2d, padding, stride)
+        }
+
         let kernel = &conv.kernel_shape;
         let padding = &conv.padding;
         let stride = &conv.strides;

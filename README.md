@@ -1,5 +1,5 @@
 # altius
-Lightweight DNN Compiler written in Rust
+Small DNN runtime written in Rust
 
 # Run
 

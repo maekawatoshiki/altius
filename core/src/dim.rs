@@ -25,6 +25,10 @@ impl Dimensions {
         self.0.as_slice()
     }
 
+    pub fn to_i32_vec(&self) -> Vec<i32> {
+        self.0.iter().map(|&x| x as i32).collect()
+    }
+
     pub fn from_i64(dims: &[i64]) -> Self {
         Self(dims.iter().map(|&x| x as Dimension).collect())
     }

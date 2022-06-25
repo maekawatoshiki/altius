@@ -7,6 +7,9 @@ use altius_core::{
     tensor::Tensor,
     value::ValueId,
 };
+use conv2d::Conv2dCtx;
+#[cfg(feature = "cuda")]
+use cudnn::CudnnContext;
 use rustc_hash::FxHashMap;
 use std::time::{Duration, Instant};
 
@@ -14,6 +17,8 @@ pub struct Interpreter2<'a> {
     model: &'a Model,
     values: FxHashMap<ValueId, Tensor>,
     profile: FxHashMap<&'static str, Duration>,
+    #[cfg(feature = "cuda")]
+    cudnn_ctx: CudnnContext,
     enable_profiling: bool,
 }
 
@@ -23,6 +28,8 @@ impl<'a> Interpreter2<'a> {
             model,
             values: FxHashMap::default(),
             profile: FxHashMap::default(),
+            #[cfg(feature = "cuda")]
+            cudnn_ctx: CudnnContext::new().expect("cudnn context init failed"),
             enable_profiling: false,
         }
     }
@@ -30,6 +37,10 @@ impl<'a> Interpreter2<'a> {
     pub fn with_profiling(mut self, enable: bool) -> Self {
         self.enable_profiling = enable;
         self
+    }
+
+    pub fn reset_profile(&mut self) {
+        self.profile.clear();
     }
 
     pub fn run(&mut self, inputs: Vec<(ValueId, Tensor)>) -> &Tensor {
@@ -51,6 +62,10 @@ impl<'a> Interpreter2<'a> {
         }
 
         if self.enable_profiling {
+            log::debug!(
+                "Total execution time: {:#?}",
+                self.profile.values().sum::<Duration>()
+            );
             log::debug!("Profile: {:#?}", self.profile);
         }
 
@@ -74,7 +89,13 @@ impl<'a> Interpreter2<'a> {
 
         // Actual kernel runs here.
         match op {
-            Op::Conv2d(ref conv) => conv2d::run(conv, &inputs, &mut outputs),
+            Op::Conv2d(ref conv) => conv2d::run(&mut Conv2dCtx {
+                #[cfg(feature = "cuda")]
+                cudnn: &self.cudnn_ctx,
+                op: conv,
+                inputs: &inputs,
+                outputs: &mut outputs,
+            }),
             Op::Add => self.run_node_add(node, &inputs, &mut outputs),
             Op::Mul => self.run_node_mul(node, &inputs, &mut outputs),
             Op::MaxPool(ref maxpool) => self.run_node_max_pool(maxpool, &inputs, &mut outputs),

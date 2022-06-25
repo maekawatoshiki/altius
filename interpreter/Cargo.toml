@@ -9,6 +9,11 @@ edition = "2018"
 altius-core = { path = "../core" }
 log = "0.4.17"
 rustc-hash = "1.1.0"
+cudnn = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
+cust = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
+
+[features]
+cuda = ["cudnn", "cust"]
 
 [dev-dependencies]
 env_logger = "0.9.0"

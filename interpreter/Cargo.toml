@@ -11,6 +11,7 @@ log = "0.4.17"
 rustc-hash = "1.1.0"
 cudnn = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
+ndarray = "0.15.4"
 
 [features]
 cuda = ["cudnn", "cust"]

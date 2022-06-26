@@ -20,6 +20,8 @@ pub struct Conv2dCtx<'a> {
 
 #[cfg(not(feature = "cuda"))]
 pub fn run(ctx: &mut Conv2dCtx) {
+    use ndarray::{linalg, s, Array, Array3, Array4, Array6};
+
     let input = &ctx.inputs[Node::CONV2D_IN];
     let weight = &ctx.inputs[Node::CONV2D_WEIGHT];
     let bias = ctx.inputs.get(Node::CONV2D_BIAS).map_or(
@@ -32,52 +34,137 @@ pub fn run(ctx: &mut Conv2dCtx) {
     let padding = &ctx.op.padding;
     let stride = &ctx.op.strides;
 
-    let dilation = 1;
+    let _dilation = 1;
     let group = ctx.op.group as usize;
     let in_c_per_g = input.dims()[1] / group;
     let out_c_per_g = output.dims()[1] / group;
 
-    // let mut output = Tensor::new(node.output_dims.clone());
-    for n in 0..input.dims()[0] {
-        for g in 0..group {
-            for d in (g * out_c_per_g)..((g + 1) * out_c_per_g) {
-                let mut x = -(padding[0] as isize);
-                for ax in 0..output.dims()[2] {
-                    let mut y = -(padding[1] as isize);
-                    for ay in 0..output.dims()[3] {
-                        let mut sum = bias.at(&[d]);
-                        for fx in 0..kernel[0] as isize {
-                            for fy in 0..kernel[1] as isize {
-                                let ox = x + fx * dilation;
-                                let oy = y + fy * dilation;
+    let mut input_ = Array4::zeros([
+        input.dims()[0],
+        input.dims()[1],
+        input.dims()[2] + padding[0] * 2,
+        input.dims()[3] + padding[1] * 2,
+    ]);
+    input_
+        .slice_mut(s![
+            ..,
+            ..,
+            padding[0]..input.dims()[2] + padding[0],
+            padding[1]..input.dims()[3] + padding[1]
+        ])
+        .assign(
+            &Array4::from_shape_vec(
+                [
+                    input.dims()[0],
+                    input.dims()[1],
+                    input.dims()[2],
+                    input.dims()[3],
+                ],
+                input.data::<f32>().to_vec(),
+            )
+            .unwrap(),
+        );
+    let weight_ = Array4::from_shape_vec(
+        [
+            weight.dims()[0],
+            weight.dims()[1],
+            weight.dims()[2],
+            weight.dims()[3],
+        ],
+        weight.data::<f32>().to_vec(),
+    )
+    .unwrap();
+    let bias_ =
+        Array4::from_shape_vec([1, bias.dims()[0], 1, 1], bias.data::<f32>().to_vec()).unwrap();
+    let mut output_ = Array3::zeros([
+        group,
+        out_c_per_g,
+        input.dims()[0] * output.dims()[2] * output.dims()[3],
+        // output.dims()[0] * output.dims()[2] * output.dims()[3],
+        // output.dims()[1],
+    ]);
 
-                                if ox < 0
-                                    || oy < 0
-                                    || ox >= input.dims()[2] as isize
-                                    || oy >= input.dims()[3] as isize
-                                {
-                                    continue;
-                                }
+    let mut col = Array6::<f32>::zeros([
+        input.dims()[0],
+        input.dims()[1],
+        weight.dims()[2],
+        weight.dims()[3],
+        output.dims()[2],
+        output.dims()[3],
+    ]);
 
-                                for fd in 0..in_c_per_g {
-                                    sum += weight.at_4d(d, fd, fx as usize, fy as usize)
-                                        * input.at_4d(
-                                            n,
-                                            g * in_c_per_g + fd,
-                                            ox as usize,
-                                            oy as usize,
-                                        );
-                                }
-                            }
-                        }
-                        *output.at_4d_mut(n, d, ax, ay) = sum;
-                        y += stride[1] as isize
-                    }
-                    x += stride[0] as isize
-                }
-            }
+    for fy in 0..kernel[0] {
+        let fy_max = (fy + stride[0] * output.dims()[2]).min(input.dims()[2] + 2 * padding[0]);
+        for fx in 0..kernel[1] {
+            let fx_max = (fx + stride[1] * output.dims()[3]).min(input.dims()[3] + 2 * padding[0]);
+            col.slice_mut(s![
+                ..,
+                ..,
+                fy,
+                fx,
+                ..(fy..fy_max).step_by(stride[0]).len(),
+                ..(fx..fx_max).step_by(stride[1]).len()
+            ])
+            .assign(&input_.slice(s![.., .., fy..fy_max;stride[0], fx..fx_max;stride[1]]))
         }
     }
+
+    // let col = col.permute(0, 4, 5, 1, 2, 3).contiguous().reshape(N*out_h*out_w, -1)
+    let col = Array::from_iter(col.permuted_axes([1, 2, 3, 0, 4, 5]).into_iter())
+        .into_shape([
+            group,
+            in_c_per_g * weight.dims()[2] * weight.dims()[3],
+            input.dims()[0] * output.dims()[2] * output.dims()[3], // input.dims()[0] * output.dims()[2] * output.dims()[3],
+                                                                   // input.dims()[1] * weight.dims()[2] * weight.dims()[3],
+        ])
+        .unwrap();
+    let weight_ = weight_
+        .into_shape([
+            group,
+            out_c_per_g,
+            in_c_per_g * weight.dims()[2] * weight.dims()[3],
+        ])
+        .unwrap();
+
+    // println!("group: {group}");
+    // println!("col: {col}, weight_: {weight_}");
+
+    for g in 0..group {
+        linalg::general_mat_mul(
+            1.0,
+            &weight_.slice(s![g, .., ..]),
+            &col.slice(s![g, .., ..]),
+            0.0,
+            &mut output_.slice_mut(s![g, .., ..]),
+        );
+    }
+
+    let mut output_ = Array::from_iter(
+        output_
+            .into_shape([
+                output.dims()[1],
+                output.dims()[0],
+                output.dims()[2],
+                output.dims()[3],
+            ])
+            .unwrap()
+            .permuted_axes([1, 0, 2, 3])
+            .into_iter(),
+    )
+    .into_shape([
+        output.dims()[0],
+        output.dims()[1],
+        output.dims()[2],
+        output.dims()[3],
+    ])
+    .unwrap();
+    output_ = output_ + bias_;
+    // println!("{}", output_);
+
+    *output = Tensor::new(
+        output.dims().clone(),
+        output_.into_iter().collect::<Vec<_>>(),
+    );
 }
 
 #[cfg(feature = "cuda")]

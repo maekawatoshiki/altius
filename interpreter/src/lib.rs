@@ -10,6 +10,7 @@ use altius_core::{
 use conv2d::Conv2dCtx;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
+use ndarray::{linalg, Array2};
 use rustc_hash::FxHashMap;
 use std::time::{Duration, Instant};
 
@@ -291,41 +292,27 @@ impl<'a> Interpreter2<'a> {
         let input_c = &inputs[Node::GEMM_IN_C];
         let output = &mut outputs[Node::GEMM_OUT];
 
-        let dim_a = input_a.dims();
-        let dim_b = input_b.dims();
-        assert!(dim_a.len() == 2);
-        assert!(dim_b.len() == 2);
-        let (dim_a0, dim_a1) = if gemm.trans_a {
-            (dim_a[1], dim_a[0])
-        } else {
-            (dim_a[0], dim_a[1])
-        };
-        let (dim_b0, dim_b1) = if gemm.trans_b {
-            (dim_b[1], dim_b[0])
-        } else {
-            (dim_b[0], dim_b[1])
-        };
-        assert!(dim_a1 == dim_b0);
-        let input_a = if gemm.trans_a {
-            input_a.to_transposed_2d()
-        } else {
-            input_a.clone()
-        };
-        let input_b = if gemm.trans_b {
-            input_b.to_transposed_2d()
-        } else {
-            input_b.clone()
-        };
+        let a = Array2::from_shape_vec(
+            [input_a.dims()[0], input_a.dims()[1]],
+            input_a.data::<f32>().to_vec(),
+        )
+        .unwrap();
+        let b = Array2::from_shape_vec(
+            [input_b.dims()[0], input_b.dims()[1]],
+            input_b.data::<f32>().to_vec(),
+        )
+        .unwrap();
+        let a = if gemm.trans_a { a.t() } else { a.view() };
+        let b = if gemm.trans_b { b.t() } else { b.view() };
 
-        for i in 0..dim_a0 {
-            for j in 0..dim_b1 {
-                let mut t = 0.0;
-                for k in 0..dim_b0 {
-                    t += input_a.at_2d(i, k) * input_b.at_2d(k, j)
-                }
-                *output.at_2d_mut(i, j) = t * gemm.alpha + input_c.at(&[j]) * gemm.beta;
-            }
-        }
+        let mut c = Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
+            .unwrap()
+            .broadcast([output.dims()[0], output.dims()[1]])
+            .unwrap()
+            .into_owned();
+        linalg::general_mat_mul(gemm.alpha, &a, &b, gemm.beta, &mut c);
+
+        *output = Tensor::new(output.dims().clone(), c.into_raw_vec());
     }
 
     fn run_node_relu(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {

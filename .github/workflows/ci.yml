@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ '*' ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+    - name: Install dependencies
+      run: |
+        sudo apt install -y git-lfs
+    - name: Git Lfs
+      run: |
+        git lfs install && \
+        git lfs pull
+    # - name: Install dependencies
+    #   env: 
+    #     ACCEPT_EULA: Y
+    #   run:  |
+    #         rustup override set nightly && \
+    #         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add - && \
+    #         sudo sh -c 'echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-12 main" >> /etc/apt/sources.list' && \
+    #         sudo sh -c 'echo "deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-12 main" >> /etc/apt/sources.list' && \
+    #         sudo -E apt-get update && \
+    #         # sudo -E dpkg --configure -a && \
+    #         # sudo -E dpkg --remove containers-common && \
+    #         # sudo -E apt-get upgrade -y && \
+    #         sudo -E apt-get install -y zlib1g-dev apt-utils && \
+    #         sudo -E apt-get install -y opt libedit-dev build-essential make && \
+    #         sudo -E apt-get install -y cmake llvm-10 pkg-config jq && \
+    #         sudo -E apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev binutils-dev libiberty-dev llvm-12
+    #         # cd vicis_core && \
+    #         # cargo install cargo-kcov && \
+    #         # cargo kcov --print-install-kcov-sh | sh
+    - name: Test (Debug)
+      run: |
+        RUST_LOG=debug cargo test
+    - name: Test (Release)
+      run: |
+        RUST_LOG=debug cargo test --release
+    # - name: Coverage
+    #   run: |
+    #         cargo install cargo-tarpaulin && \
+    #         cargo tarpaulin --out Xml && \
+    #         bash <(curl -s https://codecov.io/bash)

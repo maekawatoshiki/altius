@@ -20,7 +20,7 @@ pub struct Conv2dCtx<'a> {
 
 #[cfg(not(feature = "cuda"))]
 pub fn run(ctx: &mut Conv2dCtx) {
-    use ndarray::{linalg, s, Array, Array3, Array4, Array6};
+    use ndarray::{linalg, s, Array3, Array4, Array6};
 
     let input = &ctx.inputs[Node::CONV2D_IN];
     let weight = &ctx.inputs[Node::CONV2D_WEIGHT];
@@ -90,15 +90,17 @@ pub fn run(ctx: &mut Conv2dCtx) {
     ]);
 
     for fy in 0..kernel[0] {
-        let fy_max = (fy + stride[0] * output.dims()[2]).min(input.dims()[2] + 2 * padding[0]);
+        let fy_max = fy + stride[0] * output.dims()[2];
         for fx in 0..kernel[1] {
-            let fx_max = (fx + stride[1] * output.dims()[3]).min(input.dims()[3] + 2 * padding[0]);
+            let fx_max = fx + stride[1] * output.dims()[3];
             col.slice_mut(s![.., .., fy, fx, .., ..])
                 .assign(&input_.slice(s![.., .., fy..fy_max;stride[0], fx..fx_max;stride[1]]))
         }
     }
 
-    let col = Array::from_iter(col.permuted_axes([1, 2, 3, 0, 4, 5]).into_iter())
+    let col = col.permuted_axes([1, 2, 3, 0, 4, 5]);
+    let col = col
+        .as_standard_layout()
         .into_shape([
             group,
             in_c_per_g * weight.dims()[2] * weight.dims()[3],
@@ -116,7 +118,7 @@ pub fn run(ctx: &mut Conv2dCtx) {
         );
     }
 
-    let mut output_ = output_
+    let output_ = output_
         .into_shape([
             output.dims()[1],
             output.dims()[0],
@@ -124,10 +126,13 @@ pub fn run(ctx: &mut Conv2dCtx) {
             output.dims()[3],
         ])
         .unwrap()
-        .permuted_axes([1, 0, 2, 3]);
-    output_ = output_ + bias_;
+        .permuted_axes([1, 0, 2, 3])
+        + bias_;
 
-    *output = Tensor::new(output.dims().clone(), output_.into_raw_vec());
+    *output = Tensor::new(
+        output.dims().clone(),
+        output_.as_standard_layout().to_owned().into_raw_vec(),
+    );
 }
 
 #[cfg(feature = "cuda")]

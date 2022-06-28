@@ -55,6 +55,17 @@ impl Tensor {
         }
     }
 
+    pub fn set_raw_vec<T>(&mut self, data: Vec<T>) {
+        let data = std::mem::ManuallyDrop::new(data);
+        self.data = unsafe {
+            Vec::from_raw_parts(
+                data.as_ptr() as *mut u8,
+                data.len() * std::mem::size_of::<T>(),
+                data.capacity() * std::mem::size_of::<T>(),
+            )
+        };
+    }
+
     pub fn reshape_into(mut self, dims: Dimensions) -> Self {
         self.stride = compute_strides(&dims);
         self.dims = dims;

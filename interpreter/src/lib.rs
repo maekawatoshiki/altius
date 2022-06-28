@@ -312,7 +312,7 @@ impl<'a> Interpreter2<'a> {
             .into_owned();
         linalg::general_mat_mul(gemm.alpha, &a, &b, gemm.beta, &mut c);
 
-        *output = Tensor::new(output.dims().clone(), c.into_raw_vec());
+        output.set_raw_vec(c.into_raw_vec());
     }
 
     fn run_node_relu(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {

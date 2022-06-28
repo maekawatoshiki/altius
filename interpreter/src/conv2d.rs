@@ -20,7 +20,7 @@ pub struct Conv2dCtx<'a> {
 
 #[cfg(not(feature = "cuda"))]
 pub fn run(ctx: &mut Conv2dCtx) {
-    use ndarray::{linalg, s, Array3, Array4, Array6};
+    use ndarray::{linalg, s, Array3, Array4, Array6, ArrayView3, ArrayView4};
 
     let input = &ctx.inputs[Node::CONV2D_IN];
     let weight = &ctx.inputs[Node::CONV2D_WEIGHT];
@@ -34,6 +34,11 @@ pub fn run(ctx: &mut Conv2dCtx) {
     let group = ctx.op.group as usize;
     let in_c_per_g = input.dims()[1] / group;
     let out_c_per_g = output.dims()[1] / group;
+
+    assert!(
+        padding.len() == 2
+            || (padding.len() == 4 && padding[0] == padding[2] && padding[1] == padding[3])
+    );
 
     let mut input_ = Array4::zeros([
         input.dims()[0],
@@ -49,36 +54,46 @@ pub fn run(ctx: &mut Conv2dCtx) {
             padding[1]..input.dims()[3] + padding[1]
         ])
         .assign(
-            &Array4::from_shape_vec(
+            &ArrayView4::from_shape(
                 [
                     input.dims()[0],
                     input.dims()[1],
                     input.dims()[2],
                     input.dims()[3],
                 ],
-                input.data::<f32>().to_vec(),
+                input.data::<f32>(),
             )
             .unwrap(),
         );
-    let weight_ = Array3::from_shape_vec(
+    let weight_ = ArrayView3::from_shape(
         [
             group,
             out_c_per_g,
             in_c_per_g * weight.dims()[2] * weight.dims()[3],
         ],
-        weight.data::<f32>().to_vec(),
+        weight.data::<f32>(),
     )
     .unwrap();
-    let bias_ = if let Some(bias) = ctx.inputs.get(Node::CONV2D_BIAS) {
-        Array4::from_shape_vec([1, bias.dims()[0], 1, 1], bias.data::<f32>().to_vec()).unwrap()
-    } else {
-        Array4::zeros([1, 1, 1, 1])
-    };
-    let mut output_ = Array3::zeros([
-        group,
-        out_c_per_g,
-        input.dims()[0] * output.dims()[2] * output.dims()[3],
-    ]);
+    let mut output_ = ctx.inputs.get(Node::CONV2D_BIAS).map_or_else(
+        || {
+            Array3::zeros([
+                group,
+                out_c_per_g,
+                input.dims()[0] * output.dims()[2] * output.dims()[3],
+            ])
+        },
+        |bias| {
+            ArrayView3::from_shape([group, out_c_per_g, 1], bias.data::<f32>())
+                .unwrap()
+                .broadcast([
+                    group,
+                    out_c_per_g,
+                    input.dims()[0] * output.dims()[2] * output.dims()[3],
+                ])
+                .unwrap()
+                .to_owned()
+        },
+    );
 
     let mut col = Array6::<f32>::zeros([
         input.dims()[0],
@@ -113,7 +128,7 @@ pub fn run(ctx: &mut Conv2dCtx) {
             1.0,
             &weight_.slice(s![g, .., ..]),
             &col.slice(s![g, .., ..]),
-            0.0,
+            1.0,
             &mut output_.slice_mut(s![g, .., ..]),
         );
     }
@@ -126,13 +141,9 @@ pub fn run(ctx: &mut Conv2dCtx) {
             output.dims()[3],
         ])
         .unwrap()
-        .permuted_axes([1, 0, 2, 3])
-        + bias_;
+        .permuted_axes([1, 0, 2, 3]);
 
-    *output = Tensor::new(
-        output.dims().clone(),
-        output_.as_standard_layout().to_owned().into_raw_vec(),
-    );
+    output.set_raw_vec(output_.as_standard_layout().to_owned().into_raw_vec());
 }
 
 #[cfg(feature = "cuda")]

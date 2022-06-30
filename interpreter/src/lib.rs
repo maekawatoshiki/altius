@@ -126,14 +126,17 @@ impl<'a> Interpreter2<'a> {
         assert!(input.dims().len() == 4);
         assert!(output.dims().len() == 4);
 
+        let area = (input.dims()[2] * input.dims()[3]) as f32;
+
         for n in 0..input.dims()[0] {
             for c in 0..input.dims()[1] {
+                let mut sum = 0f32;
                 for h in 0..input.dims()[2] {
                     for w in 0..input.dims()[3] {
-                        *output.at_4d_mut(n, c, 0, 0) += input.at_4d(n, c, h, w);
+                        sum += input.at_4d(n, c, h, w);
                     }
                 }
-                *output.at_4d_mut(n, c, 0, 0) /= (input.dims()[2] * input.dims()[3]) as f32;
+                *output.at_4d_mut(n, c, 0, 0) = sum / area;
             }
         }
     }

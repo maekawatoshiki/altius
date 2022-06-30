@@ -53,18 +53,7 @@ pub fn run(ctx: &mut Conv2dCtx) {
             padding[0]..input.dims()[2] + padding[0],
             padding[1]..input.dims()[3] + padding[1]
         ])
-        .assign(
-            &ArrayView4::from_shape(
-                [
-                    input.dims()[0],
-                    input.dims()[1],
-                    input.dims()[2],
-                    input.dims()[3],
-                ],
-                input.data::<f32>(),
-            )
-            .unwrap(),
-        );
+        .assign(&ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap());
     let weight_ = ArrayView3::from_shape(
         [
             group,

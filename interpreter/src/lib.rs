@@ -295,22 +295,16 @@ impl<'a> Interpreter2<'a> {
         let input_c = &inputs[Node::GEMM_IN_C];
         let output = &mut outputs[Node::GEMM_OUT];
 
-        let a = Array2::from_shape_vec(
-            [input_a.dims()[0], input_a.dims()[1]],
-            input_a.data::<f32>().to_vec(),
-        )
-        .unwrap();
-        let b = Array2::from_shape_vec(
-            [input_b.dims()[0], input_b.dims()[1]],
-            input_b.data::<f32>().to_vec(),
-        )
-        .unwrap();
+        let a = Array2::from_shape_vec(input_a.fixed_dims::<2>(), input_a.data::<f32>().to_vec())
+            .unwrap();
+        let b = Array2::from_shape_vec(input_b.fixed_dims::<2>(), input_b.data::<f32>().to_vec())
+            .unwrap();
         let a = if gemm.trans_a { a.t() } else { a.view() };
         let b = if gemm.trans_b { b.t() } else { b.view() };
 
         let mut c = Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
             .unwrap()
-            .broadcast([output.dims()[0], output.dims()[1]])
+            .broadcast(output.fixed_dims::<2>())
             .unwrap()
             .into_owned();
         linalg::general_mat_mul(gemm.alpha, &a, &b, gemm.beta, &mut c);

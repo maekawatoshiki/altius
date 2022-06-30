@@ -139,6 +139,12 @@ impl Tensor {
         &self.dims
     }
 
+    pub fn fixed_dims<const N: usize>(&self) -> [Dimension; N] {
+        let mut dims: [Dimension; N] = [0; N];
+        dims.copy_from_slice(self.dims.as_slice());
+        dims
+    }
+
     pub fn data<T>(&self) -> &[T] {
         unsafe {
             std::slice::from_raw_parts(

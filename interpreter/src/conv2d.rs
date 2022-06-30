@@ -227,5 +227,5 @@ pub fn run(ctx: &mut Conv2dCtx) {
         )
         .unwrap();
 
-    *output = Tensor::new(output.dims().clone(), output_cuda.as_host_vec().unwrap());
+    output.set_raw_vec(output_cuda.as_host_vec().unwrap());
 }

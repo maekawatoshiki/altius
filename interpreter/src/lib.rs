@@ -118,6 +118,7 @@ impl<'a> Interpreter2<'a> {
             Op::Round => todo!("round"),
             Op::Loop => todo!("loop"),
             Op::Tile => todo!("tile"),
+            Op::Cast(_) => todo!("cast"),
         }
 
         let elapsed = start.elapsed();

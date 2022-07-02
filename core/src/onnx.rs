@@ -7,7 +7,7 @@ use crate::{
     dim::Dimensions,
     model::Model,
     node::{
-        Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, ReduceMin,
+        Cast, Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, ReduceMin,
         Resize, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorElemType},
@@ -207,6 +207,20 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             }
             "Tile" => {
                 let _tile = Node::new(Op::Tile)
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
+            "Cast" => {
+                let to = match DataType::from_i32(
+                    get_attribute(&node.attribute, "to").unwrap().i() as i32
+                )
+                .unwrap()
+                {
+                    DataType::Float => TensorElemType::F32,
+                    _ => todo!(),
+                };
+                let _cast = Node::new(Op::Cast(Cast { to }))
                     .with_ins(inputs)
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);

@@ -10,7 +10,9 @@ pub struct Tensor {
 
 #[derive(Debug, Clone, Copy)]
 pub enum TensorElemType {
+    Bool,
     F32,
+    I32,
     I64,
 }
 
@@ -50,7 +52,9 @@ impl Tensor {
     pub fn zeros<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
         let total_elems = dims.total_elems();
         match T::get_type() {
+            TensorElemType::Bool => Self::new(dims, vec![0u8; total_elems]),
             TensorElemType::F32 => Self::new(dims, vec![0.0f32; total_elems]),
+            TensorElemType::I32 => Self::new(dims, vec![0i32; total_elems]),
             TensorElemType::I64 => Self::new(dims, vec![0i64; total_elems]),
         }
     }
@@ -171,15 +175,35 @@ impl Tensor {
 impl TensorElemType {
     pub fn size(&self) -> usize {
         match self {
+            TensorElemType::Bool => std::mem::size_of::<u8>(),
             TensorElemType::F32 => std::mem::size_of::<f32>(),
+            TensorElemType::I32 => std::mem::size_of::<i32>(),
             TensorElemType::I64 => std::mem::size_of::<i64>(),
         }
+    }
+}
+
+impl TensorElemTypeExt for u8 {
+    fn get_type() -> TensorElemType {
+        TensorElemType::Bool
+    }
+}
+
+impl TensorElemTypeExt for bool {
+    fn get_type() -> TensorElemType {
+        TensorElemType::Bool
     }
 }
 
 impl TensorElemTypeExt for f32 {
     fn get_type() -> TensorElemType {
         TensorElemType::F32
+    }
+}
+
+impl TensorElemTypeExt for i32 {
+    fn get_type() -> TensorElemType {
+        TensorElemType::I32
     }
 }
 

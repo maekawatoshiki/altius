@@ -6,7 +6,7 @@ use thiserror::Error;
 use crate::{
     dim::Dimensions,
     model::Model,
-    node::{Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op},
+    node::{Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, Resize},
     tensor::{Tensor, TensorElemType},
 };
 
@@ -116,6 +116,38 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .with_ins(inputs)
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);
+            }
+            "Resize" => {
+                let coordinate_transformation_mode =
+                    get_attribute(&node.attribute, "coordinate_transformation_mode")
+                        .map_or("half_pixel".to_string(), |a| {
+                            unsafe { std::str::from_utf8_unchecked(a.s()) }.to_string()
+                        });
+                let cubic_coeff_a =
+                    get_attribute(&node.attribute, "cubic_coeff_a").map_or(-0.75, |a| a.f());
+                let exclude_outside =
+                    get_attribute(&node.attribute, "exclude_outside").map_or(0, |a| a.i());
+                let extrapolation_value =
+                    get_attribute(&node.attribute, "extrapolation_value").map_or(0.0, |a| a.f());
+                let mode = get_attribute(&node.attribute, "mode")
+                    .map_or("nearest".to_string(), |a| {
+                        unsafe { std::str::from_utf8_unchecked(a.s()) }.to_string()
+                    });
+                let nearest_mode = get_attribute(&node.attribute, "nearest_mode")
+                    .map_or("round_prefer_floor".to_string(), |a| {
+                        unsafe { std::str::from_utf8_unchecked(a.s()) }.to_string()
+                    });
+                let _resize = Node::new(Op::Resize(Resize {
+                    coordinate_transformation_mode,
+                    cubic_coeff_a,
+                    exclude_outside,
+                    extrapolation_value,
+                    mode,
+                    nearest_mode,
+                }))
+                .with_ins(inputs)
+                .with_outs(outputs)
+                .alloc(&mut model.nodes);
             }
             "MaxPool" => {
                 let kernel = Dimensions::from_i64(

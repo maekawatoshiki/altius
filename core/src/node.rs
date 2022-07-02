@@ -28,6 +28,7 @@ pub enum Op {
     Transpose(Transpose),
     Squeeze(Squeeze),
     ReduceMin(ReduceMin),
+    Round,
     MatMul,
     Gemm(Gemm),
     HardSigmoid(HardSigmoid),
@@ -127,6 +128,9 @@ impl Node {
     pub const LEAKYRELU_IN: usize = 0;
     pub const LEAKYRELU_OUT: usize = 0;
 
+    pub const ROUND_IN: usize = 0;
+    pub const ROUND_OUT: usize = 0;
+
     pub const MAXPOOL_IN: usize = 0;
     pub const MAXPOOL_OUT: usize = 0;
 
@@ -221,6 +225,7 @@ impl Op {
             Op::Transpose(_) => "Transpose",
             Op::Squeeze(_) => "Squeeze",
             Op::ReduceMin(_) => "ReduceMin",
+            Op::Round => "Round",
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
             Op::HardSigmoid(_) => "HardSigmoid",
@@ -431,6 +436,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         }
         Op::HardSigmoid(_) => {
             let input = inputs[Node::HARDSIGMOID_IN].dims();
+            shapes.push(input.clone());
+        }
+        Op::Round => {
+            let input = inputs[Node::ROUND_IN].dims();
             shapes.push(input.clone());
         }
     }

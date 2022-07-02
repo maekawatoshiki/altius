@@ -112,6 +112,8 @@ fn mnist_model() {
 
     let maxpool0_out = m.values.new_val();
     let _maxpool0 = Node::new(Op::MaxPool(MaxPool {
+        auto_pad: "NOTSET".into(),
+        padding: vec![0, 0, 0, 0].into(),
         kernel_shape: vec![2, 2].into(),
         strides: vec![2, 2].into(),
     }))
@@ -148,6 +150,8 @@ fn mnist_model() {
 
     let maxpool1_out = m.values.new_val();
     let _maxpool1 = Node::new(Op::MaxPool(MaxPool {
+        auto_pad: "NOTSET".into(),
+        padding: vec![0, 0, 0, 0].into(),
         kernel_shape: vec![3, 3].into(),
         strides: vec![3, 3].into(),
     }))

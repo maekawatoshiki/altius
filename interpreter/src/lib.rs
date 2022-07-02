@@ -105,7 +105,7 @@ impl<'a> Interpreter2<'a> {
             Op::Add => self.run_node_add(node, &inputs, &mut outputs),
             Op::Sub => todo!("sub"),
             Op::Mul => self.run_node_mul(node, &inputs, &mut outputs),
-            Op::Div => todo!("div"),
+            Op::Div => self.run_node_div(node, &inputs, &mut outputs),
             Op::MaxPool(ref maxpool) => self.run_node_max_pool(maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => self.run_node_gavg_pool(node, &inputs, &mut outputs),
             Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),
@@ -285,6 +285,26 @@ impl<'a> Interpreter2<'a> {
                 }
             }
 
+            return;
+        }
+
+        todo!()
+    }
+
+    fn run_node_div(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        let input_a = &inputs[Node::MUL_IN_A];
+        let input_b = &inputs[Node::MUL_IN_B];
+        let output = &mut outputs[Node::MUL_OUT];
+
+        if input_a.dims() == input_b.dims() {
+            for (i, (a, b)) in input_a
+                .data::<f32>()
+                .iter()
+                .zip(input_b.data::<f32>().iter())
+                .enumerate()
+            {
+                output.data_mut::<f32>()[i] = a / b;
+            }
             return;
         }
 

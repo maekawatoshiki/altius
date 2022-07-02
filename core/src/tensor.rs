@@ -167,6 +167,10 @@ impl Tensor {
         }
     }
 
+    pub fn elem_ty(&self) -> &TensorElemType {
+        &self.elem_ty
+    }
+
     pub fn verify(&self) -> bool {
         self.data.len() / self.elem_ty.size() == self.dims.total_elems()
     }
@@ -180,6 +184,22 @@ impl TensorElemType {
             TensorElemType::I32 => std::mem::size_of::<i32>(),
             TensorElemType::I64 => std::mem::size_of::<i64>(),
         }
+    }
+
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Self::Bool)
+    }
+
+    pub fn is_f32(&self) -> bool {
+        matches!(self, Self::F32)
+    }
+
+    pub fn is_i32(&self) -> bool {
+        matches!(self, Self::I32)
+    }
+
+    pub fn is_i64(&self) -> bool {
+        matches!(self, Self::I64)
     }
 }
 

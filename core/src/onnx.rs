@@ -196,6 +196,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);
             }
+            "Exp" => {
+                let _exp = Node::new(Op::Exp)
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
             "Loop" => {
                 // TODO
                 let _body = get_attribute(&node.attribute, "body").unwrap();

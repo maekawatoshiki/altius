@@ -24,6 +24,7 @@ pub enum Op {
     Div,
     ReLU,
     LeakyReLU(LeakyReLU),
+    Sigmoid,
     Cast(Cast),
     MaxPool(MaxPool),
     GlobalAveragePool,
@@ -147,6 +148,9 @@ impl Node {
     pub const LEAKYRELU_IN: usize = 0;
     pub const LEAKYRELU_OUT: usize = 0;
 
+    pub const SIGMOID_IN: usize = 0;
+    pub const SIGMOID_OUT: usize = 0;
+
     pub const CAST_IN: usize = 0;
     pub const CAST_OUT: usize = 0;
 
@@ -253,6 +257,7 @@ impl Op {
             Op::Div => "Div",
             Op::ReLU => "ReLU",
             Op::LeakyReLU(_) => "LeakyReLU",
+            Op::Sigmoid => "Sigmoid",
             Op::Cast(_) => "Cast",
             Op::MaxPool(_) => "MaxPool",
             Op::GlobalAveragePool => "GlobalAveragePool",
@@ -522,6 +527,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         }
         Op::LeakyReLU(_) => {
             let input = inputs[Node::LEAKYRELU_IN].dims();
+            shapes.push(input.clone());
+        }
+        Op::Sigmoid => {
+            let input = inputs[Node::SIGMOID_IN].dims();
             shapes.push(input.clone());
         }
         Op::Cast(_) => {

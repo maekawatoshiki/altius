@@ -132,6 +132,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);
             }
+            "Sigmoid" => {
+                let _sigmoid = Node::new(Op::Sigmoid)
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
             "Resize" => {
                 let coordinate_transformation_mode =
                     get_attribute(&node.attribute, "coordinate_transformation_mode")

@@ -16,6 +16,7 @@ pub enum Op {
     Conv2d(Conv2d),
     Add,
     Mul,
+    Div,
     ReLU,
     LeakyReLU(LeakyReLU),
     MaxPool(MaxPool),
@@ -109,6 +110,10 @@ impl Node {
     pub const MUL_IN_B: usize = 1;
     pub const MUL_OUT: usize = 0;
 
+    pub const DIV_IN_A: usize = 0;
+    pub const DIV_IN_B: usize = 1;
+    pub const DIV_OUT: usize = 0;
+
     pub const RELU_IN: usize = 0;
     pub const RELU_OUT: usize = 0;
 
@@ -194,6 +199,7 @@ impl Op {
             Op::Conv2d(_) => "Conv2d",
             Op::Add => "Add",
             Op::Mul => "Mul",
+            Op::Div => "Div",
             Op::ReLU => "ReLU",
             Op::LeakyReLU(_) => "LeakyReLU",
             Op::MaxPool(_) => "MaxPool",
@@ -275,6 +281,12 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 }
             ); // TODO: Support broadcasting.
             shapes.push(in_b.clone());
+        }
+        Op::Div => {
+            let in_a = inputs[Node::DIV_IN_A].dims();
+            let in_b = inputs[Node::DIV_IN_B].dims();
+            assert!(in_a == in_b);
+            shapes.push(in_a.clone());
         }
         Op::MaxPool(maxpool) => {
             let kernel = &maxpool.kernel_shape;

@@ -99,6 +99,7 @@ impl<'a> Interpreter2<'a> {
             }),
             Op::Add => self.run_node_add(node, &inputs, &mut outputs),
             Op::Mul => self.run_node_mul(node, &inputs, &mut outputs),
+            Op::Div => todo!("div"),
             Op::MaxPool(ref maxpool) => self.run_node_max_pool(maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => self.run_node_gavg_pool(node, &inputs, &mut outputs),
             Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),

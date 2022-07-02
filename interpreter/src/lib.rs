@@ -2,14 +2,14 @@ mod conv2d;
 
 use altius_core::{
     model::Model,
-    node::{compute_output_shapes, Flatten, Gemm, HardSigmoid, MaxPool, Node, NodeId, Op},
+    node::{compute_output_shapes, Concat, Flatten, Gemm, HardSigmoid, MaxPool, Node, NodeId, Op},
     tensor::Tensor,
     value::ValueId,
 };
 use conv2d::Conv2dCtx;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-use ndarray::{linalg, Array2};
+use ndarray::{linalg, Array2, Array4, ArrayView4, Axis};
 use rustc_hash::FxHashMap;
 use std::time::{Duration, Instant};
 
@@ -114,7 +114,7 @@ impl<'a> Interpreter2<'a> {
             Op::LeakyReLU(_) => todo!("leaky relu"),
             Op::Sigmoid => todo!("sigmoid"),
             Op::Resize(_) => todo!("resize"),
-            Op::Concat(_) => todo!("concat"),
+            Op::Concat(ref concat) => self.run_node_concat(concat, &inputs, &mut outputs),
             Op::Transpose(_) => todo!("transpose"),
             Op::Squeeze(_) => todo!("squeeze"),
             Op::Unsqueeze(_) => todo!("unsqueeze"),
@@ -360,6 +360,17 @@ impl<'a> Interpreter2<'a> {
         {
             *o = (hs.alpha * i + hs.beta).min(1.0).max(0.0);
         }
+    }
+
+    fn run_node_concat(&mut self, concat: &Concat, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        let mut in_views = vec![];
+        for i in inputs {
+            in_views.push(ArrayView4::from_shape(i.fixed_dims::<4>(), i.data::<f32>()).unwrap());
+        }
+        let output = &mut outputs[Node::CONCAT_OUT];
+        assert!(output.dims().len() == 4);
+        let out = ndarray::concatenate(Axis(concat.axis as usize), in_views.as_slice()).unwrap();
+        output.set_raw_vec(out.into_raw_vec());
     }
 
     fn run_node_loop(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {

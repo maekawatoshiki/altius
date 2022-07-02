@@ -115,6 +115,7 @@ impl<'a> Interpreter2<'a> {
             Op::Concat(_) => todo!("concat"),
             Op::Transpose(_) => todo!("transpose"),
             Op::Squeeze(_) => todo!("squeeze"),
+            Op::Unsqueeze(_) => todo!("unsqueeze"),
             Op::ReduceMin(_) => todo!("reduce min"),
             Op::Round => todo!("round"),
             Op::Exp => todo!("exp"),

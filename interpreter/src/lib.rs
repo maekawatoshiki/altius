@@ -2,7 +2,9 @@ mod conv2d;
 
 use altius_core::{
     model::Model,
-    node::{compute_output_shapes, Concat, Flatten, Gemm, HardSigmoid, MaxPool, Node, NodeId, Op},
+    node::{
+        compute_output_shapes, Cast, Concat, Flatten, Gemm, HardSigmoid, MaxPool, Node, NodeId, Op,
+    },
     tensor::Tensor,
     value::ValueId,
 };
@@ -123,7 +125,7 @@ impl<'a> Interpreter2<'a> {
             Op::Exp => todo!("exp"),
             Op::Loop => self.run_node_loop(node, &inputs, &mut outputs),
             Op::Tile => self.run_node_tile(node, &inputs, &mut outputs),
-            Op::Cast(_) => todo!("cast"),
+            Op::Cast(ref cast) => self.run_node_cast(cast, &inputs, &mut outputs),
             Op::Slice => todo!("slice"),
             Op::NonMaxSuppression => todo!("nms"),
         }
@@ -363,14 +365,33 @@ impl<'a> Interpreter2<'a> {
     }
 
     fn run_node_concat(&mut self, concat: &Concat, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let mut in_views = vec![];
-        for i in inputs {
-            in_views.push(ArrayView4::from_shape(i.fixed_dims::<4>(), i.data::<f32>()).unwrap());
+        if inputs[0].elem_ty().is_f32() {
+            let mut in_views = vec![];
+            for i in inputs {
+                assert!(i.elem_ty().is_f32());
+                in_views
+                    .push(ArrayView4::from_shape(i.fixed_dims::<4>(), i.data::<f32>()).unwrap());
+            }
+            let output = &mut outputs[Node::CONCAT_OUT];
+            assert!(output.dims().len() == 4);
+            let out =
+                ndarray::concatenate(Axis(concat.axis as usize), in_views.as_slice()).unwrap();
+            *output = Tensor::new(output.dims().clone(), out.into_raw_vec());
+        } else if inputs[0].elem_ty().is_i32() {
+            let mut in_views = vec![];
+            for i in inputs {
+                assert!(i.elem_ty().is_i32());
+                in_views
+                    .push(ArrayView4::from_shape(i.fixed_dims::<4>(), i.data::<i32>()).unwrap());
+            }
+            let output = &mut outputs[Node::CONCAT_OUT];
+            assert!(output.dims().len() == 4);
+            let out =
+                ndarray::concatenate(Axis(concat.axis as usize), in_views.as_slice()).unwrap();
+            *output = Tensor::new(output.dims().clone(), out.into_raw_vec());
+        } else {
+            todo!()
         }
-        let output = &mut outputs[Node::CONCAT_OUT];
-        assert!(output.dims().len() == 4);
-        let out = ndarray::concatenate(Axis(concat.axis as usize), in_views.as_slice()).unwrap();
-        output.set_raw_vec(out.into_raw_vec());
     }
 
     fn run_node_loop(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
@@ -404,7 +425,15 @@ impl<'a> Interpreter2<'a> {
                     v.push(*i);
                 }
             }
-            output.set_raw_vec(v);
+            *output = Tensor::new(output.dims().clone(), v);
+        } else if repeats[0] == 7 {
+            let mut v = vec![];
+            for _ in 0..7 {
+                for i in input {
+                    v.push(*i);
+                }
+            }
+            *output = Tensor::new(output.dims().clone(), v);
         } else if repeats[1] == 14 {
             let mut v = vec![];
             for i in input {
@@ -412,7 +441,7 @@ impl<'a> Interpreter2<'a> {
                     v.push(*i);
                 }
             }
-            output.set_raw_vec(v);
+            *output = Tensor::new(output.dims().clone(), v);
         } else if repeats[0] == 14 {
             let mut v = vec![];
             for _ in 0..14 {
@@ -420,7 +449,25 @@ impl<'a> Interpreter2<'a> {
                     v.push(*i);
                 }
             }
-            output.set_raw_vec(v);
+            *output = Tensor::new(output.dims().clone(), v);
+        } else {
+            todo!()
+        }
+    }
+
+    fn run_node_cast(&mut self, cast: &Cast, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        let input = &inputs[Node::CAST_IN];
+        let output = &mut outputs[Node::CAST_OUT];
+        if input.elem_ty().is_i32() && cast.to.is_f32() {
+            *output = Tensor::new(
+                output.dims().clone(),
+                input.data::<i32>().iter().map(|x| *x as f32).collect(),
+            );
+        } else if input.elem_ty().is_i64() && cast.to.is_i32() {
+            *output = Tensor::new(
+                output.dims().clone(),
+                input.data::<i64>().iter().map(|x| *x as i32).collect(),
+            );
         } else {
             todo!()
         }

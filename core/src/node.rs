@@ -41,6 +41,7 @@ pub enum Op {
     Loop,
     Tile,
     Slice,
+    NonMaxSuppression,
     MatMul,
     Gemm(Gemm),
     HardSigmoid(HardSigmoid),
@@ -211,6 +212,13 @@ impl Node {
     pub const SLICE_IN_STEPS: usize = 4;
     pub const SLICE_OUT: usize = 0;
 
+    pub const NMS_IN_BOXES: usize = 0;
+    pub const NMS_IN_SCORES: usize = 1;
+    pub const NMS_IN_MAX_OUTPUT_BOXES_PER_CLASS: usize = 2;
+    pub const NMS_IN_NMS_IOU_THRESHOLD: usize = 3;
+    pub const NMS_IN_NMS_SCORE_THRESHOLD: usize = 4;
+    pub const NMS_OUT: usize = 0;
+
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
     pub const MATMUL_OUT: usize = 0;
@@ -283,6 +291,7 @@ impl Op {
             Op::Loop => "Loop",
             Op::Tile => "Tile",
             Op::Slice => "Slice",
+            Op::NonMaxSuppression => "NonMaxSuppression",
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
             Op::HardSigmoid(_) => "HardSigmoid",
@@ -518,6 +527,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 dims[axis] = out_dim;
             }
             shapes.push(dims.into());
+        }
+        Op::NonMaxSuppression => {
+            todo!()
         }
         Op::MatMul => {
             let in_a = &inputs[Node::MATMUL_IN_A].dims();

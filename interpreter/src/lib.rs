@@ -113,6 +113,7 @@ impl<'a> Interpreter2<'a> {
             Op::Concat(_) => todo!("concat"),
             Op::Transpose(_) => todo!("transpose"),
             Op::Squeeze(_) => todo!("squeeze"),
+            Op::ReduceMin(_) => todo!("reduce min"),
         }
 
         let elapsed = start.elapsed();

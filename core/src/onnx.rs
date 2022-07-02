@@ -7,8 +7,8 @@ use crate::{
     dim::Dimensions,
     model::Model,
     node::{
-        Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, Resize, Squeeze,
-        Transpose,
+        Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, ReduceMin,
+        Resize, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorElemType},
 };
@@ -178,6 +178,11 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .with_ins(inputs)
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);
+            }
+            "ReduceMin" => {
+                let axes = get_attribute(&node.attribute, "axes").unwrap().ints.clone();
+                let keep_dims = get_attribute(&node.attribute, "keepdims").map_or(1, |a| a.i());
+                let _reduce_min = Node::new(Op::ReduceMin(ReduceMin { axes, keep_dims }));
             }
             "MaxPool" => {
                 let kernel = Dimensions::from_i64(

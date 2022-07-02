@@ -210,7 +210,21 @@ fn get_tensor(tensor: &TensorProto) -> Tensor {
             TensorElemType::I64,
             tensor.raw_data().to_vec(),
         ),
-        _ => todo!(),
+        DataType::Int32 if tensor.raw_data().is_empty() => Tensor::new(
+            Dimensions::from_i64(&tensor.dims),
+            tensor.int32_data.clone(),
+        ),
+        DataType::Int32 => Tensor::new_from_raw(
+            Dimensions::from_i64(&tensor.dims),
+            TensorElemType::I32,
+            tensor.raw_data().to_vec(),
+        ),
+        DataType::Bool => Tensor::new_from_raw(
+            Dimensions::from_i64(&tensor.dims),
+            TensorElemType::Bool,
+            tensor.raw_data().to_vec(),
+        ),
+        e => todo!("data type: {e:?}"),
     }
 }
 

@@ -110,6 +110,7 @@ impl<'a> Interpreter2<'a> {
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(ref hs) => self.run_node_hard_sigomid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(_) => todo!("leaky relu"),
+            Op::Sigmoid => todo!("sigmoid"),
             Op::Resize(_) => todo!("resize"),
             Op::Concat(_) => todo!("concat"),
             Op::Transpose(_) => todo!("transpose"),

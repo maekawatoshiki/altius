@@ -98,6 +98,7 @@ impl<'a> Interpreter2<'a> {
                 outputs: &mut outputs,
             }),
             Op::Add => self.run_node_add(node, &inputs, &mut outputs),
+            Op::Sub => todo!("sub"),
             Op::Mul => self.run_node_mul(node, &inputs, &mut outputs),
             Op::Div => todo!("div"),
             Op::MaxPool(ref maxpool) => self.run_node_max_pool(maxpool, &inputs, &mut outputs),

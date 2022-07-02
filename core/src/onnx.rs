@@ -107,6 +107,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);
             }
+            "Sub" => {
+                let _sub = Node::new(Op::Sub)
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
             "Div" => {
                 let _div = Node::new(Op::Div)
                     .with_ins(inputs)

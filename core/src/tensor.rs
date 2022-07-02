@@ -8,7 +8,7 @@ pub struct Tensor {
     elem_ty: TensorElemType,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TensorElemType {
     Bool,
     F32,

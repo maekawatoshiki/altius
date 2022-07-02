@@ -1,4 +1,8 @@
-use crate::{dim::Dimensions, tensor::Tensor, value::ValueId};
+use crate::{
+    dim::Dimensions,
+    tensor::{Tensor, TensorElemType},
+    value::ValueId,
+};
 use id_arena::{Arena, Id};
 
 pub type NodeId = Id<Node>;
@@ -20,6 +24,7 @@ pub enum Op {
     Div,
     ReLU,
     LeakyReLU(LeakyReLU),
+    Cast(Cast),
     MaxPool(MaxPool),
     GlobalAveragePool,
     Reshape,
@@ -61,6 +66,11 @@ pub struct HardSigmoid {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct LeakyReLU {
     pub alpha: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Cast {
+    pub to: TensorElemType,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -134,6 +144,9 @@ impl Node {
 
     pub const LEAKYRELU_IN: usize = 0;
     pub const LEAKYRELU_OUT: usize = 0;
+
+    pub const CAST_IN: usize = 0;
+    pub const CAST_OUT: usize = 0;
 
     pub const ROUND_IN: usize = 0;
     pub const ROUND_OUT: usize = 0;
@@ -228,6 +241,7 @@ impl Op {
             Op::Div => "Div",
             Op::ReLU => "ReLU",
             Op::LeakyReLU(_) => "LeakyReLU",
+            Op::Cast(_) => "Cast",
             Op::MaxPool(_) => "MaxPool",
             Op::GlobalAveragePool => "GlobalAveragePool",
             Op::Reshape => "Reshape",
@@ -464,6 +478,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         }
         Op::LeakyReLU(_) => {
             let input = inputs[Node::LEAKYRELU_IN].dims();
+            shapes.push(input.clone());
+        }
+        Op::Cast(_) => {
+            let input = inputs[Node::CAST_IN].dims();
             shapes.push(input.clone());
         }
         Op::HardSigmoid(_) => {

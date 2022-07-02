@@ -4,7 +4,7 @@ use altius_core::{
     model::Model,
     node::{
         compute_output_shapes, Cast, Concat, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node,
-        NodeId, Op, Squeeze,
+        NodeId, Op, Squeeze, Transpose,
     },
     tensor::Tensor,
     value::ValueId,
@@ -118,7 +118,7 @@ impl<'a> Interpreter2<'a> {
             Op::Sigmoid => todo!("sigmoid"),
             Op::Resize(_) => todo!("resize"),
             Op::Concat(ref concat) => self.run_node_concat(concat, &inputs, &mut outputs),
-            Op::Transpose(_) => todo!("transpose"),
+            Op::Transpose(ref trans) => self.run_node_transpose(trans, &inputs, &mut outputs),
             Op::Squeeze(ref squeeze) => self.run_node_squeeze(squeeze, &inputs, &mut outputs),
             Op::Unsqueeze(_) => todo!("unsqueeze"),
             Op::ReduceMin(_) => todo!("reduce min"),
@@ -462,6 +462,36 @@ impl<'a> Interpreter2<'a> {
             let out =
                 ndarray::concatenate(Axis(concat.axis as usize), in_views.as_slice()).unwrap();
             *output = Tensor::new(output.dims().clone(), out.into_raw_vec());
+        } else {
+            todo!()
+        }
+    }
+
+    fn run_node_transpose(
+        &mut self,
+        transpose: &Transpose,
+        inputs: &[Tensor],
+        outputs: &mut [Tensor],
+    ) {
+        let input = &inputs[Node::TRANSPOSE_IN];
+        let output = &mut outputs[Node::TRANSPOSE_OUT];
+        assert!(input.elem_ty().is_f32());
+
+        if input.dims().len() == 2 {
+            let in_view =
+                ArrayView2::from_shape(input.fixed_dims::<2>(), input.data::<f32>()).unwrap();
+            in_view.permuted_axes([transpose.perm[0] as usize, transpose.perm[1] as usize]);
+            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+        } else if input.dims().len() == 4 {
+            let in_view =
+                ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap();
+            in_view.permuted_axes([
+                transpose.perm[0] as usize,
+                transpose.perm[1] as usize,
+                transpose.perm[2] as usize,
+                transpose.perm[3] as usize,
+            ]);
+            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
         } else {
             todo!()
         }

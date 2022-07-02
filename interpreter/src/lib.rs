@@ -3,8 +3,8 @@ mod conv2d;
 use altius_core::{
     model::Model,
     node::{
-        compute_output_shapes, Cast, Concat, Flatten, Gemm, HardSigmoid, MaxPool, Node, NodeId, Op,
-        Squeeze,
+        compute_output_shapes, Cast, Concat, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node,
+        NodeId, Op, Squeeze,
     },
     tensor::Tensor,
     value::ValueId,
@@ -12,7 +12,7 @@ use altius_core::{
 use conv2d::Conv2dCtx;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-use ndarray::{linalg, Array2, Array4, ArrayView1, ArrayView2, ArrayView4, ArrayViewD, Axis};
+use ndarray::{linalg, Array2, ArrayView1, ArrayView2, ArrayView4, Axis};
 use rustc_hash::FxHashMap;
 use std::time::{Duration, Instant};
 
@@ -114,7 +114,7 @@ impl<'a> Interpreter2<'a> {
             Op::Gemm(ref gemm) => self.run_node_gemm(gemm, &inputs, &mut outputs),
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(ref hs) => self.run_node_hard_sigomid(hs, &inputs, &mut outputs),
-            Op::LeakyReLU(_) => todo!("leaky relu"),
+            Op::LeakyReLU(ref leaky) => self.run_node_leaky_relu(leaky, &inputs, &mut outputs),
             Op::Sigmoid => todo!("sigmoid"),
             Op::Resize(_) => todo!("resize"),
             Op::Concat(ref concat) => self.run_node_concat(concat, &inputs, &mut outputs),
@@ -382,6 +382,24 @@ impl<'a> Interpreter2<'a> {
             .zip(output.data_mut::<f32>().iter_mut())
         {
             *o = (hs.alpha * i + hs.beta).min(1.0).max(0.0);
+        }
+    }
+
+    fn run_node_leaky_relu(
+        &mut self,
+        leaky: &LeakyReLU,
+        inputs: &[Tensor],
+        outputs: &mut [Tensor],
+    ) {
+        let input = &inputs[Node::HARDSIGMOID_IN];
+        let output = &mut outputs[Node::HARDSIGMOID_OUT];
+
+        for (i, o) in input
+            .data::<f32>()
+            .iter()
+            .zip(output.data_mut::<f32>().iter_mut())
+        {
+            *o = if *i < 0.0 { leaky.alpha * i } else { *i };
         }
     }
 

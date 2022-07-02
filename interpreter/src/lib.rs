@@ -110,6 +110,7 @@ impl<'a> Interpreter2<'a> {
             Op::LeakyReLU(_) => todo!("leaky relu"),
             Op::Resize(_) => todo!("resize"),
             Op::Concat(_) => todo!("concat"),
+            Op::Transpose(_) => todo!("transpose"),
         }
 
         let elapsed = start.elapsed();

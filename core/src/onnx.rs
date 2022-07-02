@@ -6,7 +6,9 @@ use thiserror::Error;
 use crate::{
     dim::Dimensions,
     model::Model,
-    node::{Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, Resize},
+    node::{
+        Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, Resize, Transpose,
+    },
     tensor::{Tensor, TensorElemType},
 };
 
@@ -152,6 +154,13 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             "Concat" => {
                 let axis = get_attribute(&node.attribute, "axis").unwrap().i();
                 let _concat = Node::new(Op::Concat(Concat { axis }))
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
+            "Transpose" => {
+                let perm = get_attribute(&node.attribute, "perm").unwrap().ints.clone();
+                let _transpose = Node::new(Op::Transpose(Transpose { perm }))
                     .with_ins(inputs)
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);

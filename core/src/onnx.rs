@@ -7,7 +7,8 @@ use crate::{
     dim::Dimensions,
     model::Model,
     node::{
-        Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, Resize, Transpose,
+        Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, Resize, Squeeze,
+        Transpose,
     },
     tensor::{Tensor, TensorElemType},
 };
@@ -161,6 +162,13 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             "Transpose" => {
                 let perm = get_attribute(&node.attribute, "perm").unwrap().ints.clone();
                 let _transpose = Node::new(Op::Transpose(Transpose { perm }))
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
+            "Squeeze" => {
+                let axes = get_attribute(&node.attribute, "axes").unwrap().ints.clone();
+                let _squeeze = Node::new(Op::Squeeze(Squeeze { axes }))
                     .with_ins(inputs)
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);

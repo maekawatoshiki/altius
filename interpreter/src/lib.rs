@@ -111,6 +111,7 @@ impl<'a> Interpreter2<'a> {
             Op::Resize(_) => todo!("resize"),
             Op::Concat(_) => todo!("concat"),
             Op::Transpose(_) => todo!("transpose"),
+            Op::Squeeze(_) => todo!("squeeze"),
         }
 
         let elapsed = start.elapsed();

@@ -46,7 +46,10 @@ impl<'a> Interpreter2<'a> {
 
     pub fn run(&mut self, inputs: Vec<(ValueId, Tensor)>) -> &Tensor {
         // assert!(self.model.inputs.len() == 1);
-        assert!(self.model.outputs.len() == 1);
+        // assert!(self.model.outputs.len() == 1);
+        if self.model.outputs.len() > 1 {
+            log::debug!("Number of outputs: {}", self.model.outputs.len());
+        }
 
         // Set input & initializer values.
         for (id, tensor) in inputs {

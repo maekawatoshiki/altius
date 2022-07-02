@@ -60,6 +60,9 @@ impl Model {
                 if self.outputs.contains(output) {
                     continue;
                 }
+                if !value_users.contains_key(&output) {
+                    continue;
+                }
                 for n in value_users[output].iter() {
                     *num_node_inputs.get_mut(n).unwrap() -= 1;
                     if *num_node_inputs.get(n).unwrap() == 0 {

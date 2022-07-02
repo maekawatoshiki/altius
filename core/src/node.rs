@@ -27,6 +27,7 @@ pub enum Op {
     Concat(Concat),
     Transpose(Transpose),
     Squeeze(Squeeze),
+    ReduceMin(ReduceMin),
     MatMul,
     Gemm(Gemm),
     HardSigmoid(HardSigmoid),
@@ -89,6 +90,12 @@ pub struct Squeeze {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
+pub struct ReduceMin {
+    pub axes: Vec<i64>,
+    pub keep_dims: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Gemm {
     pub alpha: f32,
     pub beta: f32,
@@ -147,6 +154,9 @@ impl Node {
 
     pub const SQUEEZE_IN: usize = 0;
     pub const SQUEEZE_OUT: usize = 0;
+
+    pub const REDUCEMIN_IN: usize = 0;
+    pub const REDUCEMIN_OUT: usize = 0;
 
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
@@ -210,6 +220,7 @@ impl Op {
             Op::Concat(_) => "Concat",
             Op::Transpose(_) => "Transpose",
             Op::Squeeze(_) => "Squeeze",
+            Op::ReduceMin(_) => "ReduceMin",
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
             Op::HardSigmoid(_) => "HardSigmoid",
@@ -368,7 +379,21 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             let mut dims = vec![];
             for (i, &x) in in_dims.iter().enumerate() {
                 if squeeze.axes.contains(&(i as i64)) {
-                    break;
+                    continue;
+                }
+                dims.push(x);
+            }
+            shapes.push(dims.into());
+        }
+        Op::ReduceMin(rmin) => {
+            let in_dims = inputs[Node::REDUCEMIN_IN].dims();
+            let mut dims = vec![];
+            for (i, &x) in in_dims.as_slice().iter().enumerate() {
+                if rmin.axes.contains(&(i as i64)) {
+                    if rmin.keep_dims == 1 {
+                        dims.push(1);
+                    }
+                    continue;
                 }
                 dims.push(x);
             }

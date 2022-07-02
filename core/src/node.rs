@@ -37,6 +37,7 @@ pub enum Op {
     Round,
     Loop,
     Tile,
+    Slice,
     MatMul,
     Gemm(Gemm),
     HardSigmoid(HardSigmoid),
@@ -186,6 +187,13 @@ impl Node {
     pub const TILE_REPEATS: usize = 1;
     pub const TILE_OUT: usize = 0;
 
+    pub const SLICE_IN_DATA: usize = 0;
+    pub const SLICE_IN_STARTS: usize = 1;
+    pub const SLICE_IN_ENDS: usize = 2;
+    pub const SLICE_IN_AXES: usize = 3;
+    pub const SLICE_IN_STEPS: usize = 4;
+    pub const SLICE_OUT: usize = 0;
+
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
     pub const MATMUL_OUT: usize = 0;
@@ -254,6 +262,7 @@ impl Op {
             Op::Round => "Round",
             Op::Loop => "Loop",
             Op::Tile => "Tile",
+            Op::Slice => "Slice",
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
             Op::HardSigmoid(_) => "HardSigmoid",
@@ -450,6 +459,33 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             let mut dims = vec![];
             for (i, &x) in in_dims.as_slice().iter().enumerate() {
                 dims.push(x * reps[i as usize] as usize);
+            }
+            shapes.push(dims.into());
+        }
+        Op::Slice => {
+            let in_data_dims = inputs[Node::SLICE_IN_DATA].dims();
+            let in_starts = inputs[Node::SLICE_IN_STARTS].data::<i64>();
+            let in_ends = inputs[Node::SLICE_IN_ENDS].data::<i64>();
+            let in_axes = inputs[Node::SLICE_IN_AXES].data::<i64>();
+            let in_steps = inputs[Node::SLICE_IN_STEPS].data::<i64>();
+            assert!(in_starts.iter().all(|&x| x >= 0));
+            assert!(in_ends.iter().all(|&x| x >= 0));
+            assert!(in_axes.iter().all(|&x| x >= 0));
+            assert!(in_steps.iter().all(|&x| x >= 0));
+            let mut dims = in_data_dims.clone();
+            for (((start, end), axis), step) in in_starts
+                .iter()
+                .zip(in_ends.iter())
+                .zip(in_axes.iter())
+                .zip(in_steps.iter())
+            {
+                let start = *start as usize;
+                let end = *end as usize;
+                let axis = *axis as usize;
+                let step = *step as usize;
+                let out_dim = (end - start) / step;
+                assert!(out_dim > 0);
+                dims[axis] = out_dim;
             }
             shapes.push(dims.into());
         }

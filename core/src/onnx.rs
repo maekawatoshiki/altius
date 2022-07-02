@@ -225,6 +225,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);
             }
+            "Slice" => {
+                let _slice = Node::new(Op::Slice)
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
             "MaxPool" => {
                 let kernel = Dimensions::from_i64(
                     &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,

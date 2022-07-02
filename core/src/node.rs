@@ -30,6 +30,7 @@ pub enum Op {
     Squeeze(Squeeze),
     ReduceMin(ReduceMin),
     Round,
+    Loop,
     MatMul,
     Gemm(Gemm),
     HardSigmoid(HardSigmoid),
@@ -232,6 +233,7 @@ impl Op {
             Op::Squeeze(_) => "Squeeze",
             Op::ReduceMin(_) => "ReduceMin",
             Op::Round => "Round",
+            Op::Loop => "Loop",
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
             Op::HardSigmoid(_) => "HardSigmoid",
@@ -415,6 +417,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 dims.push(x);
             }
             shapes.push(dims.into());
+        }
+        Op::Loop => {
+            todo!()
         }
         Op::MatMul => {
             let in_a = &inputs[Node::MATMUL_IN_A].dims();

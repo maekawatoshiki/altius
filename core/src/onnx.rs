@@ -196,6 +196,14 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);
             }
+            "Loop" => {
+                let _body = get_attribute(&node.attribute, "body").unwrap();
+                log::debug!("Ignore loop body!");
+                let _loop = Node::new(Op::Loop)
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
             "MaxPool" => {
                 let kernel = Dimensions::from_i64(
                     &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,

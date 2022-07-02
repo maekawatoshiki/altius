@@ -472,8 +472,8 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             assert!(!trans.perm.is_empty());
             let in_dims = inputs[Node::TRANSPOSE_IN].dims().as_slice();
             let mut dims = vec![0usize; in_dims.len()];
-            for (i, &x) in in_dims.iter().enumerate() {
-                dims[trans.perm[i] as usize] = x;
+            for i in 0..in_dims.len() {
+                dims[i] = in_dims[trans.perm[i] as usize];
             }
             shapes.push(dims.into());
         }

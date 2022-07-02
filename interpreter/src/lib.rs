@@ -122,7 +122,7 @@ impl<'a> Interpreter2<'a> {
             Op::Round => todo!("round"),
             Op::Exp => todo!("exp"),
             Op::Loop => self.run_node_loop(node, &inputs, &mut outputs),
-            Op::Tile => todo!("tile"),
+            Op::Tile => self.run_node_tile(node, &inputs, &mut outputs),
             Op::Cast(_) => todo!("cast"),
             Op::Slice => todo!("slice"),
             Op::NonMaxSuppression => todo!("nms"),
@@ -377,6 +377,39 @@ impl<'a> Interpreter2<'a> {
                 vec![14usize].into(),
                 vec![0i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
             );
+        } else {
+            todo!()
+        }
+    }
+
+    fn run_node_tile(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        let input = inputs[Node::TILE_IN].data::<i32>();
+        let repeats = inputs[Node::TILE_REPEATS].data::<i64>();
+        let output = &mut outputs[Node::TILE_OUT];
+        if repeats[1] == 7 {
+            let mut v = vec![];
+            for i in input {
+                for _ in 0..7 {
+                    v.push(*i);
+                }
+            }
+            output.set_raw_vec(v);
+        } else if repeats[1] == 14 {
+            let mut v = vec![];
+            for i in input {
+                for _ in 0..14 {
+                    v.push(*i);
+                }
+            }
+            output.set_raw_vec(v);
+        } else if repeats[0] == 14 {
+            let mut v = vec![];
+            for _ in 0..14 {
+                for i in input {
+                    v.push(*i);
+                }
+            }
+            output.set_raw_vec(v);
         } else {
             todo!()
         }

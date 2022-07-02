@@ -1,3 +1,5 @@
+#![feature(portable_simd)]
+
 mod conv2d;
 
 use altius_core::{
@@ -226,18 +228,20 @@ impl<'a> Interpreter2<'a> {
     }
 
     fn run_node_mul(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        use std::simd;
+
         let input_a = &inputs[Node::MUL_IN_A];
         let input_b = &inputs[Node::MUL_IN_B];
         let output = &mut outputs[Node::MUL_OUT];
 
         if input_a.dims() == input_b.dims() {
-            for (i, (a, b)) in input_a
-                .data::<f32>()
-                .iter()
-                .zip(input_b.data::<f32>().iter())
-                .enumerate()
-            {
-                output.data_mut::<f32>()[i] = a * b;
+            let input_a_slice = input_a.data::<f32>();
+            let input_b_slice = input_b.data::<f32>();
+            let output_slice = output.data_mut::<f32>();
+            for i in (0..input_a_slice.len()).step_by(16) {
+                let a = simd::f32x16::from_slice(&input_a_slice[i..]);
+                let b = simd::f32x16::from_slice(&input_b_slice[i..]);
+                output_slice[i..i + 16].copy_from_slice(&(a * b).to_array());
             }
 
             return;
@@ -252,17 +256,19 @@ impl<'a> Interpreter2<'a> {
             && in_a[2] == 1
             && in_a[3] == 1
         {
-            for n in 0..in_a[0] {
-                for z in 0..in_a[1] {
-                    for x in 0..in_b[2] {
-                        for y in 0..in_b[3] {
-                            *output.at_4d_mut(n, z, x, y) =
-                                input_a.at_4d(n, z, 0, 0) * input_b.at_4d(n, z, x, y);
-                        }
-                    }
-                }
+            let input_a = input_a
+                .clone()
+                .broadcast_into_4d(in_b[0], in_b[1], in_b[2], in_b[3]);
+            let input_a_slice = input_a.data::<f32>();
+            let input_b_slice = input_b.data::<f32>();
+            let output_slice = output.data_mut::<f32>();
+            for i in (0..input_a_slice.len()).step_by(16) {
+                let a = simd::f32x16::from_slice(&input_a_slice[i..]);
+                let b = simd::f32x16::from_slice(&input_b_slice[i..]);
+                let c = a * b;
+                let c = c.to_array();
+                output_slice[i..i + 16].copy_from_slice(&c);
             }
-
             return;
         }
 

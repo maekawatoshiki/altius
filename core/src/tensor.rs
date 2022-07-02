@@ -84,6 +84,19 @@ impl Tensor {
         out
     }
 
+    pub fn broadcast_into_4d(self, n: Dimension, c: Dimension, h: Dimension, w: Dimension) -> Self {
+        assert!(self.dims[2] == 1 && self.dims[3] == 1);
+        let mut data2: Vec<f32> = vec![];
+        for d in self.into_raw_vec() {
+            data2.append(&mut vec![d; h * w]);
+        }
+        Tensor::new(vec![n, c, h, w].into(), data2)
+        // dims: Dimensions,
+        // stride: Dimensions,
+        // data: Vec<u8>,
+        // elem_ty: TensorElemType,
+    }
+
     pub fn at(&self, indices: &[Dimension]) -> f32 {
         let mut index = 0;
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
@@ -159,6 +172,17 @@ impl Tensor {
             std::slice::from_raw_parts_mut(
                 self.data.as_ptr() as *mut T,
                 self.data.len() / std::mem::size_of::<T>(),
+            )
+        }
+    }
+
+    pub fn into_raw_vec<T: TensorElemTypeExt>(self) -> Vec<T> {
+        let data = std::mem::ManuallyDrop::new(self.data);
+        unsafe {
+            Vec::from_raw_parts(
+                data.as_ptr() as *mut T,
+                data.len() / std::mem::size_of::<T>(),
+                data.capacity() / std::mem::size_of::<T>(),
             )
         }
     }

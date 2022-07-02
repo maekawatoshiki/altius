@@ -20,7 +20,9 @@ pub struct Conv2dCtx<'a> {
 
 #[cfg(not(feature = "cuda"))]
 pub fn run(ctx: &mut Conv2dCtx) {
-    use ndarray::{linalg, s, Array3, Array4, Array6, ArrayView3, ArrayView4};
+    use std::time::{Duration, Instant};
+
+    use ndarray::{linalg, s, Array3, Array4, Array6, ArrayView3, ArrayView4, ArrayView6};
 
     let input = &ctx.inputs[Node::CONV2D_IN];
     let weight = &ctx.inputs[Node::CONV2D_WEIGHT];

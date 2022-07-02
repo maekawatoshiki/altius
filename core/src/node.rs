@@ -17,6 +17,7 @@ pub enum Op {
     Add,
     Mul,
     ReLU,
+    LeakyReLU(LeakyReLU),
     MaxPool(MaxPool),
     GlobalAveragePool,
     Reshape,
@@ -48,6 +49,11 @@ pub struct HardSigmoid {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
+pub struct LeakyReLU {
+    pub alpha: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Flatten {
     pub axis: i64,
 }
@@ -76,6 +82,9 @@ impl Node {
 
     pub const RELU_IN: usize = 0;
     pub const RELU_OUT: usize = 0;
+
+    pub const LEAKYRELU_IN: usize = 0;
+    pub const LEAKYRELU_OUT: usize = 0;
 
     pub const MAXPOOL_IN: usize = 0;
     pub const MAXPOOL_OUT: usize = 0;
@@ -142,6 +151,7 @@ impl Op {
             Op::Add => "Add",
             Op::Mul => "Mul",
             Op::ReLU => "ReLU",
+            Op::LeakyReLU(_) => "LeakyReLU",
             Op::MaxPool(_) => "MaxPool",
             Op::GlobalAveragePool => "GlobalAveragePool",
             Op::Reshape => "Reshape",
@@ -277,6 +287,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         }
         Op::ReLU => {
             let input = inputs[Node::RELU_IN].dims();
+            shapes.push(input.clone());
+        }
+        Op::LeakyReLU(_) => {
+            let input = inputs[Node::LEAKYRELU_IN].dims();
             shapes.push(input.clone());
         }
         Op::HardSigmoid(_) => {

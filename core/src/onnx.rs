@@ -6,7 +6,7 @@ use thiserror::Error;
 use crate::{
     dim::Dimensions,
     model::Model,
-    node::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Node, Op},
+    node::{Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op},
     tensor::{Tensor, TensorElemType},
 };
 
@@ -110,6 +110,13 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);
             }
+            "LeakyRelu" => {
+                let alpha = get_attribute(&node.attribute, "alpha").unwrap().f();
+                let _leaky_relu = Node::new(Op::LeakyReLU(LeakyReLU { alpha }))
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
             "MaxPool" => {
                 let kernel = Dimensions::from_i64(
                     &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,
@@ -176,7 +183,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 .with_outs(outputs)
                 .alloc(&mut model.nodes);
             }
-            op => todo!("{}", op),
+            op => todo!("op: {}", op),
         }
     }
 

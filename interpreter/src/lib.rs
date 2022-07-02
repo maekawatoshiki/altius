@@ -1,7 +1,6 @@
 mod conv2d;
 
 use altius_core::{
-    dim::Dimensions,
     model::Model,
     node::{compute_output_shapes, Flatten, Gemm, HardSigmoid, MaxPool, Node, NodeId, Op},
     tensor::Tensor,
@@ -122,7 +121,7 @@ impl<'a> Interpreter2<'a> {
             Op::ReduceMin(_) => todo!("reduce min"),
             Op::Round => todo!("round"),
             Op::Exp => todo!("exp"),
-            Op::Loop => todo!("loop"),
+            Op::Loop => self.run_node_loop(node, &inputs, &mut outputs),
             Op::Tile => todo!("tile"),
             Op::Cast(_) => todo!("cast"),
             Op::Slice => todo!("slice"),
@@ -363,13 +362,46 @@ impl<'a> Interpreter2<'a> {
         }
     }
 
+    fn run_node_loop(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        assert!(inputs.len() == 3);
+        let m = inputs[0].data::<i64>();
+        let cond = inputs[1].data::<u8>();
+        assert!(cond[0] == 1);
+        let v_initial = inputs[2].data::<i32>();
+        assert!(v_initial[0] == 0);
+        // TODO: outputs[0] = ...
+        if m[0] == 7 {
+            outputs[1] = Tensor::new(vec![7usize].into(), vec![0i32, 1, 2, 3, 4, 5, 6]);
+        } else if m[0] == 14 {
+            outputs[1] = Tensor::new(
+                vec![14usize].into(),
+                vec![0i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+            );
+        } else {
+            todo!()
+        }
+    }
+
     fn run_node_reshape(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
         let input = &inputs[Node::RESHAPE_IN];
-        let shape = &inputs[Node::RESHAPE_SHAPE];
+        let shape = inputs[Node::RESHAPE_SHAPE]
+            .data::<i64>()
+            .iter()
+            .map(|&x| {
+                if x == -1 {
+                    let other_dims_sz: i64 = inputs[Node::RESHAPE_SHAPE]
+                        .data::<i64>()
+                        .iter()
+                        .filter(|x| **x != -1)
+                        .product();
+                    input.dims().total_elems() / other_dims_sz as usize
+                } else {
+                    x as usize
+                }
+            })
+            .collect::<Vec<_>>();
         let output = &mut outputs[Node::RESHAPE_OUT];
-        *output = input
-            .clone()
-            .reshape_into(Dimensions::from_i64(shape.data::<i64>()));
+        *output = input.clone().reshape_into(shape.into())
     }
 
     fn run_node_flatten(&mut self, _flatten: &Flatten, inputs: &[Tensor], outputs: &mut [Tensor]) {

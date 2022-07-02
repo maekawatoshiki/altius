@@ -58,8 +58,10 @@ pub struct Conv2d {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MaxPool {
+    pub auto_pad: String,
     pub kernel_shape: Dimensions,
     pub strides: Dimensions,
+    pub padding: Dimensions,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -377,17 +379,32 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             shapes.push(in_a.clone());
         }
         Op::MaxPool(maxpool) => {
+            let auto_pad = &maxpool.auto_pad;
             let kernel = &maxpool.kernel_shape;
             let stride = &maxpool.strides;
             let input = &inputs[Node::MAXPOOL_IN].dims();
+            let mut padding = &maxpool.padding;
+
+            if !auto_pad.is_empty() && auto_pad != "NOTSET" {
+                let out0 = (input[2] as f32 / stride[0] as f32).ceil() as usize;
+                let out1 = (input[3] as f32 / stride[1] as f32).ceil() as usize;
+                let pad0 =
+                    ((out0 - 1) * stride[0] + ((kernel[0] - 1) * 1 + 1)).saturating_sub(input[2]);
+                let pad1 =
+                    ((out1 - 1) * stride[1] + ((kernel[1] - 1) * 1 + 1)).saturating_sub(input[3]);
+                assert!(auto_pad == "SAME_UPPER");
+                let new_padding = vec![pad0 / 2, pad1 / 2, pad0 - pad0 / 2, pad1 - pad1 / 2];
+                maxpool.padding = new_padding.into();
+                padding = &maxpool.padding;
+            }
 
             let h_in = input[2];
             let w_in = input[3];
             let output_shape = vec![
                 input[0],
                 input[1],
-                (h_in + 2 * 0 - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
-                (w_in + 2 * 0 - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
+                (h_in + (padding[0] + padding[2]) - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
+                (w_in + (padding[1] + padding[3]) - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
             shapes.push(output_shape.into());
         }

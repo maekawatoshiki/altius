@@ -258,12 +258,20 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .alloc(&mut model.nodes);
             }
             "MaxPool" => {
+                let auto_pad = get_attribute(&node.attribute, "auto_pad")
+                    .map_or("NOTSET".to_string(), |a| {
+                        unsafe { std::str::from_utf8_unchecked(a.s()) }.to_string()
+                    });
+                let padding = get_attribute(&node.attribute, "pads")
+                    .map_or(vec![0, 0].into(), |a| Dimensions::from_i64(&a.ints));
                 let kernel = Dimensions::from_i64(
                     &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,
                 );
                 let strides =
                     Dimensions::from_i64(&get_attribute(&node.attribute, "strides").unwrap().ints);
                 let _maxpool = Node::new(Op::MaxPool(MaxPool {
+                    auto_pad,
+                    padding,
                     kernel_shape: kernel,
                     strides,
                 }))

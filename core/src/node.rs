@@ -22,6 +22,7 @@ pub enum Op {
     GlobalAveragePool,
     Reshape,
     Flatten(Flatten),
+    Resize(Resize),
     MatMul,
     Gemm(Gemm),
     HardSigmoid(HardSigmoid),
@@ -56,6 +57,16 @@ pub struct LeakyReLU {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Flatten {
     pub axis: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Resize {
+    pub coordinate_transformation_mode: String,
+    pub cubic_coeff_a: f32,
+    pub exclude_outside: i64,
+    pub extrapolation_value: f32,
+    pub mode: String,
+    pub nearest_mode: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -98,6 +109,12 @@ impl Node {
 
     pub const FLATTEN_IN: usize = 0;
     pub const FLATTEN_OUT: usize = 0;
+
+    pub const RESIZE_IN_X: usize = 0;
+    pub const RESIZE_IN_ROI: usize = 1;
+    pub const RESIZE_IN_SCALES: usize = 2;
+    pub const RESIZE_IN_SIZES: usize = 3;
+    pub const RESIZE_OUT: usize = 0;
 
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
@@ -156,6 +173,7 @@ impl Op {
             Op::GlobalAveragePool => "GlobalAveragePool",
             Op::Reshape => "Reshape",
             Op::Flatten(_) => "Flatten",
+            Op::Resize(_) => "Resize",
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
             Op::HardSigmoid(_) => "HardSigmoid",
@@ -262,6 +280,26 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             let x: Dimensions = dims[..flatten.axis as usize].to_vec().into();
             let y: Dimensions = dims[flatten.axis as usize..].to_vec().into();
             shapes.push(vec![x.total_elems(), y.total_elems()].into())
+        }
+        Op::Resize(resize) => {
+            // TODO: Support other cases.
+            assert!(resize.coordinate_transformation_mode == "asymmetric");
+            assert!(resize.mode == "nearest");
+            assert!(resize.nearest_mode == "floor");
+            assert!(inputs.len() == 3);
+            let x = &inputs[Node::RESIZE_IN_X];
+            assert!(x.dims().len() == 4);
+            let roi = &inputs[Node::RESIZE_IN_ROI].data::<f32>();
+            let scales = &inputs[Node::RESIZE_IN_SCALES].data::<f32>();
+            shapes.push(
+                vec![
+                    (x.dims()[0] as f32 * (roi[4] - roi[0]) * scales[0]).floor() as usize,
+                    (x.dims()[1] as f32 * (roi[5] - roi[1]) * scales[1]).floor() as usize,
+                    (x.dims()[2] as f32 * (roi[6] - roi[2]) * scales[2]).floor() as usize,
+                    (x.dims()[3] as f32 * (roi[7] - roi[3]) * scales[3]).floor() as usize,
+                ]
+                .into(),
+            )
         }
         Op::MatMul => {
             let in_a = &inputs[Node::MATMUL_IN_A].dims();

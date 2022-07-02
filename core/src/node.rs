@@ -400,7 +400,18 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             let shape = inputs[Node::RESHAPE_SHAPE]
                 .data::<i64>()
                 .iter()
-                .map(|&x| x as usize)
+                .map(|&x| {
+                    if x == -1 {
+                        let other_dims_sz: i64 = inputs[Node::RESHAPE_SHAPE]
+                            .data::<i64>()
+                            .iter()
+                            .filter(|x| **x != -1)
+                            .product();
+                        inputs[Node::RESHAPE_IN].dims().total_elems() / other_dims_sz as usize
+                    } else {
+                        x as usize
+                    }
+                })
                 .collect::<Vec<_>>();
             shapes.push(shape.into());
         }
@@ -490,7 +501,14 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             shapes.push(dims.into());
         }
         Op::Loop => {
-            todo!()
+            assert!(inputs.len() == 3);
+            let m = inputs[0].data::<i64>();
+            let cond = inputs[1].data::<u8>();
+            assert!(cond[0] == 1);
+            let v_initial = inputs[2].data::<i32>();
+            assert!(v_initial[0] == 0);
+            shapes.push(vec![1].into());
+            shapes.push(vec![m[0] as usize].into());
         }
         Op::Tile => {
             let in_dims = inputs[Node::TILE_IN].dims();

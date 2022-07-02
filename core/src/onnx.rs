@@ -237,7 +237,8 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 .unwrap()
                 {
                     DataType::Float => TensorElemType::F32,
-                    _ => todo!(),
+                    DataType::Int32 => TensorElemType::I32,
+                    e => todo!("Cast to {:?}", e),
                 };
                 let _cast = Node::new(Op::Cast(Cast { to }))
                     .with_ins(inputs)
@@ -246,6 +247,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             }
             "Slice" => {
                 let _slice = Node::new(Op::Slice)
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
+            "NonMaxSuppression" => {
+                let _non_max_suppression = Node::new(Op::NonMaxSuppression)
                     .with_ins(inputs)
                     .with_outs(outputs)
                     .alloc(&mut model.nodes);

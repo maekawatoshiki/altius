@@ -123,6 +123,7 @@ impl<'a> Interpreter2<'a> {
             Op::Tile => todo!("tile"),
             Op::Cast(_) => todo!("cast"),
             Op::Slice => todo!("slice"),
+            Op::NonMaxSuppression => todo!("nms"),
         }
 
         let elapsed = start.elapsed();

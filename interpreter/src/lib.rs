@@ -114,6 +114,7 @@ impl<'a> Interpreter2<'a> {
             Op::Transpose(_) => todo!("transpose"),
             Op::Squeeze(_) => todo!("squeeze"),
             Op::ReduceMin(_) => todo!("reduce min"),
+            Op::Round => todo!("round"),
         }
 
         let elapsed = start.elapsed();

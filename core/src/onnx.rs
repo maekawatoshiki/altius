@@ -184,6 +184,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 let keep_dims = get_attribute(&node.attribute, "keepdims").map_or(1, |a| a.i());
                 let _reduce_min = Node::new(Op::ReduceMin(ReduceMin { axes, keep_dims }));
             }
+            "Round" => {
+                let _round = Node::new(Op::Round)
+                    .with_ins(inputs)
+                    .with_outs(outputs)
+                    .alloc(&mut model.nodes);
+            }
             "MaxPool" => {
                 let kernel = Dimensions::from_i64(
                     &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,

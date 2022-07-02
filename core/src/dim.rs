@@ -25,6 +25,10 @@ impl Dimensions {
         self.0.as_slice()
     }
 
+    pub fn as_mut_slice(&mut self) -> &mut [Dimension] {
+        self.0.as_mut_slice()
+    }
+
     pub fn to_i32_vec(&self) -> Vec<i32> {
         self.0.iter().map(|&x| x as i32).collect()
     }

@@ -109,6 +109,7 @@ impl<'a> Interpreter2<'a> {
             Op::HardSigmoid(ref hs) => self.run_node_hard_sigomid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(_) => todo!("leaky relu"),
             Op::Resize(_) => todo!("resize"),
+            Op::Concat(_) => todo!("concat"),
         }
 
         let elapsed = start.elapsed();

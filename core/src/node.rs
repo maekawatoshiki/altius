@@ -23,6 +23,7 @@ pub enum Op {
     Reshape,
     Flatten(Flatten),
     Resize(Resize),
+    Concat(Concat),
     MatMul,
     Gemm(Gemm),
     HardSigmoid(HardSigmoid),
@@ -67,6 +68,11 @@ pub struct Resize {
     pub extrapolation_value: f32,
     pub mode: String,
     pub nearest_mode: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Concat {
+    pub axis: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -115,6 +121,9 @@ impl Node {
     pub const RESIZE_IN_SCALES: usize = 2;
     pub const RESIZE_IN_SIZES: usize = 3;
     pub const RESIZE_OUT: usize = 0;
+
+    pub const CONCAT_IN: usize = 0; // variadic
+    pub const CONCAT_OUT: usize = 0;
 
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
@@ -174,6 +183,7 @@ impl Op {
             Op::Reshape => "Reshape",
             Op::Flatten(_) => "Flatten",
             Op::Resize(_) => "Resize",
+            Op::Concat(_) => "Concat",
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
             Op::HardSigmoid(_) => "HardSigmoid",
@@ -300,6 +310,15 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 ]
                 .into(),
             )
+        }
+        Op::Concat(concat) => {
+            let mut dims = inputs[Node::CONCAT_IN].dims().clone();
+            let mut sum = 0;
+            for i in inputs {
+                sum += i.dims()[concat.axis as usize];
+            }
+            dims.as_mut_slice()[concat.axis as usize] = sum;
+            shapes.push(dims);
         }
         Op::MatMul => {
             let in_a = &inputs[Node::MATMUL_IN_A].dims();

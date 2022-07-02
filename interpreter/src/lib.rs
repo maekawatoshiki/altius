@@ -107,6 +107,7 @@ impl<'a> Interpreter2<'a> {
             Op::Gemm(ref gemm) => self.run_node_gemm(gemm, &inputs, &mut outputs),
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(ref hs) => self.run_node_hard_sigomid(hs, &inputs, &mut outputs),
+            Op::LeakyReLU(_) => todo!("leaky relu"),
         }
 
         let elapsed = start.elapsed();

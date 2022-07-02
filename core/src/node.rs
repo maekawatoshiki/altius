@@ -436,6 +436,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 }
                 dims.push(x);
             }
+            if dims.is_empty() {
+                dims.push(1);
+            }
             shapes.push(dims.into());
         }
         Op::Loop => {

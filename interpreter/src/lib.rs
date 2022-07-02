@@ -4,6 +4,7 @@ use altius_core::{
     model::Model,
     node::{
         compute_output_shapes, Cast, Concat, Flatten, Gemm, HardSigmoid, MaxPool, Node, NodeId, Op,
+        Squeeze,
     },
     tensor::Tensor,
     value::ValueId,
@@ -11,7 +12,7 @@ use altius_core::{
 use conv2d::Conv2dCtx;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-use ndarray::{linalg, Array2, Array4, ArrayView4, Axis};
+use ndarray::{linalg, Array2, Array4, ArrayView1, ArrayView2, ArrayView4, ArrayViewD, Axis};
 use rustc_hash::FxHashMap;
 use std::time::{Duration, Instant};
 
@@ -118,7 +119,7 @@ impl<'a> Interpreter2<'a> {
             Op::Resize(_) => todo!("resize"),
             Op::Concat(ref concat) => self.run_node_concat(concat, &inputs, &mut outputs),
             Op::Transpose(_) => todo!("transpose"),
-            Op::Squeeze(_) => todo!("squeeze"),
+            Op::Squeeze(ref squeeze) => self.run_node_squeeze(squeeze, &inputs, &mut outputs),
             Op::Unsqueeze(_) => todo!("unsqueeze"),
             Op::ReduceMin(_) => todo!("reduce min"),
             Op::Round => todo!("round"),
@@ -366,17 +367,51 @@ impl<'a> Interpreter2<'a> {
 
     fn run_node_concat(&mut self, concat: &Concat, inputs: &[Tensor], outputs: &mut [Tensor]) {
         if inputs[0].elem_ty().is_f32() {
-            let mut in_views = vec![];
-            for i in inputs {
-                assert!(i.elem_ty().is_f32());
-                in_views
-                    .push(ArrayView4::from_shape(i.fixed_dims::<4>(), i.data::<f32>()).unwrap());
+            if inputs[0].dims().len() == 4 {
+                let mut in_views = vec![];
+                for i in inputs {
+                    assert!(i.dims().len() == 4);
+                    assert!(i.elem_ty().is_f32());
+                    in_views.push(
+                        ArrayView4::from_shape(i.fixed_dims::<4>(), i.data::<f32>()).unwrap(),
+                    );
+                }
+                let output = &mut outputs[Node::CONCAT_OUT];
+                assert!(output.dims().len() == 4);
+                let out =
+                    ndarray::concatenate(Axis(concat.axis as usize), in_views.as_slice()).unwrap();
+                *output = Tensor::new(output.dims().clone(), out.into_raw_vec());
+            } else if inputs[0].dims().len() == 2 {
+                let mut in_views = vec![];
+                for i in inputs {
+                    assert!(i.dims().len() == 2);
+                    assert!(i.elem_ty().is_f32());
+                    in_views.push(
+                        ArrayView2::from_shape(i.fixed_dims::<2>(), i.data::<f32>()).unwrap(),
+                    );
+                }
+                let output = &mut outputs[Node::CONCAT_OUT];
+                assert!(output.dims().len() == 2);
+                let out =
+                    ndarray::concatenate(Axis(concat.axis as usize), in_views.as_slice()).unwrap();
+                *output = Tensor::new(output.dims().clone(), out.into_raw_vec());
+            } else if inputs[0].dims().len() == 1 {
+                let mut in_views = vec![];
+                for i in inputs {
+                    assert!(i.dims().len() == 1);
+                    assert!(i.elem_ty().is_f32());
+                    in_views.push(
+                        ArrayView1::from_shape(i.fixed_dims::<1>(), i.data::<f32>()).unwrap(),
+                    );
+                }
+                let output = &mut outputs[Node::CONCAT_OUT];
+                assert!(output.dims().len() == 1);
+                let out =
+                    ndarray::concatenate(Axis(concat.axis as usize), in_views.as_slice()).unwrap();
+                *output = Tensor::new(output.dims().clone(), out.into_raw_vec());
+            } else {
+                todo!("{:?}", inputs[0].dims().len());
             }
-            let output = &mut outputs[Node::CONCAT_OUT];
-            assert!(output.dims().len() == 4);
-            let out =
-                ndarray::concatenate(Axis(concat.axis as usize), in_views.as_slice()).unwrap();
-            *output = Tensor::new(output.dims().clone(), out.into_raw_vec());
         } else if inputs[0].elem_ty().is_i32() {
             let mut in_views = vec![];
             for i in inputs {
@@ -392,6 +427,13 @@ impl<'a> Interpreter2<'a> {
         } else {
             todo!()
         }
+    }
+
+    fn run_node_squeeze(&mut self, _squeeze: &Squeeze, inputs: &[Tensor], outputs: &mut [Tensor]) {
+        let input = &inputs[Node::SQUEEZE_IN];
+        assert!(input.elem_ty().is_f32());
+        let output = &mut outputs[Node::SQUEEZE_OUT];
+        output.set_raw_vec(input.data::<f32>().to_vec());
     }
 
     fn run_node_loop(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {

@@ -31,6 +31,7 @@ pub enum Op {
     ReduceMin(ReduceMin),
     Round,
     Loop,
+    Tile,
     MatMul,
     Gemm(Gemm),
     HardSigmoid(HardSigmoid),
@@ -168,6 +169,10 @@ impl Node {
     pub const REDUCEMIN_IN: usize = 0;
     pub const REDUCEMIN_OUT: usize = 0;
 
+    pub const TILE_IN: usize = 0;
+    pub const TILE_REPEATS: usize = 1;
+    pub const TILE_OUT: usize = 0;
+
     pub const MATMUL_IN_A: usize = 0;
     pub const MATMUL_IN_B: usize = 1;
     pub const MATMUL_OUT: usize = 0;
@@ -234,6 +239,7 @@ impl Op {
             Op::ReduceMin(_) => "ReduceMin",
             Op::Round => "Round",
             Op::Loop => "Loop",
+            Op::Tile => "Tile",
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
             Op::HardSigmoid(_) => "HardSigmoid",
@@ -420,6 +426,15 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         }
         Op::Loop => {
             todo!()
+        }
+        Op::Tile => {
+            let in_dims = inputs[Node::TILE_IN].dims();
+            let reps = inputs[Node::TILE_REPEATS].data::<i64>();
+            let mut dims = vec![];
+            for (i, &x) in in_dims.as_slice().iter().enumerate() {
+                dims.push(x * reps[i as usize] as usize);
+            }
+            shapes.push(dims.into());
         }
         Op::MatMul => {
             let in_a = &inputs[Node::MATMUL_IN_A].dims();

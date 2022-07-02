@@ -117,6 +117,7 @@ impl<'a> Interpreter2<'a> {
             Op::ReduceMin(_) => todo!("reduce min"),
             Op::Round => todo!("round"),
             Op::Loop => todo!("loop"),
+            Op::Tile => todo!("tile"),
         }
 
         let elapsed = start.elapsed();

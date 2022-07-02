@@ -116,6 +116,7 @@ impl<'a> Interpreter2<'a> {
             Op::Squeeze(_) => todo!("squeeze"),
             Op::ReduceMin(_) => todo!("reduce min"),
             Op::Round => todo!("round"),
+            Op::Exp => todo!("exp"),
             Op::Loop => todo!("loop"),
             Op::Tile => todo!("tile"),
             Op::Cast(_) => todo!("cast"),

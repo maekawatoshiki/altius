@@ -35,6 +35,7 @@ pub enum Op {
     Squeeze(Squeeze),
     ReduceMin(ReduceMin),
     Round,
+    Exp,
     Loop,
     Tile,
     Slice,
@@ -152,6 +153,9 @@ impl Node {
     pub const ROUND_IN: usize = 0;
     pub const ROUND_OUT: usize = 0;
 
+    pub const EXP_IN: usize = 0;
+    pub const EXP_OUT: usize = 0;
+
     pub const MAXPOOL_IN: usize = 0;
     pub const MAXPOOL_OUT: usize = 0;
 
@@ -260,6 +264,7 @@ impl Op {
             Op::Squeeze(_) => "Squeeze",
             Op::ReduceMin(_) => "ReduceMin",
             Op::Round => "Round",
+            Op::Exp => "Exp",
             Op::Loop => "Loop",
             Op::Tile => "Tile",
             Op::Slice => "Slice",
@@ -529,6 +534,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
         }
         Op::Round => {
             let input = inputs[Node::ROUND_IN].dims();
+            shapes.push(input.clone());
+        }
+        Op::Exp => {
+            let input = inputs[Node::EXP_IN].dims();
             shapes.push(input.clone());
         }
     }

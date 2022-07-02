@@ -34,6 +34,7 @@ pub enum Op {
     Concat(Concat),
     Transpose(Transpose),
     Squeeze(Squeeze),
+    Unsqueeze(Unsqueeze),
     ReduceMin(ReduceMin),
     Round,
     Exp,
@@ -103,6 +104,11 @@ pub struct Transpose {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Squeeze {
+    pub axes: Vec<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Unsqueeze {
     pub axes: Vec<i64>,
 }
 
@@ -188,6 +194,9 @@ impl Node {
     pub const SQUEEZE_IN: usize = 0;
     pub const SQUEEZE_OUT: usize = 0;
 
+    pub const UNSQUEEZE_IN: usize = 0;
+    pub const UNSQUEEZE_OUT: usize = 0;
+
     pub const REDUCEMIN_IN: usize = 0;
     pub const REDUCEMIN_OUT: usize = 0;
 
@@ -267,6 +276,7 @@ impl Op {
             Op::Concat(_) => "Concat",
             Op::Transpose(_) => "Transpose",
             Op::Squeeze(_) => "Squeeze",
+            Op::Unsqueeze(_) => "Unsqueeze",
             Op::ReduceMin(_) => "ReduceMin",
             Op::Round => "Round",
             Op::Exp => "Exp",
@@ -440,6 +450,16 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                     continue;
                 }
                 dims.push(x);
+            }
+            shapes.push(dims.into());
+        }
+        Op::Unsqueeze(unsqueeze) => {
+            assert!(!unsqueeze.axes.is_empty());
+            assert!(unsqueeze.axes.iter().all(|&x| x >= 0));
+            let in_dims = inputs[Node::UNSQUEEZE_IN].dims().as_slice().to_vec();
+            let mut dims = in_dims.clone();
+            for &x in unsqueeze.axes.iter() {
+                dims.insert(x as usize, 1);
             }
             shapes.push(dims.into());
         }

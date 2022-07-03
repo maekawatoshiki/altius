@@ -5,7 +5,7 @@ use crate::{
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Model {
     pub nodes: NodeArena,
     pub values: ValueArena,

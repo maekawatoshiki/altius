@@ -5,7 +5,7 @@ pub type ValueId = Id<Value>;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Value(pub Option<String>);
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ValueArena(Arena<Value>);
 
 impl ValueArena {

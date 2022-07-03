@@ -445,48 +445,11 @@ impl<'a> Interpreter2<'a> {
     }
 
     fn run_node_loop(&mut self, _node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
-        todo!()
+        todo!("loop")
     }
 
-    fn run_node_tile(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input = inputs[Node::TILE_IN].data::<i32>();
-        let repeats = inputs[Node::TILE_REPEATS].data::<i64>();
-        let output = &mut outputs[Node::TILE_OUT];
-        if repeats[1] == 7 {
-            let mut v = vec![];
-            for i in input {
-                for _ in 0..7 {
-                    v.push(*i);
-                }
-            }
-            *output = Tensor::new(output.dims().clone(), v);
-        } else if repeats[0] == 7 {
-            let mut v = vec![];
-            for _ in 0..7 {
-                for i in input {
-                    v.push(*i);
-                }
-            }
-            *output = Tensor::new(output.dims().clone(), v);
-        } else if repeats[1] == 14 {
-            let mut v = vec![];
-            for i in input {
-                for _ in 0..14 {
-                    v.push(*i);
-                }
-            }
-            *output = Tensor::new(output.dims().clone(), v);
-        } else if repeats[0] == 14 {
-            let mut v = vec![];
-            for _ in 0..14 {
-                for i in input {
-                    v.push(*i);
-                }
-            }
-            *output = Tensor::new(output.dims().clone(), v);
-        } else {
-            todo!()
-        }
+    fn run_node_tile(&mut self, _node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
+        todo!("tile")
     }
 
     fn run_node_cast(&mut self, cast: &Cast, inputs: &[Tensor], outputs: &mut [Tensor]) {

@@ -34,7 +34,7 @@ fn main() {
     Interpreter2::new(&model).run(vec![(input_value, input.clone())]); // First run is slow so
                                                                        // ignore it.
     let out = i.run(vec![(input_value, input)]);
-    let mut out = out.data::<f32>().iter().enumerate().collect::<Vec<_>>();
+    let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
     out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 
     let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();

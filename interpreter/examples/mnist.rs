@@ -48,7 +48,7 @@ fn main() {
             .map(|(expected, input)| {
                 let mut i = Interpreter2::new(&mnist);
                 let v = i.run(vec![(input_value, input.clone())]);
-                let inferred = v
+                let inferred = v[0]
                     .data::<f32>()
                     .iter()
                     .enumerate()

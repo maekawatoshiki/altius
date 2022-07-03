@@ -2,6 +2,7 @@
 members = [
   "core",
   "interpreter",
+  "altius-py"
 ]
 
 [profile.release]

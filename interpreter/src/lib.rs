@@ -46,6 +46,10 @@ impl<'a> Interpreter2<'a> {
         self.profile.clear();
     }
 
+    pub fn model(&self) -> &Model {
+        self.model
+    }
+
     pub fn run(&mut self, inputs: Vec<(ValueId, Tensor)>) -> Vec<&Tensor> {
         // assert!(self.model.inputs.len() == 1);
         // assert!(self.model.outputs.len() == 1);

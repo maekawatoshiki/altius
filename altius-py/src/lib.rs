@@ -1,9 +1,14 @@
 extern crate altius_core;
 extern crate altius_interpreter;
 
-use altius_core::model::Model;
+use std::collections::HashMap;
+
+use altius_core::{model::Model, tensor::Tensor};
 use altius_interpreter::Interpreter2;
-use pyo3::{exceptions::PyRuntimeError, prelude::*};
+use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
+
+use numpy::ndarray::ArrayD;
+use numpy::{PyArrayDyn, PyReadonlyArrayDyn};
 
 #[pyclass]
 #[repr(transparent)]
@@ -26,6 +31,47 @@ fn load(path: String) -> PyResult<PyModel> {
 fn session<'a>(model: &'a PyModel) -> PyResult<PySession> {
     let model = unsafe { std::mem::transmute::<&'a Model, &'static Model>(&model.0) };
     Ok(PySession(Interpreter2::new(model)))
+}
+
+#[pymethods]
+impl PySession {
+    pub fn run<'a>(
+        &mut self,
+        py: Python<'a>,
+        inputs: &PyDict,
+    ) -> PyResult<Vec<&'a PyArrayDyn<f32>>> {
+        let map: HashMap<String, PyReadonlyArrayDyn<f32>> = inputs
+            .extract()
+            .map_err(|_| PyRuntimeError::new_err("Failed to extract inputs"))?;
+        let mut inputs = vec![];
+        for (name, val) in map {
+            let val_id =
+                self.0
+                    .model()
+                    .lookup_named_value(&name)
+                    .ok_or(PyRuntimeError::new_err(format!(
+                        "Input '{}' not found",
+                        name
+                    )))?;
+            inputs.push((
+                val_id,
+                Tensor::new(
+                    val.shape().to_vec().into(),
+                    val.as_slice()
+                        .map_err(|_| PyRuntimeError::new_err("Array not contiguous"))?
+                        .to_vec(),
+                ),
+            ));
+        }
+        let mut outputs = vec![];
+        for out in self.0.run(inputs) {
+            let arr =
+                ArrayD::from_shape_vec(out.dims().as_slice().to_vec(), out.data::<f32>().to_vec())
+                    .map_err(|_| PyRuntimeError::new_err("Failed to create output array"))?;
+            outputs.push(PyArrayDyn::from_array(py, &arr))
+        }
+        Ok(outputs)
+    }
 }
 
 /// A Python module implemented in Rust.

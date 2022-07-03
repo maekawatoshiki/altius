@@ -12,3 +12,4 @@ crate-type = ["cdylib"]
 altius-core = { path = "../core" }
 altius-interpreter = { path = "../interpreter" }
 pyo3 = { version = "0.16.5", features = ["extension-module"] }
+numpy = "^0.16.0"

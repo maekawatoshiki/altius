@@ -444,24 +444,8 @@ impl<'a> Interpreter2<'a> {
         output.set_raw_vec(input.data::<f32>().to_vec());
     }
 
-    fn run_node_loop(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        assert!(inputs.len() == 3);
-        let m = inputs[0].data::<i64>();
-        let cond = inputs[1].data::<u8>();
-        assert!(cond[0] == 1);
-        let v_initial = inputs[2].data::<i32>();
-        assert!(v_initial[0] == 0);
-        // TODO: outputs[0] = ...
-        if m[0] == 7 {
-            outputs[1] = Tensor::new(vec![7usize].into(), vec![0i32, 1, 2, 3, 4, 5, 6]);
-        } else if m[0] == 14 {
-            outputs[1] = Tensor::new(
-                vec![14usize].into(),
-                vec![0i32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
-            );
-        } else {
-            todo!()
-        }
+    fn run_node_loop(&mut self, _node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
+        todo!()
     }
 
     fn run_node_tile(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {

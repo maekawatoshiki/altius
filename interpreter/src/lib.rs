@@ -46,7 +46,7 @@ impl<'a> Interpreter2<'a> {
         self.profile.clear();
     }
 
-    pub fn run(&mut self, inputs: Vec<(ValueId, Tensor)>) -> &Tensor {
+    pub fn run(&mut self, inputs: Vec<(ValueId, Tensor)>) -> Vec<&Tensor> {
         // assert!(self.model.inputs.len() == 1);
         // assert!(self.model.outputs.len() == 1);
         if self.model.outputs.len() > 1 {
@@ -75,7 +75,11 @@ impl<'a> Interpreter2<'a> {
             log::debug!("Profile: {:#?}", self.profile);
         }
 
-        &self.values[&self.model.outputs[0]]
+        self.model
+            .outputs
+            .iter()
+            .map(|id| &self.values[id])
+            .collect()
     }
 
     fn run_node(&mut self, node: NodeId) {

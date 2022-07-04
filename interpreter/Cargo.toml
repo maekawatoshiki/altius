@@ -13,11 +13,15 @@ cudnn = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 ndarray = "0.15.4"
 
+[dependencies.nokhwa]
+version = "^0.9.4"
+features = [ "input-opencv" ]
+
 [features]
 cuda = ["cudnn", "cust"]
 
 [dev-dependencies]
 env_logger = "0.9.0"
-image = "0.24.2"
+image = "0.23.14"
 rayon = "*"
 structopt = "0.3.26"

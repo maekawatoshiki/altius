@@ -1,5 +1,6 @@
 use altius_core::{onnx::load_onnx, tensor::Tensor};
 use altius_interpreter::Interpreter2;
+use image::ColorType;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
@@ -20,25 +21,51 @@ fn main() {
     let model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
     let input_value = model.lookup_named_value("input").unwrap();
 
-    let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
-    let resized = image::imageops::resize(&image, 224, 224, image::imageops::FilterType::Triangle);
-    let image = ndarray::Array4::from_shape_fn((1, 3, 224, 224), |(_, c, y, x)| {
-        let mean = [0.485, 0.456, 0.406][c];
-        let std = [0.229, 0.224, 0.225][c];
-        (resized[(x as _, y as _)][c] as f32 / 255.0 - mean) / std
-    });
-    let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
+    use nokhwa::Camera;
+    use nokhwa::{CameraFormat, FrameFormat};
+    // set up the Camera
+    let mut camera = Camera::new(
+        0,                                                                // index
+        Some(CameraFormat::new_from(1920, 1080, FrameFormat::MJPEG, 10)), // format
+    )
+    .unwrap();
+    // open stream
+    camera.open_stream().unwrap();
+    loop {
+        let frame = camera.frame().unwrap();
+        let frame = image::RgbImage::from_vec(1920, 1080, frame.into_vec()).unwrap();
+        // image::save_buffer("a.png", frame.as_raw(), 224, 224, ColorType::Rgb8);
 
-    let mut i = Interpreter2::new(&model).with_profiling(opt.profile);
-    #[cfg(feature = "cuda")]
-    Interpreter2::new(&model).run(vec![(input_value, input.clone())]); // First run is slow so
-                                                                       // ignore it.
-    let out = i.run(vec![(input_value, input)]);
-    let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
-    out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+        // println!("{}, {}", frame.width(), frame.height());
 
-    let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
-    let classes = classes.split("\n").collect::<Vec<_>>();
-    println!("inferred: {}", classes[out[0].0]);
-    println!("top5: {:?}", &out[..5]);
+        let mut image = frame;
+        // let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
+        let image = image::imageops::crop_imm(&image, 420, 0, 1080, 1080);
+        // image.save("a.png");
+        let resized =
+            image::imageops::resize(&image, 224, 224, image::imageops::FilterType::Triangle);
+        let image = ndarray::Array4::from_shape_fn((1, 3, 224, 224), |(_, c, y, x)| {
+            let mean = [0.485, 0.456, 0.406][c];
+            let std = [0.229, 0.224, 0.225][c];
+            (resized[(x as _, y as _)][c] as f32 / 255.0 - mean) / std
+        });
+        let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
+
+        let mut i = Interpreter2::new(&model).with_profiling(opt.profile);
+        #[cfg(feature = "cuda")]
+        Interpreter2::new(&model).run(vec![(input_value, input.clone())]); // First run is slow so
+                                                                           // ignore it.
+        let out = i.run(vec![(input_value, input)])[0];
+        let mut out = out.data::<f32>().iter().enumerate().collect::<Vec<_>>();
+        out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+
+        let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
+        let classes = classes.split("\n").collect::<Vec<_>>();
+        // println!("inferred: {}", classes[out[0].0]);
+        for (i, prob) in out.iter().take(5) {
+            println!("{}\t({})", classes[*i], prob);
+            // println!("{}: {} ({})", i, classes[i], prob);
+        }
+        print!("\x1B[2J\x1B[1;1H");
+    }
 }

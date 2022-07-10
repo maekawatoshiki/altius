@@ -20,7 +20,7 @@ pub struct Conv2dCtx<'a> {
 
 #[cfg(not(feature = "cuda"))]
 pub fn run(ctx: &mut Conv2dCtx) {
-    use ndarray::{linalg, s, Array4, Array5, ArrayView3, ArrayView4};
+    use ndarray::{linalg, s, Array4, Array6, ArrayView3, ArrayView4};
 
     let input = &ctx.inputs[Node::CONV2D_IN];
     let weight = &ctx.inputs[Node::CONV2D_WEIGHT];
@@ -90,28 +90,32 @@ pub fn run(ctx: &mut Conv2dCtx) {
         },
     );
 
-    for n in 0..batch_size {
-        let mut col = Array5::<f32>::zeros([input_c, kernel[0], kernel[1], output_h, output_w]);
-        for fy in 0..kernel[0] {
-            let fy_max = fy + stride[0] * output.dims()[2];
-            for fx in 0..kernel[1] {
-                let fx_max = fx + stride[1] * output.dims()[3];
-                col.slice_mut(s![.., fy, fx, .., ..])
-                    .assign(&input_.slice(s![n, .., fy..fy_max;stride[0], fx..fx_max;stride[1]]))
-            }
+    let mut col = Array6::<f32>::zeros([
+        batch_size, input_c, kernel[0], kernel[1], output_h, output_w,
+    ]);
+    for fy in 0..kernel[0] {
+        let fy_max = fy + stride[0] * output.dims()[2];
+        for fx in 0..kernel[1] {
+            let fx_max = fx + stride[1] * output.dims()[3];
+            col.slice_mut(s![.., .., fy, fx, .., ..])
+                .assign(&input_.slice(s![.., .., fy..fy_max;stride[0], fx..fx_max;stride[1]]))
         }
-        let col = col
-            .into_shape([
-                group,
-                in_c_per_g * weight.dims()[2] * weight.dims()[3],
-                output.dims()[2] * output.dims()[3],
-            ])
-            .unwrap();
+    }
+    let col = col
+        .into_shape([
+            batch_size,
+            group,
+            in_c_per_g * weight.dims()[2] * weight.dims()[3],
+            output.dims()[2] * output.dims()[3],
+        ])
+        .unwrap();
+
+    for n in 0..batch_size {
         for g in 0..group {
             linalg::general_mat_mul(
                 1.0,
                 &weight_.slice(s![g, .., ..]),
-                &col.slice(s![g, .., ..]),
+                &col.slice(s![n, g, .., ..]),
                 1.0,
                 &mut output_.slice_mut(s![n, g, .., ..]),
             );

@@ -1,5 +1,5 @@
 use altius_core::{onnx::load_onnx, tensor::Tensor};
-use altius_interpreter::Interpreter2;
+use altius_interpreter::Interpreter;
 use std::cmp::Ordering;
 use std::path::Path;
 
@@ -29,10 +29,10 @@ fn mobilenet() {
             .collect::<Vec<_>>(),
     );
 
-    let mut i = Interpreter2::new(&model).with_profiling(true);
+    let mut i = Interpreter::new(&model).with_profiling(true);
     #[cfg(feature = "cuda")]
-    Interpreter2::new(&model).run(vec![(input_value, input.clone())]); // First run is slow so
-                                                                       // ignore it.
+    Interpreter::new(&model).run(vec![(input_value, input.clone())]); // First run is slow so
+                                                                      // ignore it.
     let out = i.run(vec![(input_value, input)]);
     let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
     out[0..1000].sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));

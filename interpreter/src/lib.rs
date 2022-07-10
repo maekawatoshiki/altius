@@ -16,7 +16,7 @@ use ndarray::{linalg, Array2, ArrayView2, ArrayView4};
 use rustc_hash::FxHashMap;
 use std::time::{Duration, Instant};
 
-pub struct Interpreter2<'a> {
+pub struct Interpreter<'a> {
     model: &'a Model,
     values: FxHashMap<ValueId, Tensor>,
     profile: FxHashMap<&'static str, Duration>,
@@ -25,9 +25,9 @@ pub struct Interpreter2<'a> {
     enable_profiling: bool,
 }
 
-impl<'a> Interpreter2<'a> {
+impl<'a> Interpreter<'a> {
     pub fn new(model: &'a Model) -> Self {
-        Interpreter2 {
+        Interpreter {
             model,
             values: FxHashMap::default(),
             profile: FxHashMap::default(),

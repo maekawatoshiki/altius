@@ -1,6 +1,6 @@
 use altius_core::onnx::load_onnx;
 use altius_core::tensor::*;
-use altius_interpreter::Interpreter2;
+use altius_interpreter::Interpreter;
 use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::fs;
@@ -46,7 +46,7 @@ fn main() {
             .par_iter()
             .take(validation_count)
             .map(|(expected, input)| {
-                let mut i = Interpreter2::new(&mnist);
+                let mut i = Interpreter::new(&mnist);
                 let v = i.run(vec![(input_value, input.clone())]);
                 let inferred = v[0]
                     .data::<f32>()

@@ -4,7 +4,7 @@ extern crate altius_interpreter;
 use std::collections::HashMap;
 
 use altius_core::{model::Model, tensor::Tensor};
-use altius_interpreter::Interpreter2;
+use altius_interpreter::Interpreter;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 
 use numpy::ndarray::ArrayD;
@@ -17,7 +17,7 @@ pub struct PyModel(pub Model);
 
 #[pyclass]
 #[repr(transparent)]
-pub struct PySession(pub Interpreter2<'static>);
+pub struct PySession(pub Interpreter<'static>);
 
 #[pyfunction]
 fn load(path: String) -> PyResult<PyModel> {
@@ -30,7 +30,7 @@ fn load(path: String) -> PyResult<PyModel> {
 #[pyfunction]
 fn session<'a>(model: &'a PyModel) -> PyResult<PySession> {
     let model = unsafe { std::mem::transmute::<&'a Model, &'static Model>(&model.0) };
-    Ok(PySession(Interpreter2::new(model)))
+    Ok(PySession(Interpreter::new(model)))
 }
 
 #[pymethods]

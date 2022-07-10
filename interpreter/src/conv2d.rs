@@ -20,7 +20,7 @@ pub struct Conv2dCtx<'a> {
 
 #[cfg(not(feature = "cuda"))]
 pub fn run(ctx: &mut Conv2dCtx) {
-    use ndarray::{linalg, s, Array3, Array4, Array6, ArrayView3, ArrayView4};
+    use ndarray::{linalg, s, Array4, Array5, ArrayView3, ArrayView4};
 
     let input = &ctx.inputs[Node::CONV2D_IN];
     let weight = &ctx.inputs[Node::CONV2D_WEIGHT];
@@ -30,9 +30,13 @@ pub fn run(ctx: &mut Conv2dCtx) {
     let padding = &ctx.op.padding;
     let stride = &ctx.op.strides;
 
+    let batch_size = input.dims()[0];
+    let input_c = input.dims()[1];
+    let output_h = output.dims()[2];
+    let output_w = output.dims()[3];
     let _dilation = 1;
     let group = ctx.op.group as usize;
-    let in_c_per_g = input.dims()[1] / group;
+    let in_c_per_g = input_c / group;
     let out_c_per_g = output.dims()[1] / group;
 
     assert!(
@@ -41,8 +45,8 @@ pub fn run(ctx: &mut Conv2dCtx) {
     );
 
     let mut input_ = Array4::zeros([
-        input.dims()[0],
-        input.dims()[1],
+        batch_size,
+        input_c,
         input.dims()[2] + padding[0] * 2,
         input.dims()[3] + padding[1] * 2,
     ]);
@@ -65,74 +69,56 @@ pub fn run(ctx: &mut Conv2dCtx) {
     .unwrap();
     let mut output_ = ctx.inputs.get(Node::CONV2D_BIAS).map_or_else(
         || {
-            Array3::zeros([
+            Array4::zeros([
+                input.dims()[0],
                 group,
                 out_c_per_g,
-                input.dims()[0] * output.dims()[2] * output.dims()[3],
+                output.dims()[2] * output.dims()[3],
             ])
         },
         |bias| {
-            ArrayView3::from_shape([group, out_c_per_g, 1], bias.data::<f32>())
+            ArrayView4::from_shape([1, group, out_c_per_g, 1], bias.data::<f32>())
                 .unwrap()
                 .broadcast([
+                    batch_size,
                     group,
                     out_c_per_g,
-                    input.dims()[0] * output.dims()[2] * output.dims()[3],
+                    output.dims()[2] * output.dims()[3],
                 ])
                 .unwrap()
                 .to_owned()
         },
     );
 
-    let mut col = Array6::<f32>::zeros([
-        input.dims()[0],
-        input.dims()[1],
-        weight.dims()[2],
-        weight.dims()[3],
-        output.dims()[2],
-        output.dims()[3],
-    ]);
-
-    for fy in 0..kernel[0] {
-        let fy_max = fy + stride[0] * output.dims()[2];
-        for fx in 0..kernel[1] {
-            let fx_max = fx + stride[1] * output.dims()[3];
-            col.slice_mut(s![.., .., fy, fx, .., ..])
-                .assign(&input_.slice(s![.., .., fy..fy_max;stride[0], fx..fx_max;stride[1]]))
+    for n in 0..batch_size {
+        let mut col = Array5::<f32>::zeros([input_c, kernel[0], kernel[1], output_h, output_w]);
+        for fy in 0..kernel[0] {
+            let fy_max = fy + stride[0] * output.dims()[2];
+            for fx in 0..kernel[1] {
+                let fx_max = fx + stride[1] * output.dims()[3];
+                col.slice_mut(s![.., fy, fx, .., ..])
+                    .assign(&input_.slice(s![n, .., fy..fy_max;stride[0], fx..fx_max;stride[1]]))
+            }
+        }
+        let col = col
+            .into_shape([
+                group,
+                in_c_per_g * weight.dims()[2] * weight.dims()[3],
+                output.dims()[2] * output.dims()[3],
+            ])
+            .unwrap();
+        for g in 0..group {
+            linalg::general_mat_mul(
+                1.0,
+                &weight_.slice(s![g, .., ..]),
+                &col.slice(s![g, .., ..]),
+                1.0,
+                &mut output_.slice_mut(s![n, g, .., ..]),
+            );
         }
     }
 
-    let col = col.permuted_axes([1, 2, 3, 0, 4, 5]);
-    let col = col
-        .as_standard_layout()
-        .into_shape([
-            group,
-            in_c_per_g * weight.dims()[2] * weight.dims()[3],
-            input.dims()[0] * output.dims()[2] * output.dims()[3],
-        ])
-        .unwrap();
-
-    for g in 0..group {
-        linalg::general_mat_mul(
-            1.0,
-            &weight_.slice(s![g, .., ..]),
-            &col.slice(s![g, .., ..]),
-            1.0,
-            &mut output_.slice_mut(s![g, .., ..]),
-        );
-    }
-
-    let output_ = output_
-        .into_shape([
-            output.dims()[1],
-            output.dims()[0],
-            output.dims()[2],
-            output.dims()[3],
-        ])
-        .unwrap()
-        .permuted_axes([1, 0, 2, 3]);
-
-    output.set_raw_vec(output_.as_standard_layout().to_owned().into_raw_vec());
+    output.set_raw_vec(output_.into_raw_vec())
 }
 
 #[cfg(feature = "cuda")]

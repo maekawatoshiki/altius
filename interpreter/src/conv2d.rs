@@ -41,24 +41,20 @@ pub fn run(ctx: &mut Conv2dCtx) {
     let in_c_per_g = input_c / group;
     let out_c_per_g = output.dims()[1] / group;
 
-    assert!(
-        padding.len() == 2
-            || (padding.len() == 4 && padding[0] == padding[2] && padding[1] == padding[3])
-    );
+    assert!(padding.len() == 4);
+    let pad_t = padding[0];
+    let pad_l = padding[1];
+    let _pad_b = padding[2];
+    let _pad_r = padding[3];
 
     let mut input_ = Array4::zeros([
         batch_size,
         input_c,
-        input_h + padding[0] * 2,
-        input_w + padding[1] * 2,
+        input_h + pad_t * 2,
+        input_w + pad_l * 2,
     ]);
     input_
-        .slice_mut(s![
-            ..,
-            ..,
-            padding[0]..input_h + padding[0],
-            padding[1]..input_w + padding[1]
-        ])
+        .slice_mut(s![.., .., pad_t..input_h + pad_t, pad_l..input_w + pad_l])
         .assign(&ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap());
     let weight_ = ArrayView3::from_shape(
         [group, out_c_per_g, in_c_per_g * kernel[0] * kernel[1]],

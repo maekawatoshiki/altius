@@ -32,6 +32,8 @@ pub fn run(ctx: &mut Conv2dCtx) {
 
     let batch_size = input.dims()[0];
     let input_c = input.dims()[1];
+    let input_h = input.dims()[2];
+    let input_w = input.dims()[3];
     let output_h = output.dims()[2];
     let output_w = output.dims()[3];
     let _dilation = 1;
@@ -47,44 +49,28 @@ pub fn run(ctx: &mut Conv2dCtx) {
     let mut input_ = Array4::zeros([
         batch_size,
         input_c,
-        input.dims()[2] + padding[0] * 2,
-        input.dims()[3] + padding[1] * 2,
+        input_h + padding[0] * 2,
+        input_w + padding[1] * 2,
     ]);
     input_
         .slice_mut(s![
             ..,
             ..,
-            padding[0]..input.dims()[2] + padding[0],
-            padding[1]..input.dims()[3] + padding[1]
+            padding[0]..input_h + padding[0],
+            padding[1]..input_w + padding[1]
         ])
         .assign(&ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap());
     let weight_ = ArrayView3::from_shape(
-        [
-            group,
-            out_c_per_g,
-            in_c_per_g * weight.dims()[2] * weight.dims()[3],
-        ],
+        [group, out_c_per_g, in_c_per_g * kernel[0] * kernel[1]],
         weight.data::<f32>(),
     )
     .unwrap();
-    let mut output_ = ctx.inputs.get(Node::CONV2D_BIAS).map_or_else(
-        || {
-            Array4::zeros([
-                input.dims()[0],
-                group,
-                out_c_per_g,
-                output.dims()[2] * output.dims()[3],
-            ])
-        },
+    let mut output_: Array4<f32> = ctx.inputs.get(Node::CONV2D_BIAS).map_or_else(
+        || Array4::zeros([batch_size, group, out_c_per_g, output_h * output_w]),
         |bias| {
             ArrayView4::from_shape([1, group, out_c_per_g, 1], bias.data::<f32>())
                 .unwrap()
-                .broadcast([
-                    batch_size,
-                    group,
-                    out_c_per_g,
-                    output.dims()[2] * output.dims()[3],
-                ])
+                .broadcast([batch_size, group, out_c_per_g, output_h * output_w])
                 .unwrap()
                 .to_owned()
         },
@@ -94,9 +80,9 @@ pub fn run(ctx: &mut Conv2dCtx) {
         batch_size, input_c, kernel[0], kernel[1], output_h, output_w,
     ]);
     for fy in 0..kernel[0] {
-        let fy_max = fy + stride[0] * output.dims()[2];
+        let fy_max = fy + stride[0] * output_h;
         for fx in 0..kernel[1] {
-            let fx_max = fx + stride[1] * output.dims()[3];
+            let fx_max = fx + stride[1] * output_w;
             col.slice_mut(s![.., .., fy, fx, .., ..])
                 .assign(&input_.slice(s![.., .., fy..fy_max;stride[0], fx..fx_max;stride[1]]))
         }
@@ -105,8 +91,8 @@ pub fn run(ctx: &mut Conv2dCtx) {
         .into_shape([
             batch_size,
             group,
-            in_c_per_g * weight.dims()[2] * weight.dims()[3],
-            output.dims()[2] * output.dims()[3],
+            in_c_per_g * kernel[0] * kernel[1],
+            output_h * output_w,
         ])
         .unwrap();
 

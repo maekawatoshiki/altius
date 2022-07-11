@@ -310,10 +310,12 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             let auto_pad = &conv.auto_pad;
             let kernel = &conv.kernel_shape;
             let stride = &conv.strides;
-            let mut padding = &conv.padding;
+            let padding = &conv.padding;
             let input = inputs[Node::CONV2D_IN].dims();
             let weight = inputs[Node::CONV2D_WEIGHT].dims();
 
+            let pad_h;
+            let pad_w;
             if !auto_pad.is_empty() && auto_pad != "NOTSET" {
                 let out0 = (input[2] as f32 / stride[0] as f32).ceil() as usize;
                 let out1 = (input[3] as f32 / stride[1] as f32).ceil() as usize;
@@ -324,7 +326,17 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
                 assert!(auto_pad == "SAME_UPPER");
                 let new_padding = vec![pad0 / 2, pad1 / 2, pad0 - pad0 / 2, pad1 - pad1 / 2];
                 conv.padding = new_padding.into();
-                padding = &conv.padding;
+                pad_h = pad0;
+                pad_w = pad1;
+            } else if padding.len() == 2 {
+                pad_h = padding[0] * 2;
+                pad_w = padding[1] * 2;
+                conv.padding = vec![padding[0], padding[1], padding[0], padding[1]].into();
+            } else if padding.len() == 4 {
+                pad_h = padding[0] + padding[2];
+                pad_w = padding[1] + padding[3];
+            } else {
+                todo!()
             }
 
             let h_in = input[2];
@@ -332,8 +344,8 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> 
             let output_shape = vec![
                 input[0],
                 weight[0],
-                (h_in + 2 * padding[0] - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
-                (w_in + 2 * padding[1] - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
+                (h_in + pad_h - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
+                (w_in + pad_w - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
             shapes.push(output_shape.into());
         }

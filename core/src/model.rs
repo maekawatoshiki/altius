@@ -57,9 +57,6 @@ impl Model {
         while let Some(id) = que.pop() {
             nodes.push(id);
             for output in self.nodes[id].outputs.iter() {
-                if self.outputs.contains(output) {
-                    continue;
-                }
                 if !value_users.contains_key(&output) {
                     continue;
                 }

@@ -27,10 +27,12 @@ fn load(path: String) -> PyResult<PyModel> {
     )
 }
 
-#[pyfunction]
-fn session<'a>(model: &'a PyModel) -> PyResult<PySession> {
+#[pyfunction(enable_profiling = false)]
+fn session<'a>(model: &'a PyModel, enable_profiling: bool) -> PyResult<PySession> {
     let model = unsafe { std::mem::transmute::<&'a Model, &'static Model>(&model.0) };
-    Ok(PySession(Interpreter::new(model)))
+    Ok(PySession(
+        Interpreter::new(model).with_profiling(enable_profiling),
+    ))
 }
 
 #[pymethods]
@@ -77,6 +79,7 @@ impl PySession {
 /// A Python module implemented in Rust.
 #[pymodule]
 fn altius_py(_py: Python, m: &PyModule) -> PyResult<()> {
+    pyo3_log::init();
     m.add_function(wrap_pyfunction!(load, m)?)?;
     m.add_function(wrap_pyfunction!(session, m)?)?;
     Ok(())

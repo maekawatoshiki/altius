@@ -72,11 +72,11 @@ impl<'a> Interpreter<'a> {
         }
 
         if self.enable_profiling {
-            log::debug!(
+            log::info!(
                 "Total execution time: {:#?}",
                 self.profile.values().sum::<Duration>()
             );
-            log::debug!("Profile: {:#?}", self.profile);
+            log::info!("Profile: {:#?}", self.profile);
         }
 
         self.model

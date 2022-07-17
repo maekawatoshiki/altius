@@ -129,8 +129,8 @@ impl<'a> Interpreter<'a> {
             Op::Div => self.run_node_div(node, &inputs, &mut outputs),
             Op::MaxPool(ref maxpool) => self.run_node_max_pool(maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => self.run_node_gavg_pool(node, &inputs, &mut outputs),
-            Op::Reshape => self.run_node_reshape(node, &inputs, &mut outputs),
-            Op::Flatten(ref flatten) => self.run_node_flatten(flatten, &inputs, &mut outputs),
+            Op::Reshape => run_node_reshape(node, &inputs, &mut outputs),
+            Op::Flatten(ref flatten) => run_node_flatten(flatten, &inputs, &mut outputs),
             Op::MatMul => self.run_node_mat_mul(node, &inputs, &mut outputs),
             Op::Gemm(ref gemm) => self.run_node_gemm(gemm, &inputs, &mut outputs),
             Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
@@ -147,7 +147,7 @@ impl<'a> Interpreter<'a> {
             Op::Exp => todo!("exp"),
             Op::Loop => self.run_node_loop(node, &inputs, &mut outputs),
             Op::Tile => self.run_node_tile(node, &inputs, &mut outputs),
-            Op::Cast(ref cast) => self.run_node_cast(cast, &inputs, &mut outputs),
+            Op::Cast(ref cast) => run_node_cast(cast, &inputs, &mut outputs),
             Op::Slice => todo!("slice"),
             Op::NonMaxSuppression => todo!("nms"),
         }
@@ -472,50 +472,50 @@ impl<'a> Interpreter<'a> {
     fn run_node_tile(&mut self, _node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
         todo!("tile")
     }
+}
 
-    fn run_node_cast(&mut self, cast: &Cast, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input = &inputs[Node::CAST_IN];
-        let output = &mut outputs[Node::CAST_OUT];
-        if input.elem_ty().is_i32() && cast.to.is_f32() {
-            *output = Tensor::new(
-                output.dims().clone(),
-                input.data::<i32>().iter().map(|x| *x as f32).collect(),
-            );
-        } else if input.elem_ty().is_i64() && cast.to.is_i32() {
-            *output = Tensor::new(
-                output.dims().clone(),
-                input.data::<i64>().iter().map(|x| *x as i32).collect(),
-            );
-        } else {
-            todo!()
-        }
+fn run_node_cast(cast: &Cast, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::CAST_IN];
+    let output = &mut outputs[Node::CAST_OUT];
+    if input.elem_ty().is_i32() && cast.to.is_f32() {
+        *output = Tensor::new(
+            output.dims().clone(),
+            input.data::<i32>().iter().map(|x| *x as f32).collect(),
+        );
+    } else if input.elem_ty().is_i64() && cast.to.is_i32() {
+        *output = Tensor::new(
+            output.dims().clone(),
+            input.data::<i64>().iter().map(|x| *x as i32).collect(),
+        );
+    } else {
+        todo!()
     }
+}
 
-    fn run_node_reshape(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input = &inputs[Node::RESHAPE_IN];
-        let shape = inputs[Node::RESHAPE_SHAPE]
-            .data::<i64>()
-            .iter()
-            .map(|&x| {
-                if x == -1 {
-                    let other_dims_sz: i64 = inputs[Node::RESHAPE_SHAPE]
-                        .data::<i64>()
-                        .iter()
-                        .filter(|x| **x != -1)
-                        .product();
-                    input.dims().total_elems() / other_dims_sz as usize
-                } else {
-                    x as usize
-                }
-            })
-            .collect::<Vec<_>>();
-        let output = &mut outputs[Node::RESHAPE_OUT];
-        *output = input.clone().reshape_into(shape.into())
-    }
+fn run_node_reshape(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::RESHAPE_IN];
+    let shape = inputs[Node::RESHAPE_SHAPE]
+        .data::<i64>()
+        .iter()
+        .map(|&x| {
+            if x == -1 {
+                let other_dims_sz: i64 = inputs[Node::RESHAPE_SHAPE]
+                    .data::<i64>()
+                    .iter()
+                    .filter(|x| **x != -1)
+                    .product();
+                input.dims().total_elems() / other_dims_sz as usize
+            } else {
+                x as usize
+            }
+        })
+        .collect::<Vec<_>>();
+    let output = &mut outputs[Node::RESHAPE_OUT];
+    *output = input.clone().reshape_into(shape.into())
+}
 
-    fn run_node_flatten(&mut self, _flatten: &Flatten, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input = &inputs[Node::FLATTEN_IN];
-        let output = &mut outputs[Node::FLATTEN_OUT];
-        *output = input.clone().reshape_into(output.dims().clone());
-    }
+fn run_node_flatten(_flatten: &Flatten, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::FLATTEN_IN];
+    let output = &mut outputs[Node::FLATTEN_OUT];
+    *output = input.clone().reshape_into(output.dims().clone());
 }

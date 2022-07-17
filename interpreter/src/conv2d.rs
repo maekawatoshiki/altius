@@ -2,17 +2,20 @@ use altius_core::{
     node::{Conv2d, Node},
     tensor::Tensor,
 };
+
 #[cfg(feature = "cuda")]
-use cudnn::{
-    ActivationDescriptor, ActivationMode, ConvDescriptor, ConvFwdAlgo, ConvMode, CudnnContext,
-    FilterDescriptor, NanPropagation, ScalarC, TensorDescriptor,
+use crate::SafeCudnnContext;
+#[cfg(feature = "cuda")]
+pub use cudnn::{
+    ActivationDescriptor, ActivationMode, ConvDescriptor, ConvFwdAlgo, ConvMode, FilterDescriptor,
+    NanPropagation, ScalarC, TensorDescriptor,
 };
 #[cfg(feature = "cuda")]
-use cust::memory::DeviceBuffer;
+pub use cust::memory::DeviceBuffer;
 
 pub struct Conv2dCtx<'a> {
     #[cfg(feature = "cuda")]
-    pub cudnn: &'a CudnnContext,
+    pub cudnn: &'a SafeCudnnContext,
     pub op: &'a Conv2d,
     pub inputs: &'a [Tensor],
     pub outputs: &'a mut [Tensor],
@@ -143,6 +146,7 @@ pub fn run(ctx: &mut Conv2dCtx) {
 
     let size = ctx
         .cudnn
+        .0
         .get_convolution_forward_workspace_size(
             &input_desc,
             &weight_desc,
@@ -168,6 +172,7 @@ pub fn run(ctx: &mut Conv2dCtx) {
     let z_desc = TensorDescriptor::<f32>::new_format(&[1, 1, 1, 1], ScalarC::Nchw).unwrap();
 
     ctx.cudnn
+        .0
         .convolution_bias_act_forward(
             alpha,
             &input_desc,

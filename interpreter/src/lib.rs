@@ -16,12 +16,25 @@ use ndarray::{linalg, Array2, ArrayView2, ArrayView4};
 use rustc_hash::FxHashMap;
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "cuda")]
+mod cuda {
+    use super::*;
+
+    pub struct SafeCudnnContext(pub CudnnContext);
+
+    unsafe impl Send for SafeCudnnContext {}
+    unsafe impl Sync for SafeCudnnContext {}
+}
+
+#[cfg(feature = "cuda")]
+use cuda::*;
+
 pub struct Interpreter<'a> {
     model: &'a Model,
     values: FxHashMap<ValueId, Tensor>,
     profile: FxHashMap<&'static str, Duration>,
     #[cfg(feature = "cuda")]
-    cudnn_ctx: CudnnContext,
+    cudnn_ctx: SafeCudnnContext,
     enable_profiling: bool,
 }
 
@@ -32,7 +45,7 @@ impl<'a> Interpreter<'a> {
             values: FxHashMap::default(),
             profile: FxHashMap::default(),
             #[cfg(feature = "cuda")]
-            cudnn_ctx: CudnnContext::new().expect("cudnn context init failed"),
+            cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
             enable_profiling: false,
         }
     }

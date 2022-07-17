@@ -1,13 +1,12 @@
 import altius_py
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 from torchvision import transforms
 import os, random
 from matplotlib import pyplot as plt
 import onnxruntime as ort
 import onnx
-
-from PIL import Image, ImageDraw
+import time
 
 coco_labels = (
     "person",
@@ -129,16 +128,18 @@ def main():
     sess = altius_py.session(model)
 
     inputs = {"input_1": input}
+
+    start = time.time()
     outputs = sess.run(inputs)
+    print("altius elapsed:", time.time() - start)
     sess_outputs = dict(zip(model_outputs, outputs))
 
     # Check if altius output is correct compared to onnx runtime output
-    # import time
+    # sess = ort.InferenceSession(root + "altius.onnx", providers=["CPUExecutionProvider"])
     # start = time.time()
-    # sess = ort.InferenceSession(root + "glow_1.onnx", providers=["CPUExecutionProvider"])
-    # end = time.time() - start
-    # print("END:", end)
     # ort_outputs = sess.run(None, inputs)
+    # end = time.time() - start
+    # print("ort elapsed:", end)
     # assert np.allclose(outputs[0], ort_outputs[0], atol=1e3)
     # assert np.allclose(outputs[1], ort_outputs[1], atol=1e3)
     # assert np.allclose(outputs[2], ort_outputs[2], atol=1e3)

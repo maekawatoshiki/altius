@@ -116,38 +116,38 @@ impl<'a> Interpreter<'a> {
 
         // Actual kernel runs here.
         match op {
-            Op::Conv2d(ref conv) => conv2d::run(&mut Conv2dCtx {
+            Op::Conv2d(ref conv) => conv2d::compute(&mut Conv2dCtx {
                 #[cfg(feature = "cuda")]
                 cudnn: &self.cudnn_ctx,
                 op: conv,
                 inputs: &inputs,
                 outputs: &mut outputs,
             }),
-            Op::Add => self.run_node_add(node, &inputs, &mut outputs),
+            Op::Add => compute_add(node, &inputs, &mut outputs),
             Op::Sub => todo!("sub"),
-            Op::Mul => self.run_node_mul(node, &inputs, &mut outputs),
-            Op::Div => self.run_node_div(node, &inputs, &mut outputs),
-            Op::MaxPool(ref maxpool) => self.run_node_max_pool(maxpool, &inputs, &mut outputs),
-            Op::GlobalAveragePool => self.run_node_gavg_pool(node, &inputs, &mut outputs),
-            Op::Reshape => run_node_reshape(node, &inputs, &mut outputs),
-            Op::Flatten(ref flatten) => run_node_flatten(flatten, &inputs, &mut outputs),
-            Op::MatMul => self.run_node_mat_mul(node, &inputs, &mut outputs),
-            Op::Gemm(ref gemm) => self.run_node_gemm(gemm, &inputs, &mut outputs),
-            Op::ReLU => run_node_relu(node, &inputs, &mut outputs),
-            Op::HardSigmoid(ref hs) => run_node_hard_sigomid(hs, &inputs, &mut outputs),
-            Op::LeakyReLU(ref leaky) => run_node_leaky_relu(leaky, &inputs, &mut outputs),
+            Op::Mul => compute_mul(node, &inputs, &mut outputs),
+            Op::Div => compute_div(node, &inputs, &mut outputs),
+            Op::MaxPool(ref maxpool) => compute_max_pool(maxpool, &inputs, &mut outputs),
+            Op::GlobalAveragePool => compute_gavg_pool(node, &inputs, &mut outputs),
+            Op::Reshape => compute_reshape(node, &inputs, &mut outputs),
+            Op::Flatten(ref flatten) => compute_flatten(flatten, &inputs, &mut outputs),
+            Op::MatMul => compute_mat_mul(node, &inputs, &mut outputs),
+            Op::Gemm(ref gemm) => compute_gemm(gemm, &inputs, &mut outputs),
+            Op::ReLU => compute_relu(node, &inputs, &mut outputs),
+            Op::HardSigmoid(ref hs) => compute_hard_sigomid(hs, &inputs, &mut outputs),
+            Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
             Op::Sigmoid => todo!("sigmoid"),
             Op::Resize(_) => todo!("resize"),
-            Op::Concat(ref concat) => run_node_concat(concat, &inputs, &mut outputs),
-            Op::Transpose(ref trans) => run_node_transpose(trans, &inputs, &mut outputs),
-            Op::Squeeze(ref squeeze) => run_node_squeeze(squeeze, &inputs, &mut outputs),
+            Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
+            Op::Transpose(ref trans) => compute_transpose(trans, &inputs, &mut outputs),
+            Op::Squeeze(ref squeeze) => compute_squeeze(squeeze, &inputs, &mut outputs),
             Op::Unsqueeze(_) => todo!("unsqueeze"),
             Op::ReduceMin(_) => todo!("reduce min"),
             Op::Round => todo!("round"),
             Op::Exp => todo!("exp"),
-            Op::Loop => run_node_loop(node, &inputs, &mut outputs),
-            Op::Tile => run_node_tile(node, &inputs, &mut outputs),
-            Op::Cast(ref cast) => run_node_cast(cast, &inputs, &mut outputs),
+            Op::Loop => compute_loop(node, &inputs, &mut outputs),
+            Op::Tile => compute_tile(node, &inputs, &mut outputs),
+            Op::Cast(ref cast) => compute_cast(cast, &inputs, &mut outputs),
             Op::Slice => todo!("slice"),
             Op::NonMaxSuppression => todo!("nms"),
         }
@@ -161,222 +161,222 @@ impl<'a> Interpreter<'a> {
             self.values.insert(val, output);
         }
     }
+}
 
-    fn run_node_gavg_pool(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input = &inputs[Node::GLOBALAVERAGEPOOL_IN];
-        let output = &mut outputs[Node::GLOBALAVERAGEPOOL_OUT];
+fn compute_gavg_pool(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::GLOBALAVERAGEPOOL_IN];
+    let output = &mut outputs[Node::GLOBALAVERAGEPOOL_OUT];
 
-        assert!(input.dims().len() == 4);
-        assert!(output.dims().len() == 4);
+    assert!(input.dims().len() == 4);
+    assert!(output.dims().len() == 4);
 
-        let area = (input.dims()[2] * input.dims()[3]) as f32;
+    let area = (input.dims()[2] * input.dims()[3]) as f32;
 
-        for n in 0..input.dims()[0] {
-            for c in 0..input.dims()[1] {
-                let mut sum = 0f32;
-                for h in 0..input.dims()[2] {
-                    for w in 0..input.dims()[3] {
-                        sum += input.at_4d(n, c, h, w);
-                    }
-                }
-                *output.at_4d_mut(n, c, 0, 0) = sum / area;
-            }
-        }
-    }
-
-    fn run_node_max_pool(&mut self, maxpool: &MaxPool, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input = &inputs[Node::MAXPOOL_IN];
-        let output = &mut outputs[Node::MAXPOOL_OUT];
-
-        let kernel = &maxpool.kernel_shape;
-        let stride = &maxpool.strides;
-
-        assert!(input.dims().len() == 4);
-        assert!(output.dims().len() == 4);
-
-        for n in 0..output.dims()[0] {
-            for z in 0..input.dims()[1] {
-                let mut x = 0isize; // TODO: pad
-                for ax in 0..output.dims()[2] {
-                    let mut y = 0isize; // TODO: pad
-                    for ay in 0..output.dims()[3] {
-                        let mut max = f32::MIN;
-                        for fx in 0..kernel[0] as isize {
-                            for fy in 0..kernel[1] as isize {
-                                let ox = x + fx;
-                                let oy = y + fy;
-
-                                if ox < 0
-                                    || oy < 0
-                                    || ox >= input.dims()[2] as isize
-                                    || oy >= input.dims()[3] as isize
-                                {
-                                    continue;
-                                }
-
-                                let val = input.at_4d(n, z, ox as usize, oy as usize);
-
-                                if val >= max {
-                                    max = val;
-                                }
-                            }
-                        }
-                        *output.at_4d_mut(n, z, ax, ay) = if max == f32::MIN { 0.0 } else { max };
-                        y += stride[1] as isize
-                    }
-                    x += stride[0] as isize
+    for n in 0..input.dims()[0] {
+        for c in 0..input.dims()[1] {
+            let mut sum = 0f32;
+            for h in 0..input.dims()[2] {
+                for w in 0..input.dims()[3] {
+                    sum += input.at_4d(n, c, h, w);
                 }
             }
+            *output.at_4d_mut(n, c, 0, 0) = sum / area;
         }
-    }
-
-    fn run_node_add(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input_a = &inputs[Node::ADD_IN_A];
-        let input_b = &inputs[Node::ADD_IN_B];
-        let output = &mut outputs[Node::ADD_OUT];
-
-        if input_a.dims() == input_b.dims() {
-            for (i, (a, b)) in input_a
-                .data::<f32>()
-                .iter()
-                .zip(input_b.data::<f32>().iter())
-                .enumerate()
-            {
-                output.data_mut::<f32>()[i] = a + b;
-            }
-
-            return;
-        }
-
-        if input_a.dims().len() == 4 && input_b.dims().len() == 3 {
-            assert!(input_a.dims()[1] == input_b.dims()[0]);
-            assert!(input_b.dims()[1] == 1);
-            assert!(input_b.dims()[2] == 1);
-
-            for n in 0..input_a.dims()[0] {
-                for z in 0..input_a.dims()[1] {
-                    for x in 0..input_a.dims()[2] {
-                        for y in 0..input_a.dims()[3] {
-                            *output.at_4d_mut(n, z, x, y) =
-                                input_a.at_4d(n, z, x, y) + input_b.at_3d(z, 0, 0);
-                        }
-                    }
-                }
-            }
-
-            return;
-        }
-    }
-
-    fn run_node_mul(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input_a = &inputs[Node::MUL_IN_A];
-        let input_b = &inputs[Node::MUL_IN_B];
-        let output = &mut outputs[Node::MUL_OUT];
-
-        if input_a.dims() == input_b.dims() {
-            for (i, (a, b)) in input_a
-                .data::<f32>()
-                .iter()
-                .zip(input_b.data::<f32>().iter())
-                .enumerate()
-            {
-                output.data_mut::<f32>()[i] = a * b;
-            }
-
-            return;
-        }
-
-        let in_a = input_a.dims();
-        let in_b = input_b.dims();
-        if in_a.len() == 4
-            && in_b.len() == 4
-            && in_a[0] == in_b[0]
-            && in_a[1] == in_b[1]
-            && in_a[2] == 1
-            && in_a[3] == 1
-        {
-            for n in 0..in_a[0] {
-                for z in 0..in_a[1] {
-                    for x in 0..in_b[2] {
-                        for y in 0..in_b[3] {
-                            *output.at_4d_mut(n, z, x, y) =
-                                input_a.at_4d(n, z, 0, 0) * input_b.at_4d(n, z, x, y);
-                        }
-                    }
-                }
-            }
-
-            return;
-        }
-
-        todo!()
-    }
-
-    fn run_node_div(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input_a = &inputs[Node::MUL_IN_A];
-        let input_b = &inputs[Node::MUL_IN_B];
-        let output = &mut outputs[Node::MUL_OUT];
-
-        if input_a.dims() == input_b.dims() {
-            for (i, (a, b)) in input_a
-                .data::<f32>()
-                .iter()
-                .zip(input_b.data::<f32>().iter())
-                .enumerate()
-            {
-                output.data_mut::<f32>()[i] = a / b;
-            }
-            return;
-        }
-
-        todo!()
-    }
-
-    fn run_node_mat_mul(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input_a = &inputs[Node::MATMUL_IN_A];
-        let input_b = &inputs[Node::MATMUL_IN_B];
-        let output = &mut outputs[Node::MATMUL_OUT];
-
-        assert!(input_a.dims().len() == 2);
-        assert!(input_b.dims().len() == 2);
-        assert!(input_a.dims()[1] == input_b.dims()[0]);
-
-        for i in 0..input_a.dims()[0] {
-            for j in 0..input_b.dims()[1] {
-                let mut t = 0.0;
-                for k in 0..input_b.dims()[0] {
-                    t += input_a.at_2d(i, k) * input_b.at_2d(k, j);
-                }
-                *output.at_2d_mut(i, j) = t;
-            }
-        }
-    }
-
-    fn run_node_gemm(&mut self, gemm: &Gemm, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input_a = &inputs[Node::GEMM_IN_A];
-        let input_b = &inputs[Node::GEMM_IN_B];
-        let input_c = &inputs[Node::GEMM_IN_C];
-        let output = &mut outputs[Node::GEMM_OUT];
-
-        let a = Array2::from_shape_vec(input_a.fixed_dims::<2>(), input_a.data::<f32>().to_vec())
-            .unwrap();
-        let b = Array2::from_shape_vec(input_b.fixed_dims::<2>(), input_b.data::<f32>().to_vec())
-            .unwrap();
-        let a = if gemm.trans_a { a.t() } else { a.view() };
-        let b = if gemm.trans_b { b.t() } else { b.view() };
-
-        let mut c = Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
-            .unwrap()
-            .broadcast(output.fixed_dims::<2>())
-            .unwrap()
-            .into_owned();
-        linalg::general_mat_mul(gemm.alpha, &a, &b, gemm.beta, &mut c);
-
-        output.set_raw_vec(c.into_raw_vec());
     }
 }
 
-fn run_node_relu(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+fn compute_max_pool(maxpool: &MaxPool, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::MAXPOOL_IN];
+    let output = &mut outputs[Node::MAXPOOL_OUT];
+
+    let kernel = &maxpool.kernel_shape;
+    let stride = &maxpool.strides;
+
+    assert!(input.dims().len() == 4);
+    assert!(output.dims().len() == 4);
+
+    for n in 0..output.dims()[0] {
+        for z in 0..input.dims()[1] {
+            let mut x = 0isize; // TODO: pad
+            for ax in 0..output.dims()[2] {
+                let mut y = 0isize; // TODO: pad
+                for ay in 0..output.dims()[3] {
+                    let mut max = f32::MIN;
+                    for fx in 0..kernel[0] as isize {
+                        for fy in 0..kernel[1] as isize {
+                            let ox = x + fx;
+                            let oy = y + fy;
+
+                            if ox < 0
+                                || oy < 0
+                                || ox >= input.dims()[2] as isize
+                                || oy >= input.dims()[3] as isize
+                            {
+                                continue;
+                            }
+
+                            let val = input.at_4d(n, z, ox as usize, oy as usize);
+
+                            if val >= max {
+                                max = val;
+                            }
+                        }
+                    }
+                    *output.at_4d_mut(n, z, ax, ay) = if max == f32::MIN { 0.0 } else { max };
+                    y += stride[1] as isize
+                }
+                x += stride[0] as isize
+            }
+        }
+    }
+}
+
+fn compute_add(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input_a = &inputs[Node::ADD_IN_A];
+    let input_b = &inputs[Node::ADD_IN_B];
+    let output = &mut outputs[Node::ADD_OUT];
+
+    if input_a.dims() == input_b.dims() {
+        for (i, (a, b)) in input_a
+            .data::<f32>()
+            .iter()
+            .zip(input_b.data::<f32>().iter())
+            .enumerate()
+        {
+            output.data_mut::<f32>()[i] = a + b;
+        }
+
+        return;
+    }
+
+    if input_a.dims().len() == 4 && input_b.dims().len() == 3 {
+        assert!(input_a.dims()[1] == input_b.dims()[0]);
+        assert!(input_b.dims()[1] == 1);
+        assert!(input_b.dims()[2] == 1);
+
+        for n in 0..input_a.dims()[0] {
+            for z in 0..input_a.dims()[1] {
+                for x in 0..input_a.dims()[2] {
+                    for y in 0..input_a.dims()[3] {
+                        *output.at_4d_mut(n, z, x, y) =
+                            input_a.at_4d(n, z, x, y) + input_b.at_3d(z, 0, 0);
+                    }
+                }
+            }
+        }
+
+        return;
+    }
+}
+
+fn compute_mul(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input_a = &inputs[Node::MUL_IN_A];
+    let input_b = &inputs[Node::MUL_IN_B];
+    let output = &mut outputs[Node::MUL_OUT];
+
+    if input_a.dims() == input_b.dims() {
+        for (i, (a, b)) in input_a
+            .data::<f32>()
+            .iter()
+            .zip(input_b.data::<f32>().iter())
+            .enumerate()
+        {
+            output.data_mut::<f32>()[i] = a * b;
+        }
+
+        return;
+    }
+
+    let in_a = input_a.dims();
+    let in_b = input_b.dims();
+    if in_a.len() == 4
+        && in_b.len() == 4
+        && in_a[0] == in_b[0]
+        && in_a[1] == in_b[1]
+        && in_a[2] == 1
+        && in_a[3] == 1
+    {
+        for n in 0..in_a[0] {
+            for z in 0..in_a[1] {
+                for x in 0..in_b[2] {
+                    for y in 0..in_b[3] {
+                        *output.at_4d_mut(n, z, x, y) =
+                            input_a.at_4d(n, z, 0, 0) * input_b.at_4d(n, z, x, y);
+                    }
+                }
+            }
+        }
+
+        return;
+    }
+
+    todo!()
+}
+
+fn compute_div(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input_a = &inputs[Node::MUL_IN_A];
+    let input_b = &inputs[Node::MUL_IN_B];
+    let output = &mut outputs[Node::MUL_OUT];
+
+    if input_a.dims() == input_b.dims() {
+        for (i, (a, b)) in input_a
+            .data::<f32>()
+            .iter()
+            .zip(input_b.data::<f32>().iter())
+            .enumerate()
+        {
+            output.data_mut::<f32>()[i] = a / b;
+        }
+        return;
+    }
+
+    todo!()
+}
+
+fn compute_mat_mul(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input_a = &inputs[Node::MATMUL_IN_A];
+    let input_b = &inputs[Node::MATMUL_IN_B];
+    let output = &mut outputs[Node::MATMUL_OUT];
+
+    assert!(input_a.dims().len() == 2);
+    assert!(input_b.dims().len() == 2);
+    assert!(input_a.dims()[1] == input_b.dims()[0]);
+
+    for i in 0..input_a.dims()[0] {
+        for j in 0..input_b.dims()[1] {
+            let mut t = 0.0;
+            for k in 0..input_b.dims()[0] {
+                t += input_a.at_2d(i, k) * input_b.at_2d(k, j);
+            }
+            *output.at_2d_mut(i, j) = t;
+        }
+    }
+}
+
+fn compute_gemm(gemm: &Gemm, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input_a = &inputs[Node::GEMM_IN_A];
+    let input_b = &inputs[Node::GEMM_IN_B];
+    let input_c = &inputs[Node::GEMM_IN_C];
+    let output = &mut outputs[Node::GEMM_OUT];
+
+    let a =
+        Array2::from_shape_vec(input_a.fixed_dims::<2>(), input_a.data::<f32>().to_vec()).unwrap();
+    let b =
+        Array2::from_shape_vec(input_b.fixed_dims::<2>(), input_b.data::<f32>().to_vec()).unwrap();
+    let a = if gemm.trans_a { a.t() } else { a.view() };
+    let b = if gemm.trans_b { b.t() } else { b.view() };
+
+    let mut c = Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
+        .unwrap()
+        .broadcast(output.fixed_dims::<2>())
+        .unwrap()
+        .into_owned();
+    linalg::general_mat_mul(gemm.alpha, &a, &b, gemm.beta, &mut c);
+
+    output.set_raw_vec(c.into_raw_vec());
+}
+
+fn compute_relu(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
     let input = &inputs[Node::RELU_IN];
     let output = &mut outputs[Node::RELU_OUT];
 
@@ -389,7 +389,7 @@ fn run_node_relu(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
     }
 }
 
-fn run_node_hard_sigomid(hs: &HardSigmoid, inputs: &[Tensor], outputs: &mut [Tensor]) {
+fn compute_hard_sigomid(hs: &HardSigmoid, inputs: &[Tensor], outputs: &mut [Tensor]) {
     let input = &inputs[Node::HARDSIGMOID_IN];
     let output = &mut outputs[Node::HARDSIGMOID_OUT];
 
@@ -402,7 +402,7 @@ fn run_node_hard_sigomid(hs: &HardSigmoid, inputs: &[Tensor], outputs: &mut [Ten
     }
 }
 
-fn run_node_leaky_relu(leaky: &LeakyReLU, inputs: &[Tensor], outputs: &mut [Tensor]) {
+fn compute_leaky_relu(leaky: &LeakyReLU, inputs: &[Tensor], outputs: &mut [Tensor]) {
     let input = &inputs[Node::HARDSIGMOID_IN];
     let output = &mut outputs[Node::HARDSIGMOID_OUT];
 
@@ -415,11 +415,11 @@ fn run_node_leaky_relu(leaky: &LeakyReLU, inputs: &[Tensor], outputs: &mut [Tens
     }
 }
 
-fn run_node_concat(_concat: &Concat, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
+fn compute_concat(_concat: &Concat, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
     todo!("concat")
 }
 
-fn run_node_transpose(transpose: &Transpose, inputs: &[Tensor], outputs: &mut [Tensor]) {
+fn compute_transpose(transpose: &Transpose, inputs: &[Tensor], outputs: &mut [Tensor]) {
     let input = &inputs[Node::TRANSPOSE_IN];
     let output = &mut outputs[Node::TRANSPOSE_OUT];
     assert!(input.elem_ty().is_f32());
@@ -442,22 +442,22 @@ fn run_node_transpose(transpose: &Transpose, inputs: &[Tensor], outputs: &mut [T
     }
 }
 
-fn run_node_squeeze(_squeeze: &Squeeze, inputs: &[Tensor], outputs: &mut [Tensor]) {
+fn compute_squeeze(_squeeze: &Squeeze, inputs: &[Tensor], outputs: &mut [Tensor]) {
     let input = &inputs[Node::SQUEEZE_IN];
     assert!(input.elem_ty().is_f32());
     let output = &mut outputs[Node::SQUEEZE_OUT];
     output.set_raw_vec(input.data::<f32>().to_vec());
 }
 
-fn run_node_loop(_node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
+fn compute_loop(_node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
     todo!("loop")
 }
 
-fn run_node_tile(_node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
+fn compute_tile(_node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
     todo!("tile")
 }
 
-fn run_node_cast(cast: &Cast, inputs: &[Tensor], outputs: &mut [Tensor]) {
+fn compute_cast(cast: &Cast, inputs: &[Tensor], outputs: &mut [Tensor]) {
     let input = &inputs[Node::CAST_IN];
     let output = &mut outputs[Node::CAST_OUT];
     if input.elem_ty().is_i32() && cast.to.is_f32() {
@@ -475,7 +475,7 @@ fn run_node_cast(cast: &Cast, inputs: &[Tensor], outputs: &mut [Tensor]) {
     }
 }
 
-fn run_node_reshape(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+fn compute_reshape(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
     let input = &inputs[Node::RESHAPE_IN];
     let shape = inputs[Node::RESHAPE_SHAPE]
         .data::<i64>()
@@ -497,7 +497,7 @@ fn run_node_reshape(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
     *output = input.clone().reshape_into(shape.into())
 }
 
-fn run_node_flatten(_flatten: &Flatten, inputs: &[Tensor], outputs: &mut [Tensor]) {
+fn compute_flatten(_flatten: &Flatten, inputs: &[Tensor], outputs: &mut [Tensor]) {
     let input = &inputs[Node::FLATTEN_IN];
     let output = &mut outputs[Node::FLATTEN_OUT];
     *output = input.clone().reshape_into(output.dims().clone());

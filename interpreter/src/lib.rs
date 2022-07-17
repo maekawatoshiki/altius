@@ -133,20 +133,20 @@ impl<'a> Interpreter<'a> {
             Op::Flatten(ref flatten) => run_node_flatten(flatten, &inputs, &mut outputs),
             Op::MatMul => self.run_node_mat_mul(node, &inputs, &mut outputs),
             Op::Gemm(ref gemm) => self.run_node_gemm(gemm, &inputs, &mut outputs),
-            Op::ReLU => self.run_node_relu(node, &inputs, &mut outputs),
-            Op::HardSigmoid(ref hs) => self.run_node_hard_sigomid(hs, &inputs, &mut outputs),
-            Op::LeakyReLU(ref leaky) => self.run_node_leaky_relu(leaky, &inputs, &mut outputs),
+            Op::ReLU => run_node_relu(node, &inputs, &mut outputs),
+            Op::HardSigmoid(ref hs) => run_node_hard_sigomid(hs, &inputs, &mut outputs),
+            Op::LeakyReLU(ref leaky) => run_node_leaky_relu(leaky, &inputs, &mut outputs),
             Op::Sigmoid => todo!("sigmoid"),
             Op::Resize(_) => todo!("resize"),
-            Op::Concat(ref concat) => self.run_node_concat(concat, &inputs, &mut outputs),
-            Op::Transpose(ref trans) => self.run_node_transpose(trans, &inputs, &mut outputs),
-            Op::Squeeze(ref squeeze) => self.run_node_squeeze(squeeze, &inputs, &mut outputs),
+            Op::Concat(ref concat) => run_node_concat(concat, &inputs, &mut outputs),
+            Op::Transpose(ref trans) => run_node_transpose(trans, &inputs, &mut outputs),
+            Op::Squeeze(ref squeeze) => run_node_squeeze(squeeze, &inputs, &mut outputs),
             Op::Unsqueeze(_) => todo!("unsqueeze"),
             Op::ReduceMin(_) => todo!("reduce min"),
             Op::Round => todo!("round"),
             Op::Exp => todo!("exp"),
-            Op::Loop => self.run_node_loop(node, &inputs, &mut outputs),
-            Op::Tile => self.run_node_tile(node, &inputs, &mut outputs),
+            Op::Loop => run_node_loop(node, &inputs, &mut outputs),
+            Op::Tile => run_node_tile(node, &inputs, &mut outputs),
             Op::Cast(ref cast) => run_node_cast(cast, &inputs, &mut outputs),
             Op::Slice => todo!("slice"),
             Op::NonMaxSuppression => todo!("nms"),
@@ -374,104 +374,87 @@ impl<'a> Interpreter<'a> {
 
         output.set_raw_vec(c.into_raw_vec());
     }
+}
 
-    fn run_node_relu(&mut self, _node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input = &inputs[Node::RELU_IN];
-        let output = &mut outputs[Node::RELU_OUT];
+fn run_node_relu(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::RELU_IN];
+    let output = &mut outputs[Node::RELU_OUT];
 
-        for (i, o) in input
-            .data::<f32>()
-            .iter()
-            .zip(output.data_mut::<f32>().iter_mut())
-        {
-            *o = i.max(0.0);
-        }
+    for (i, o) in input
+        .data::<f32>()
+        .iter()
+        .zip(output.data_mut::<f32>().iter_mut())
+    {
+        *o = i.max(0.0);
     }
+}
 
-    fn run_node_hard_sigomid(
-        &mut self,
-        hs: &HardSigmoid,
-        inputs: &[Tensor],
-        outputs: &mut [Tensor],
-    ) {
-        let input = &inputs[Node::HARDSIGMOID_IN];
-        let output = &mut outputs[Node::HARDSIGMOID_OUT];
+fn run_node_hard_sigomid(hs: &HardSigmoid, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::HARDSIGMOID_IN];
+    let output = &mut outputs[Node::HARDSIGMOID_OUT];
 
-        for (i, o) in input
-            .data::<f32>()
-            .iter()
-            .zip(output.data_mut::<f32>().iter_mut())
-        {
-            *o = (hs.alpha * i + hs.beta).min(1.0).max(0.0);
-        }
+    for (i, o) in input
+        .data::<f32>()
+        .iter()
+        .zip(output.data_mut::<f32>().iter_mut())
+    {
+        *o = (hs.alpha * i + hs.beta).min(1.0).max(0.0);
     }
+}
 
-    fn run_node_leaky_relu(
-        &mut self,
-        leaky: &LeakyReLU,
-        inputs: &[Tensor],
-        outputs: &mut [Tensor],
-    ) {
-        let input = &inputs[Node::HARDSIGMOID_IN];
-        let output = &mut outputs[Node::HARDSIGMOID_OUT];
+fn run_node_leaky_relu(leaky: &LeakyReLU, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::HARDSIGMOID_IN];
+    let output = &mut outputs[Node::HARDSIGMOID_OUT];
 
-        for (i, o) in input
-            .data::<f32>()
-            .iter()
-            .zip(output.data_mut::<f32>().iter_mut())
-        {
-            *o = if *i < 0.0 { leaky.alpha * i } else { *i };
-        }
+    for (i, o) in input
+        .data::<f32>()
+        .iter()
+        .zip(output.data_mut::<f32>().iter_mut())
+    {
+        *o = if *i < 0.0 { leaky.alpha * i } else { *i };
     }
+}
 
-    fn run_node_concat(&mut self, _concat: &Concat, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
-        todo!("concat")
+fn run_node_concat(_concat: &Concat, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
+    todo!("concat")
+}
+
+fn run_node_transpose(transpose: &Transpose, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::TRANSPOSE_IN];
+    let output = &mut outputs[Node::TRANSPOSE_OUT];
+    assert!(input.elem_ty().is_f32());
+
+    if input.dims().len() == 2 {
+        let in_view = ArrayView2::from_shape(input.fixed_dims::<2>(), input.data::<f32>()).unwrap();
+        in_view.permuted_axes([transpose.perm[0] as usize, transpose.perm[1] as usize]);
+        output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+    } else if input.dims().len() == 4 {
+        let in_view = ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap();
+        in_view.permuted_axes([
+            transpose.perm[0] as usize,
+            transpose.perm[1] as usize,
+            transpose.perm[2] as usize,
+            transpose.perm[3] as usize,
+        ]);
+        output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+    } else {
+        todo!()
     }
+}
 
-    fn run_node_transpose(
-        &mut self,
-        transpose: &Transpose,
-        inputs: &[Tensor],
-        outputs: &mut [Tensor],
-    ) {
-        let input = &inputs[Node::TRANSPOSE_IN];
-        let output = &mut outputs[Node::TRANSPOSE_OUT];
-        assert!(input.elem_ty().is_f32());
+fn run_node_squeeze(_squeeze: &Squeeze, inputs: &[Tensor], outputs: &mut [Tensor]) {
+    let input = &inputs[Node::SQUEEZE_IN];
+    assert!(input.elem_ty().is_f32());
+    let output = &mut outputs[Node::SQUEEZE_OUT];
+    output.set_raw_vec(input.data::<f32>().to_vec());
+}
 
-        if input.dims().len() == 2 {
-            let in_view =
-                ArrayView2::from_shape(input.fixed_dims::<2>(), input.data::<f32>()).unwrap();
-            in_view.permuted_axes([transpose.perm[0] as usize, transpose.perm[1] as usize]);
-            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
-        } else if input.dims().len() == 4 {
-            let in_view =
-                ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap();
-            in_view.permuted_axes([
-                transpose.perm[0] as usize,
-                transpose.perm[1] as usize,
-                transpose.perm[2] as usize,
-                transpose.perm[3] as usize,
-            ]);
-            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
-        } else {
-            todo!()
-        }
-    }
+fn run_node_loop(_node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
+    todo!("loop")
+}
 
-    fn run_node_squeeze(&mut self, _squeeze: &Squeeze, inputs: &[Tensor], outputs: &mut [Tensor]) {
-        let input = &inputs[Node::SQUEEZE_IN];
-        assert!(input.elem_ty().is_f32());
-        let output = &mut outputs[Node::SQUEEZE_OUT];
-        output.set_raw_vec(input.data::<f32>().to_vec());
-    }
-
-    fn run_node_loop(&mut self, _node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
-        todo!("loop")
-    }
-
-    fn run_node_tile(&mut self, _node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
-        todo!("tile")
-    }
+fn run_node_tile(_node: &Node, _inputs: &[Tensor], _outputs: &mut [Tensor]) {
+    todo!("tile")
 }
 
 fn run_node_cast(cast: &Cast, inputs: &[Tensor], outputs: &mut [Tensor]) {

@@ -1,4 +1,7 @@
 # altius
+
+[![CI](https://github.com/maekawatoshiki/altius/workflows/CI/badge.svg)](https://github.com/maekawatoshiki/altius/actions/workflows/ci.yml)
+
 Small DNN runtime written in Rust
 
 # Run

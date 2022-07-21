@@ -11,3 +11,14 @@ cargo run --release --example mnist
 cargo run --release --example mobilenet
 cargo run --release --example mobilenet --features cuda # -- --profile
 ```
+
+# Run from Python
+
+```sh
+cd altius-py
+python -m venv .env
+source .env/bin/activate
+pip install maturin
+maturin develop -r
+python test.py
+```

@@ -19,6 +19,7 @@ cd altius-py
 python -m venv .env
 source .env/bin/activate
 pip install maturin
+pip install -r requirements.txt
 maturin develop -r
 python test.py
 ```

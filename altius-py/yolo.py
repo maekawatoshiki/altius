@@ -124,13 +124,12 @@ def main():
     model = onnx.load(root + "altius.onnx")
     model_outputs = [x.name for x in model.graph.output]
 
-    model = altius_py.load(root + "altius.onnx")
-    sess = altius_py.session(model)
+    sess = altius_py.InferenceSession(root + "altius.onnx")
 
     inputs = {"input_1": input}
 
     start = time.time()
-    outputs = sess.run(inputs)
+    outputs = sess.run(None, inputs)
     print("altius elapsed:", time.time() - start)
     sess_outputs = dict(zip(model_outputs, outputs))
 

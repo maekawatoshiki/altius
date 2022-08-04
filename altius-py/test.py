@@ -21,11 +21,10 @@ def main():
     input = preprocess(image)
     input = input.unsqueeze(0).numpy()
 
-    model = altius_py.load("../models/mobilenetv3.onnx")
-    sess = altius_py.session(model)
+    sess = altius_py.InferenceSession("../models/mobilenetv3.onnx")
 
     inputs = {"input": input}
-    output = sess.run(inputs)[0][0]
+    output = sess.run(None, inputs)[0][0]
     output = np.argsort(output)[::-1][:5]
     output = [labels[i].strip() for i in output]
     print(f"top5: {output}")

@@ -51,8 +51,8 @@ jobs:
     - name: Test (Release)
       run: |
         RUST_LOG=debug cargo test --release
-    # - name: Coverage
-    #   run: |
-    #         cargo install cargo-tarpaulin && \
-    #         cargo tarpaulin --out Xml && \
-    #         bash <(curl -s https://codecov.io/bash)
+    - name: Coverage
+      run: |
+            cargo install cargo-tarpaulin && \
+            cargo tarpaulin --verbose -p altius-core altius-interpreter --out Xml && \
+            bash <(curl -s https://codecov.io/bash)

@@ -16,8 +16,9 @@ pub enum TensorElemType {
     I64,
 }
 
-pub trait TensorElemTypeExt {
+pub trait TensorElemTypeExt: PartialEq + PartialOrd + Copy {
     fn get_type() -> TensorElemType;
+    fn zero() -> Self;
 }
 
 impl Tensor {
@@ -207,11 +208,19 @@ impl TensorElemTypeExt for u8 {
     fn get_type() -> TensorElemType {
         TensorElemType::Bool
     }
+
+    fn zero() -> Self {
+        0
+    }
 }
 
 impl TensorElemTypeExt for bool {
     fn get_type() -> TensorElemType {
         TensorElemType::Bool
+    }
+
+    fn zero() -> Self {
+        false
     }
 }
 
@@ -219,17 +228,29 @@ impl TensorElemTypeExt for f32 {
     fn get_type() -> TensorElemType {
         TensorElemType::F32
     }
+
+    fn zero() -> Self {
+        0f32
+    }
 }
 
 impl TensorElemTypeExt for i32 {
     fn get_type() -> TensorElemType {
         TensorElemType::I32
     }
+
+    fn zero() -> Self {
+        0i32
+    }
 }
 
 impl TensorElemTypeExt for i64 {
     fn get_type() -> TensorElemType {
         TensorElemType::I64
+    }
+
+    fn zero() -> Self {
+        0i64
     }
 }
 
@@ -252,4 +273,19 @@ fn create_tensors() {
         ],
     );
     assert!(t.verify());
+}
+
+#[test]
+fn test_zeros() {
+    fn all_zero<T: TensorElemTypeExt>(slice: &[T]) -> bool {
+        slice.iter().all(|&x| x == T::zero())
+    }
+    let zeros_bool = Tensor::zeros::<bool>(vec![1, 1, 28, 28].into());
+    let zeros_f32 = Tensor::zeros::<f32>(vec![1, 1, 28, 28].into());
+    let zeros_i32 = Tensor::zeros::<i32>(vec![1, 1, 28, 28].into());
+    let zeros_i64 = Tensor::zeros::<i64>(vec![1, 1, 28, 28].into());
+    assert!(all_zero(zeros_bool.data::<bool>()));
+    assert!(all_zero(zeros_f32.data::<f32>()));
+    assert!(all_zero(zeros_i32.data::<i32>()));
+    assert!(all_zero(zeros_i64.data::<i64>()));
 }

@@ -76,7 +76,21 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             })
             .collect();
 
-        match node.op_type() {
+        let op = match node.op_type() {
+            "Add" => Op::Add,
+            "Sub" => Op::Sub,
+            "Mul" => Op::Mul,
+            "Div" => Op::Div,
+            "Relu" => Op::ReLU,
+            "Sigmoid" => Op::Sigmoid,
+            "Round" => Op::Round,
+            "Exp" => Op::Exp,
+            "Tile" => Op::Tile,
+            "Slice" => Op::Slice,
+            "NonMaxSuppression" => Op::NonMaxSuppression,
+            "Reshape" => Op::Reshape,
+            "MatMul" => Op::MatMul,
+            "GlobalAveragePool" => Op::GlobalAveragePool,
             "Conv" => {
                 let auto_pad = get_attribute(&node.attribute, "auto_pad")
                     .map_or("NOTSET".to_string(), |a| {
@@ -90,54 +104,17 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 let padding = get_attribute(&node.attribute, "pads")
                     .map_or(vec![0, 0].into(), |a| Dimensions::from_i64(&a.ints));
                 let group = get_attribute(&node.attribute, "group").map_or(1, |a| a.i());
-                let _conv = Node::new(Op::Conv2d(Conv2d {
+                Op::Conv2d(Conv2d {
                     auto_pad,
                     kernel_shape,
                     strides,
                     group,
                     padding,
-                }))
-                .with_ins(inputs)
-                .with_outs(outputs)
-                .alloc(&mut model.nodes);
+                })
             }
-            "Add" => {
-                let _add = Node::new(Op::Add)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Sub" => {
-                let _sub = Node::new(Op::Sub)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Div" => {
-                let _div = Node::new(Op::Div)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Relu" => {
-                let _relu = Node::new(Op::ReLU)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "LeakyRelu" => {
-                let alpha = get_attribute(&node.attribute, "alpha").unwrap().f();
-                let _leaky_relu = Node::new(Op::LeakyReLU(LeakyReLU { alpha }))
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Sigmoid" => {
-                let _sigmoid = Node::new(Op::Sigmoid)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
+            "LeakyRelu" => Op::LeakyReLU(LeakyReLU {
+                alpha: get_attribute(&node.attribute, "alpha").unwrap().f(),
+            }),
             "Resize" => {
                 let coordinate_transformation_mode =
                     get_attribute(&node.attribute, "coordinate_transformation_mode")
@@ -158,77 +135,36 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .map_or("round_prefer_floor".to_string(), |a| {
                         unsafe { std::str::from_utf8_unchecked(a.s()) }.to_string()
                     });
-                let _resize = Node::new(Op::Resize(Resize {
+                Op::Resize(Resize {
                     coordinate_transformation_mode,
                     cubic_coeff_a,
                     exclude_outside,
                     extrapolation_value,
                     mode,
                     nearest_mode,
-                }))
-                .with_ins(inputs)
-                .with_outs(outputs)
-                .alloc(&mut model.nodes);
+                })
             }
-            "Concat" => {
-                let axis = get_attribute(&node.attribute, "axis").unwrap().i();
-                let _concat = Node::new(Op::Concat(Concat { axis }))
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Transpose" => {
-                let perm = get_attribute(&node.attribute, "perm").unwrap().ints.clone();
-                let _transpose = Node::new(Op::Transpose(Transpose { perm }))
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Squeeze" => {
-                let axes = get_attribute(&node.attribute, "axes").unwrap().ints.clone();
-                let _squeeze = Node::new(Op::Squeeze(Squeeze { axes }))
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Unsqueeze" => {
-                let axes = get_attribute(&node.attribute, "axes").unwrap().ints.clone();
-                let _squeeze = Node::new(Op::Squeeze(Squeeze { axes }))
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "ReduceMin" => {
-                let axes = get_attribute(&node.attribute, "axes").unwrap().ints.clone();
-                let keep_dims = get_attribute(&node.attribute, "keepdims").map_or(1, |a| a.i());
-                let _reduce_min = Node::new(Op::ReduceMin(ReduceMin { axes, keep_dims }));
-            }
-            "Round" => {
-                let _round = Node::new(Op::Round)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Exp" => {
-                let _exp = Node::new(Op::Exp)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
+            "Concat" => Op::Concat(Concat {
+                axis: get_attribute(&node.attribute, "axis").unwrap().i(),
+            }),
+            "Transpose" => Op::Transpose(Transpose {
+                perm: get_attribute(&node.attribute, "perm").unwrap().ints.clone(),
+            }),
+            "Squeeze" => Op::Squeeze(Squeeze {
+                axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
+            }),
+            "Unsqueeze" => Op::Squeeze(Squeeze {
+                axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
+            }),
+            "ReduceMin" => Op::ReduceMin(ReduceMin {
+                axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
+                keep_dims: get_attribute(&node.attribute, "keepdims").map_or(1, |a| a.i()),
+            }),
             "Loop" => {
                 // TODO
                 let _body = get_attribute(&node.attribute, "body").unwrap();
                 log::debug!("Ignore loop body!");
-                let _loop = Node::new(Op::Loop)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Tile" => {
-                let _tile = Node::new(Op::Tile)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
+                Op::Loop
             }
             "Cast" => {
                 let to = match DataType::from_i32(
@@ -240,22 +176,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     DataType::Int32 => TensorElemType::I32,
                     e => todo!("Cast to {:?}", e),
                 };
-                let _cast = Node::new(Op::Cast(Cast { to }))
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Slice" => {
-                let _slice = Node::new(Op::Slice)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "NonMaxSuppression" => {
-                let _non_max_suppression = Node::new(Op::NonMaxSuppression)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
+                Op::Cast(Cast { to })
             }
             "MaxPool" => {
                 let auto_pad = get_attribute(&node.attribute, "auto_pad")
@@ -269,70 +190,33 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 );
                 let strides =
                     Dimensions::from_i64(&get_attribute(&node.attribute, "strides").unwrap().ints);
-                let _maxpool = Node::new(Op::MaxPool(MaxPool {
+                Op::MaxPool(MaxPool {
                     auto_pad,
                     padding,
                     kernel_shape: kernel,
                     strides,
-                }))
-                .with_ins(inputs)
-                .with_outs(outputs)
-                .alloc(&mut model.nodes);
+                })
             }
-            "Reshape" => {
-                let _reshape = Node::new(Op::Reshape)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "MatMul" => {
-                let _matmul = Node::new(Op::MatMul)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "HardSigmoid" => {
-                let _hardsigmoid = Node::new(Op::HardSigmoid(HardSigmoid {
-                    alpha: get_attribute(&node.attribute, "alpha").map_or(0.2, |a| a.f()),
-                    beta: get_attribute(&node.attribute, "beta").map_or(0.5, |a| a.f()),
-                }))
-                .with_ins(inputs)
-                .with_outs(outputs)
-                .alloc(&mut model.nodes);
-            }
-            "Mul" => {
-                let _mul = Node::new(Op::Mul)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "GlobalAveragePool" => {
-                let _globalaveragepool = Node::new(Op::GlobalAveragePool)
-                    .with_ins(inputs)
-                    .with_outs(outputs)
-                    .alloc(&mut model.nodes);
-            }
-            "Flatten" => {
-                let _flatten = Node::new(Op::Flatten(Flatten {
-                    axis: get_attribute(&node.attribute, "axis").map_or(1, |a| a.i()),
-                }))
-                .with_ins(inputs)
-                .with_outs(outputs)
-                .alloc(&mut model.nodes);
-            }
-            "Gemm" => {
-                let _gemm = Node::new(Op::Gemm(Gemm {
-                    alpha: get_attribute(&node.attribute, "alpha").map_or(1.0, |a| a.f()),
-                    beta: get_attribute(&node.attribute, "beta").map_or(1.0, |a| a.f()),
-                    trans_a: get_attribute(&node.attribute, "transA").map_or(false, |a| a.i() == 1),
-                    trans_b: get_attribute(&node.attribute, "transB").map_or(false, |a| a.i() == 1),
-                }))
-                .with_ins(inputs)
-                .with_outs(outputs)
-                .alloc(&mut model.nodes);
-            }
+            "HardSigmoid" => Op::HardSigmoid(HardSigmoid {
+                alpha: get_attribute(&node.attribute, "alpha").map_or(0.2, |a| a.f()),
+                beta: get_attribute(&node.attribute, "beta").map_or(0.5, |a| a.f()),
+            }),
+            "Flatten" => Op::Flatten(Flatten {
+                axis: get_attribute(&node.attribute, "axis").map_or(1, |a| a.i()),
+            }),
+            "Gemm" => Op::Gemm(Gemm {
+                alpha: get_attribute(&node.attribute, "alpha").map_or(1.0, |a| a.f()),
+                beta: get_attribute(&node.attribute, "beta").map_or(1.0, |a| a.f()),
+                trans_a: get_attribute(&node.attribute, "transA").map_or(false, |a| a.i() == 1),
+                trans_b: get_attribute(&node.attribute, "transB").map_or(false, |a| a.i() == 1),
+            }),
             op => todo!("op: {}", op),
-        }
+        };
+
+        let _ = Node::new(op)
+            .with_ins(inputs)
+            .with_outs(outputs)
+            .alloc(&mut model.nodes);
     }
 
     Ok(model)

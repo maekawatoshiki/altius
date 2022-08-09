@@ -275,13 +275,14 @@ fn compute_mul(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
     let output = &mut outputs[Node::MUL_OUT];
 
     if input_a.dims() == input_b.dims() {
+        let output = output.data_mut::<f32>();
         for (i, (a, b)) in input_a
             .data::<f32>()
             .iter()
             .zip(input_b.data::<f32>().iter())
             .enumerate()
         {
-            output.data_mut::<f32>()[i] = a * b;
+            output[i] = a * b;
         }
 
         return;
@@ -296,12 +297,28 @@ fn compute_mul(_node: &Node, inputs: &[Tensor], outputs: &mut [Tensor]) {
         && in_a[2] == 1
         && in_a[3] == 1
     {
-        for n in 0..in_a[0] {
-            for z in 0..in_a[1] {
-                for x in 0..in_b[2] {
-                    for y in 0..in_b[3] {
-                        *output.at_4d_mut(n, z, x, y) =
-                            input_a.at_4d(n, z, 0, 0) * input_b.at_4d(n, z, x, y);
+        let input_a_strides = input_a.strides();
+        let output_strides = output.strides().to_vec();
+        let n = in_a[0];
+        let z = in_a[1];
+        let b_x = in_b[2];
+        let b_y = in_b[3];
+        let input_a = input_a.data::<f32>();
+        let input_b = input_b.data::<f32>();
+        let output = output.data_mut::<f32>();
+
+        for n in 0..n {
+            let o_s_n = n * output_strides[0];
+            let ia_s_n = n * input_a_strides[0];
+            for z in 0..z {
+                let o_s_z = o_s_n + z * output_strides[1];
+                let ia_s_z = ia_s_n + z * input_a_strides[1];
+                let d = input_a[ia_s_z];
+                for x in 0..b_x {
+                    let o_s_x = o_s_z + x * output_strides[2];
+                    for y in 0..b_y {
+                        let o_s_y = o_s_x + y;
+                        output[o_s_y] = d * input_b[o_s_y];
                     }
                 }
             }

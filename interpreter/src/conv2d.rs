@@ -78,6 +78,8 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let mut col = Array6::<f32>::zeros([
         batch_size, input_c, kernel[0], kernel[1], output_h, output_w,
     ]);
+    // TODO: The following code gets slower when rewriting it without ndarray.
+    //       Thus, ndarray is the best solution so far.
     for fy in 0..kernel[0] {
         let fy_max = fy + stride[0] * output_h;
         for fx in 0..kernel[1] {

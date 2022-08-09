@@ -172,6 +172,10 @@ impl Tensor {
         &self.elem_ty
     }
 
+    pub fn strides(&self) -> &[Dimension] {
+        self.stride.as_slice()
+    }
+
     pub fn verify(&self) -> bool {
         self.data.len() / self.elem_ty.size() == self.dims.total_elems()
     }

@@ -40,13 +40,13 @@ fn main() {
     let start = Instant::now();
 
     let input_value = mnist.lookup_named_value("Input3").unwrap();
+    let i = Interpreter::new(&mnist);
 
     for _ in 0..repeat {
         correct = inputs
             .par_iter()
             .take(validation_count)
             .map(|(expected, input)| {
-                let mut i = Interpreter::new(&mnist);
                 let v = i.run(vec![(input_value, input.clone())]);
                 let inferred = v[0]
                     .data::<f32>()

@@ -29,7 +29,7 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
 
-    let mut i = Interpreter::new(&model).with_profiling(opt.profile);
+    let i = Interpreter::new(&model).with_profiling(opt.profile);
     #[cfg(feature = "cuda")]
     Interpreter::new(&model).run(vec![(input_value, input.clone())]); // First run is slow so
                                                                       // ignore it.

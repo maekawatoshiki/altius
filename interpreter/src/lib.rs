@@ -31,8 +31,6 @@ use cuda::*;
 
 pub struct Interpreter<'a> {
     model: &'a Model,
-    values: FxHashMap<ValueId, Tensor>,
-    profile: FxHashMap<&'static str, Duration>,
     #[cfg(feature = "cuda")]
     cudnn_ctx: SafeCudnnContext,
     enable_profiling: bool,
@@ -42,8 +40,6 @@ impl<'a> Interpreter<'a> {
     pub fn new(model: &'a Model) -> Self {
         Interpreter {
             model,
-            values: FxHashMap::default(),
-            profile: FxHashMap::default(),
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
             enable_profiling: false,
@@ -55,55 +51,60 @@ impl<'a> Interpreter<'a> {
         self
     }
 
-    pub fn reset_profile(&mut self) {
-        self.profile.clear();
-    }
-
     pub fn model(&self) -> &Model {
         self.model
     }
 
-    pub fn run(&mut self, inputs: Vec<(ValueId, Tensor)>) -> Vec<&Tensor> {
-        // assert!(self.model.inputs.len() == 1);
-        // assert!(self.model.outputs.len() == 1);
+    pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Vec<Tensor> {
         if self.model.outputs.len() > 1 {
             log::debug!("Number of outputs: {}", self.model.outputs.len());
         }
 
-        // Set input & initializer values.
+        let mut profile = FxHashMap::default();
+        let mut values = self.model.inits.clone();
+
+        // Set inputs.
         for (id, tensor) in inputs {
-            self.values.insert(id, tensor);
+            values.insert(id, tensor);
         }
-        self.values.extend(self.model.inits.clone().into_iter());
 
         let nodes = self.model.topo_sort_nodes();
-
-        // println!("sorted nodes: {:?}", nodes);
+        // log::debug!("sorted nodes: {:?}", nodes);
 
         for node in nodes {
-            self.run_node(node);
+            self.run_node(&mut profile, &mut values, node);
         }
 
         if self.enable_profiling {
             log::info!(
                 "Total execution time: {:#?}",
-                self.profile.values().sum::<Duration>()
+                profile.values().sum::<Duration>()
             );
-            log::info!("Profile: {:#?}", self.profile);
+            log::info!("Profile: {:#?}", profile);
         }
 
-        self.model
-            .outputs
-            .iter()
-            .map(|id| &self.values[id])
+        values
+            .into_iter()
+            .filter_map(|(id, t)| {
+                if self.model.outputs.contains(&id) {
+                    Some(t)
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
-    fn run_node(&mut self, node: NodeId) {
+    fn run_node(
+        &self,
+        profile: &mut FxHashMap<&'static str, Duration>,
+        values: &mut FxHashMap<ValueId, Tensor>,
+        node: NodeId,
+    ) {
         let node = &self.model.nodes[node];
         let mut inputs = vec![];
         for input in node.inputs.iter() {
-            inputs.push(self.values[input].clone());
+            inputs.push(values[input].clone());
         }
         let mut op = node.op.clone();
         let output_shapes = compute_output_shapes(&mut op, &inputs);
@@ -154,11 +155,11 @@ impl<'a> Interpreter<'a> {
 
         let elapsed = start.elapsed();
         if self.enable_profiling {
-            *self.profile.entry(op.name()).or_insert(Duration::ZERO) += elapsed;
+            *profile.entry(op.name()).or_insert(Duration::ZERO) += elapsed;
         }
 
         for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
-            self.values.insert(val, output);
+            values.insert(val, output);
         }
     }
 }

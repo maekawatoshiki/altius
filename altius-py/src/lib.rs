@@ -66,7 +66,11 @@ impl PySession {
             ));
         }
         let mut outputs = vec![];
-        for out in self.0.run(inputs) {
+        for out in self
+            .0
+            .run(inputs)
+            .or_else(|_| Err(PyRuntimeError::new_err(format!("Inference failed"))))?
+        {
             let arr =
                 ArrayD::from_shape_vec(out.dims().as_slice().to_vec(), out.data::<f32>().to_vec())
                     .map_err(|_| PyRuntimeError::new_err("Failed to create output array"))?;

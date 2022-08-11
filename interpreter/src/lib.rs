@@ -15,6 +15,7 @@ use cudnn::CudnnContext;
 use ndarray::{linalg, Array2, ArrayView2, ArrayView4};
 use rustc_hash::FxHashMap;
 use std::time::{Duration, Instant};
+use thiserror::Error;
 
 #[cfg(feature = "cuda")]
 mod cuda {
@@ -28,6 +29,9 @@ mod cuda {
 
 #[cfg(feature = "cuda")]
 use cuda::*;
+
+#[derive(Debug, Clone, Error)]
+pub enum InferenceError {}
 
 pub struct Interpreter<'a> {
     model: &'a Model,
@@ -55,7 +59,7 @@ impl<'a> Interpreter<'a> {
         self.model
     }
 
-    pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Vec<Tensor> {
+    pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, InferenceError> {
         if self.model.outputs.len() > 1 {
             log::debug!("Number of outputs: {}", self.model.outputs.len());
         }
@@ -83,7 +87,7 @@ impl<'a> Interpreter<'a> {
             log::info!("Profile: {:#?}", profile);
         }
 
-        values
+        Ok(values
             .into_iter()
             .filter_map(|(id, t)| {
                 if self.model.outputs.contains(&id) {
@@ -92,7 +96,7 @@ impl<'a> Interpreter<'a> {
                     None
                 }
             })
-            .collect()
+            .collect())
     }
 
     fn run_node(

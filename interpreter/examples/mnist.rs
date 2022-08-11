@@ -47,7 +47,9 @@ fn main() {
             .par_iter()
             .take(validation_count)
             .map(|(expected, input)| {
-                let v = i.run(vec![(input_value, input.clone())]);
+                let v = i
+                    .run(vec![(input_value, input.clone())])
+                    .expect("Inference failed");
                 let inferred = v[0]
                     .data::<f32>()
                     .iter()

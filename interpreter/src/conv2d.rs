@@ -17,7 +17,7 @@ pub struct Conv2dCtx<'a> {
     #[cfg(feature = "cuda")]
     pub cudnn: &'a SafeCudnnContext,
     pub op: &'a Conv2d,
-    pub inputs: &'a [Tensor],
+    pub inputs: &'a [&'a Tensor],
     pub outputs: &'a mut [Tensor],
 }
 

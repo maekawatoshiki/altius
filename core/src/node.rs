@@ -303,7 +303,7 @@ impl Op {
 
 /// Computes the output shape for `op`.
 /// `op` could be overwritten. (e.g. paddings given auto_pad)
-pub fn compute_output_shapes(op: &mut Op, inputs: &[Tensor]) -> Vec<Dimensions> {
+pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions> {
     let mut shapes = vec![];
     match op {
         Op::Conv2d(conv) => {

@@ -119,7 +119,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let weight = &ctx.inputs[Node::CONV2D_WEIGHT];
     let bias = ctx.inputs.get(Node::CONV2D_BIAS).map_or(
         Tensor::zeros::<f32>(vec![weight.dims()[0]].into()),
-        Clone::clone,
+        |&bias| bias.clone(),
     );
     let output = &mut ctx.outputs[0];
 

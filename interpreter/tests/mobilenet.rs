@@ -29,7 +29,7 @@ fn mobilenet() {
             .collect::<Vec<_>>(),
     );
 
-    let mut i = Interpreter::new(&model).with_profiling(true);
+    let i = Interpreter::new(&model).with_profiling(true);
     #[cfg(feature = "cuda")]
     Interpreter::new(&model).run(vec![(input_value, input.clone())]); // First run is slow so
                                                                       // ignore it.

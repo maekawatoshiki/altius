@@ -179,6 +179,7 @@ fn compute_gavg_pool(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let area = (h * w) as f32;
     let input_strides = input.strides();
     let input = input.data::<f32>();
+    let out_stride_n = output.strides()[0];
     let output = output.data_mut::<f32>();
 
     for n in 0..n {
@@ -193,7 +194,7 @@ fn compute_gavg_pool(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                     sum += input[idx_w];
                 }
             }
-            output[idx_n + c] = sum / area;
+            output[n * out_stride_n + c] = sum / area;
         }
     }
 }
@@ -388,6 +389,10 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_b = inputs[Node::GEMM_IN_B];
     let input_c = inputs[Node::GEMM_IN_C];
     let output = &mut outputs[Node::GEMM_OUT];
+
+    assert!(input_a.dims().len() == 2);
+    assert!(input_b.dims().len() == 2);
+    assert!(input_c.dims().len() == 1);
 
     let a =
         Array2::from_shape_vec(input_a.fixed_dims::<2>(), input_a.data::<f32>().to_vec()).unwrap();

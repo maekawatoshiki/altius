@@ -1,6 +1,6 @@
 use prost::Message;
 use rustc_hash::FxHashMap;
-use std::{fs, io, path::Path};
+use std::{borrow::Cow, fs, io, path::Path};
 use thiserror::Error;
 
 use crate::{
@@ -21,6 +21,7 @@ include!(concat!(env!("OUT_DIR"), "/onnx.rs"));
 pub enum ModelLoadError {
     Io(#[from] io::Error),
     NoGraph,
+    Todo(Cow<'static, str>),
 }
 
 pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
@@ -41,6 +42,24 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
 
     // Load inputs.
     for x in graph.input.iter() {
+        let val = x.r#type.as_ref().unwrap().value.as_ref().unwrap();
+        match val {
+            type_proto::Value::TensorType(tensor) => {
+                for d in &tensor.shape.as_ref().unwrap().dim {
+                    match d.value.as_ref().unwrap() {
+                        tensor_shape_proto::dimension::Value::DimValue(_i) => {}
+                        _ => {
+                            return Err(ModelLoadError::Todo("Dynamic shape is not allowed".into()))
+                        }
+                    }
+                }
+            }
+            _ => {
+                return Err(ModelLoadError::Todo(
+                    "Graph input must be tensor type".into(),
+                ))
+            }
+        }
         let val = *name_to_val
             .entry(x.name())
             .or_insert_with(|| model.values.new_val_named(x.name()));

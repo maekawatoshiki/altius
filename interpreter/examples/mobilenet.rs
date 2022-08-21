@@ -38,7 +38,7 @@ fn main() {
     out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 
     let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
-    let classes = classes.split("\n").collect::<Vec<_>>();
+    let classes = classes.split('\n').collect::<Vec<_>>();
     println!("inferred: {}", classes[out[0].0]);
     println!("top5: {:?}", &out[..5]);
 }

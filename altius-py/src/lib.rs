@@ -48,13 +48,9 @@ impl PySession {
         let mut inputs = vec![];
         for (name, val) in map {
             let val_id =
-                self.0
-                    .model()
-                    .lookup_named_value(&name)
-                    .ok_or(PyRuntimeError::new_err(format!(
-                        "Input '{}' not found",
-                        name
-                    )))?;
+                self.0.model().lookup_named_value(&name).ok_or_else(|| {
+                    PyRuntimeError::new_err(format!("Input '{}' not found", name))
+                })?;
             inputs.push((
                 val_id,
                 Tensor::new(
@@ -69,7 +65,7 @@ impl PySession {
         for out in self
             .0
             .run(inputs)
-            .or_else(|_| Err(PyRuntimeError::new_err(format!("Inference failed"))))?
+            .map_err(|_| PyRuntimeError::new_err("Inference failed".to_string()))?
         {
             let arr =
                 ArrayD::from_shape_vec(out.dims().as_slice().to_vec(), out.data::<f32>().to_vec())

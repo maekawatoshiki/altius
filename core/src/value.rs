@@ -30,4 +30,8 @@ impl ValueArena {
     pub fn inner(&self) -> &Arena<Value> {
         &self.0
     }
+
+    pub fn inner_mut(&mut self) -> &mut Arena<Value> {
+        &mut self.0
+    }
 }

@@ -10,8 +10,8 @@ pub struct Tensor {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TensorDef {
-    dims: Dimensions,
-    elem_ty: TensorElemType,
+    pub dims: Dimensions,
+    pub elem_ty: TensorElemType,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -184,8 +184,8 @@ impl Tensor {
         }
     }
 
-    pub fn elem_ty(&self) -> &TensorElemType {
-        &self.elem_ty
+    pub fn elem_ty(&self) -> TensorElemType {
+        self.elem_ty
     }
 
     pub fn strides(&self) -> &[Dimension] {
@@ -200,22 +200,6 @@ impl Tensor {
 impl TensorDef {
     pub fn new(dims: Dimensions, elem_ty: TensorElemType) -> Self {
         Self { dims, elem_ty }
-    }
-
-    pub fn dims(&self) -> &Dimensions {
-        &self.dims
-    }
-
-    pub fn elem_ty(&self) -> TensorElemType {
-        self.elem_ty
-    }
-
-    pub fn dims_mut(&mut self) -> &mut Dimensions {
-        &mut self.dims
-    }
-
-    pub fn elem_ty_mut(&mut self) -> &mut TensorElemType {
-        &mut self.elem_ty
     }
 }
 

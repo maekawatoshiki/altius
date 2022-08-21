@@ -15,7 +15,7 @@ fn mobilenet() {
         .tensor_def
         .as_mut()
         .unwrap()
-        .dims_mut()
+        .dims
         .as_mut_slice()[0] = 4;
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();

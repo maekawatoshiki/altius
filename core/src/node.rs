@@ -1,6 +1,6 @@
 use crate::{
     dim::Dimensions,
-    tensor::{Tensor, TensorElemType},
+    tensor::{Tensor, TensorDef, TensorElemType},
     value::ValueId,
 };
 use id_arena::{Arena, Id};
@@ -303,8 +303,8 @@ impl Op {
 
 /// Computes the output shape for `op`.
 /// `op` could be overwritten. (e.g. paddings given auto_pad)
-pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions> {
-    let mut shapes = vec![];
+pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<TensorDef> {
+    let mut defs = vec![];
     match op {
         Op::Conv2d(conv) => {
             let auto_pad = &conv.auto_pad;
@@ -347,7 +347,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                 (h_in + pad_h - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
                 (w_in + pad_w - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
-            shapes.push(output_shape.into());
+            defs.push(TensorDef::new(
+                output_shape.into(),
+                inputs[Node::CONV2D_IN].elem_ty(),
+            ));
         }
         Op::Add => {
             let in_a = inputs[Node::ADD_IN_A].dims();
@@ -361,13 +364,19 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                         && in_b[2] == 1
                 }
             ); // TODO: Support broadcasting.
-            shapes.push(in_a.clone());
+            defs.push(TensorDef::new(
+                in_a.clone(),
+                inputs[Node::ADD_IN_A].elem_ty(),
+            ));
         }
         Op::Sub => {
             let in_a = inputs[Node::SUB_IN_A].dims();
             let in_b = inputs[Node::SUB_IN_B].dims();
             assert!(in_a == in_b);
-            shapes.push(in_a.clone());
+            defs.push(TensorDef::new(
+                in_a.clone(),
+                inputs[Node::SUB_IN_A].elem_ty(),
+            ));
         }
         Op::Mul => {
             let in_a = inputs[Node::MUL_IN_A].dims();
@@ -382,13 +391,19 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                         && in_a[3] == 1
                 }
             ); // TODO: Support broadcasting.
-            shapes.push(in_b.clone());
+            defs.push(TensorDef::new(
+                in_b.clone(),
+                inputs[Node::MUL_IN_B].elem_ty(),
+            ));
         }
         Op::Div => {
             let in_a = inputs[Node::DIV_IN_A].dims();
             let in_b = inputs[Node::DIV_IN_B].dims();
             assert!(in_a == in_b);
-            shapes.push(in_a.clone());
+            defs.push(TensorDef::new(
+                in_a.clone(),
+                inputs[Node::DIV_IN_A].elem_ty(),
+            ));
         }
         Op::MaxPool(maxpool) => {
             let auto_pad = &maxpool.auto_pad;
@@ -418,12 +433,19 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                 (h_in + (padding[0] + padding[2]) - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
                 (w_in + (padding[1] + padding[3]) - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
-            shapes.push(output_shape.into());
+            // defs.push(output_shape.into());
+            defs.push(TensorDef::new(
+                output_shape.into(),
+                inputs[Node::MAXPOOL_IN].elem_ty(),
+            ));
         }
         Op::GlobalAveragePool => {
             let input = &inputs[Node::GLOBALAVERAGEPOOL_IN].dims();
             assert!(input.len() == 4);
-            shapes.push(vec![input[0], input[1], 1, 1].into());
+            defs.push(TensorDef::new(
+                vec![input[0], input[1], 1, 1].into(),
+                inputs[Node::GLOBALAVERAGEPOOL_IN].elem_ty(),
+            ));
         }
         Op::Reshape => {
             let shape = inputs[Node::RESHAPE_SHAPE]
@@ -442,14 +464,20 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                     }
                 })
                 .collect::<Vec<_>>();
-            shapes.push(shape.into());
+            defs.push(TensorDef::new(
+                shape.into(),
+                inputs[Node::RESHAPE_IN].elem_ty(),
+            ))
         }
         Op::Flatten(flatten) => {
             let dims = inputs[Node::FLATTEN_IN].dims();
             assert!(flatten.axis >= 0);
             let x: Dimensions = dims[..flatten.axis as usize].to_vec().into();
             let y: Dimensions = dims[flatten.axis as usize..].to_vec().into();
-            shapes.push(vec![x.total_elems(), y.total_elems()].into())
+            defs.push(TensorDef::new(
+                vec![x.total_elems(), y.total_elems()].into(),
+                inputs[Node::FLATTEN_IN].elem_ty(),
+            ));
         }
         Op::Resize(resize) => {
             // TODO: Support other cases.
@@ -461,7 +489,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
             assert!(x.dims().len() == 4);
             let roi = &inputs[Node::RESIZE_IN_ROI].data::<f32>();
             let scales = &inputs[Node::RESIZE_IN_SCALES].data::<f32>();
-            shapes.push(
+            defs.push(TensorDef::new(
                 vec![
                     (x.dims()[0] as f32 * (roi[4] - roi[0]) * scales[0]).floor() as usize,
                     (x.dims()[1] as f32 * (roi[5] - roi[1]) * scales[1]).floor() as usize,
@@ -469,7 +497,8 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                     (x.dims()[3] as f32 * (roi[7] - roi[3]) * scales[3]).floor() as usize,
                 ]
                 .into(),
-            )
+                inputs[Node::RESIZE_IN_X].elem_ty(),
+            ))
         }
         Op::Concat(concat) => {
             let mut dims = inputs[Node::CONCAT_IN].dims().clone();
@@ -478,7 +507,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                 sum += i.dims()[concat.axis as usize];
             }
             dims.as_mut_slice()[concat.axis as usize] = sum;
-            shapes.push(dims);
+            defs.push(TensorDef::new(dims, inputs[Node::CONCAT_IN].elem_ty()))
         }
         Op::Transpose(trans) => {
             assert!(!trans.perm.is_empty());
@@ -487,7 +516,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
             for i in 0..in_dims.len() {
                 dims[i] = in_dims[trans.perm[i] as usize];
             }
-            shapes.push(dims.into());
+            defs.push(TensorDef::new(
+                dims.into(),
+                inputs[Node::TRANSPOSE_IN].elem_ty(),
+            ))
         }
         Op::Squeeze(squeeze) => {
             assert!(!squeeze.axes.is_empty());
@@ -500,7 +532,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                 }
                 dims.push(x);
             }
-            shapes.push(dims.into());
+            defs.push(TensorDef::new(
+                dims.into(),
+                inputs[Node::SQUEEZE_IN].elem_ty(),
+            ))
         }
         Op::Unsqueeze(unsqueeze) => {
             assert!(!unsqueeze.axes.is_empty());
@@ -510,7 +545,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
             for &x in unsqueeze.axes.iter() {
                 dims.insert(x as usize, 1);
             }
-            shapes.push(dims.into());
+            defs.push(TensorDef::new(
+                dims.into(),
+                inputs[Node::UNSQUEEZE_IN].elem_ty(),
+            ))
         }
         Op::ReduceMin(rmin) => {
             let in_dims = inputs[Node::REDUCEMIN_IN].dims();
@@ -527,17 +565,21 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
             if dims.is_empty() {
                 dims.push(1);
             }
-            shapes.push(dims.into());
+            defs.push(TensorDef::new(
+                dims.into(),
+                inputs[Node::REDUCEMIN_IN].elem_ty(),
+            ))
         }
         Op::Loop => {
             assert!(inputs.len() == 3);
-            let m = inputs[0].data::<i64>();
+            let _m = inputs[0].data::<i64>();
             let cond = inputs[1].data::<u8>();
             assert!(cond[0] == 1);
             let v_initial = inputs[2].data::<i32>();
             assert!(v_initial[0] == 0);
-            shapes.push(vec![1].into());
-            shapes.push(vec![m[0] as usize].into());
+            todo!()
+            // defs.push(vec![1].into());
+            // defs.push(vec![m[0] as usize].into());
         }
         Op::Tile => {
             let in_dims = inputs[Node::TILE_IN].dims();
@@ -546,7 +588,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
             for (i, &x) in in_dims.as_slice().iter().enumerate() {
                 dims.push(x * reps[i as usize] as usize);
             }
-            shapes.push(dims.into());
+            defs.push(TensorDef::new(dims.into(), inputs[Node::TILE_IN].elem_ty()));
         }
         Op::Slice => {
             let in_data_dims = inputs[Node::SLICE_IN_DATA].dims();
@@ -573,7 +615,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                 assert!(out_dim > 0);
                 dims[axis] = out_dim;
             }
-            shapes.push(dims.into());
+            defs.push(TensorDef::new(
+                dims.into(),
+                inputs[Node::SLICE_IN_DATA].elem_ty(),
+            ))
         }
         Op::NonMaxSuppression => {
             todo!()
@@ -582,7 +627,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
             let in_a = &inputs[Node::MATMUL_IN_A].dims();
             let in_b = &inputs[Node::MATMUL_IN_B].dims();
             assert_eq!(in_a[1], in_b[0]);
-            shapes.push(vec![in_a[0], in_b[1]].into());
+            defs.push(TensorDef::new(
+                vec![in_a[0], in_b[1]].into(),
+                inputs[Node::MATMUL_IN_A].elem_ty(),
+            ));
         }
         Op::Gemm(gemm) => {
             let in_a = &inputs[Node::GEMM_IN_A].dims();
@@ -598,36 +646,39 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<Dimensions>
                 (in_b[0], in_b[1])
             };
             assert_eq!(in_a1, in_b0);
-            shapes.push(vec![in_a0, in_b1].into());
+            defs.push(TensorDef::new(
+                vec![in_a0, in_b1].into(),
+                inputs[Node::GEMM_IN_A].elem_ty(),
+            ));
         }
         Op::ReLU => {
-            let input = inputs[Node::RELU_IN].dims();
-            shapes.push(input.clone());
+            let input = inputs[Node::RELU_IN];
+            defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
         }
         Op::LeakyReLU(_) => {
-            let input = inputs[Node::LEAKYRELU_IN].dims();
-            shapes.push(input.clone());
+            let input = inputs[Node::LEAKYRELU_IN];
+            defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
         }
         Op::Sigmoid => {
-            let input = inputs[Node::SIGMOID_IN].dims();
-            shapes.push(input.clone());
+            let input = inputs[Node::SIGMOID_IN];
+            defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
         }
         Op::Cast(_) => {
-            let input = inputs[Node::CAST_IN].dims();
-            shapes.push(input.clone());
+            let input = inputs[Node::CAST_IN];
+            defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
         }
         Op::HardSigmoid(_) => {
-            let input = inputs[Node::HARDSIGMOID_IN].dims();
-            shapes.push(input.clone());
+            let input = inputs[Node::HARDSIGMOID_IN];
+            defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
         }
         Op::Round => {
-            let input = inputs[Node::ROUND_IN].dims();
-            shapes.push(input.clone());
+            let input = inputs[Node::ROUND_IN];
+            defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
         }
         Op::Exp => {
-            let input = inputs[Node::EXP_IN].dims();
-            shapes.push(input.clone());
+            let input = inputs[Node::EXP_IN];
+            defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
         }
     }
-    shapes
+    defs
 }

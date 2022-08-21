@@ -1,6 +1,7 @@
 mod conv2d;
 
 use altius_core::{
+    dim::Dimensions,
     model::Model,
     node::{
         compute_output_shapes, Cast, Concat, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node,
@@ -37,15 +38,23 @@ pub struct Interpreter<'a> {
     model: &'a Model,
     #[cfg(feature = "cuda")]
     cudnn_ctx: SafeCudnnContext,
+    sorted_nodes: Vec<NodeId>,
+    inferred_shapes: FxHashMap<NodeId, (Op, Vec<Dimensions>)>,
     enable_profiling: bool,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new(model: &'a Model) -> Self {
+        let sorted_nodes = model.topo_sort_nodes();
+        let mut inferred_shapes = FxHashMap::default();
+        infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
+
         Interpreter {
             model,
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
+            sorted_nodes,
+            inferred_shapes,
             enable_profiling: false,
         }
     }
@@ -72,10 +81,7 @@ impl<'a> Interpreter<'a> {
             values.insert(id, tensor);
         }
 
-        let nodes = self.model.topo_sort_nodes();
-        // log::debug!("sorted nodes: {:?}", nodes);
-
-        for node in nodes {
+        for &node in &self.sorted_nodes {
             self.run_node(&mut profile, &mut values, node);
         }
 
@@ -103,16 +109,22 @@ impl<'a> Interpreter<'a> {
         &self,
         profile: &mut FxHashMap<&'static str, Duration>,
         values: &mut FxHashMap<ValueId, Tensor>,
-        node: NodeId,
+        node_id: NodeId,
     ) {
-        let node = &self.model.nodes[node];
-        let mut op = node.op.clone();
+        let node = &self.model.nodes[node_id];
         let inputs = node
             .inputs
             .iter()
             .map(|input| &values[input])
             .collect::<Vec<_>>();
-        let output_shapes = compute_output_shapes(&mut op, &inputs);
+        // Use inferred shapes if any.
+        let (op, output_shapes) = if let Some(op_and_shapes) = self.inferred_shapes.get(&node_id) {
+            op_and_shapes.clone()
+        } else {
+            let mut op = node.op.clone();
+            let output_shapes = compute_output_shapes(&mut op, &inputs);
+            (op, output_shapes)
+        };
         let mut outputs = output_shapes
             .into_iter()
             .map(|shape| Tensor::zeros::<f32>(shape))
@@ -540,4 +552,54 @@ fn compute_flatten(_flatten: &Flatten, inputs: &[&Tensor], outputs: &mut [Tensor
     let input = inputs[Node::FLATTEN_IN];
     let output = &mut outputs[Node::FLATTEN_OUT];
     *output = input.clone().reshape_into(output.dims().clone());
+}
+
+// TODO: Better move to another file.
+fn infer_shapes(
+    model: &Model,
+    sorted_nodes: &[NodeId],
+    shapes: &mut FxHashMap<NodeId, (Op, Vec<Dimensions>)>,
+) {
+    let mut values = model.inits.clone();
+
+    for &val_id in &model.inputs {
+        let dims = &model.values.inner()[val_id].1;
+        if let Some(dims) = dims {
+            let tensor = Tensor::zeros::<f32>(dims.clone()); // TODO: f32?
+            values.insert(val_id, tensor);
+        }
+    }
+
+    for &node in sorted_nodes {
+        infer_shape(model, &mut values, shapes, node)
+    }
+}
+
+// TODO: Better move to another file.
+fn infer_shape(
+    model: &Model,
+    values: &mut FxHashMap<ValueId, Tensor>,
+    shapes: &mut FxHashMap<NodeId, (Op, Vec<Dimensions>)>,
+    node_id: NodeId,
+) {
+    let node = &model.nodes[node_id];
+    let mut op = node.op.clone();
+    let mut inputs = vec![];
+    for input in &node.inputs {
+        let input = if let Some(input) = values.get(input) {
+            input
+        } else {
+            return;
+        };
+        inputs.push(input);
+    }
+    let output_shapes = compute_output_shapes(&mut op, &inputs);
+    let mut outputs = vec![];
+    for shape in &output_shapes {
+        outputs.push(Tensor::zeros::<f32>(shape.clone())); // TODO: f32?
+    }
+    for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
+        values.insert(val, output);
+    }
+    shapes.insert(node_id, (op, output_shapes));
 }

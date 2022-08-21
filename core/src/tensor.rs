@@ -8,7 +8,13 @@ pub struct Tensor {
     elem_ty: TensorElemType,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TensorDef {
+    dims: Dimensions,
+    elem_ty: TensorElemType,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TensorElemType {
     Bool,
     F32,
@@ -53,6 +59,16 @@ impl Tensor {
     pub fn zeros<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
         let total_elems = dims.total_elems();
         match T::get_type() {
+            TensorElemType::Bool => Self::new(dims, vec![0u8; total_elems]),
+            TensorElemType::F32 => Self::new(dims, vec![0.0f32; total_elems]),
+            TensorElemType::I32 => Self::new(dims, vec![0i32; total_elems]),
+            TensorElemType::I64 => Self::new(dims, vec![0i64; total_elems]),
+        }
+    }
+
+    pub fn zeros_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
+        let total_elems = dims.total_elems();
+        match ty {
             TensorElemType::Bool => Self::new(dims, vec![0u8; total_elems]),
             TensorElemType::F32 => Self::new(dims, vec![0.0f32; total_elems]),
             TensorElemType::I32 => Self::new(dims, vec![0i32; total_elems]),
@@ -178,6 +194,28 @@ impl Tensor {
 
     pub fn verify(&self) -> bool {
         self.data.len() / self.elem_ty.size() == self.dims.total_elems()
+    }
+}
+
+impl TensorDef {
+    pub fn new(dims: Dimensions, elem_ty: TensorElemType) -> Self {
+        Self { dims, elem_ty }
+    }
+
+    pub fn dims(&self) -> &Dimensions {
+        &self.dims
+    }
+
+    pub fn elem_ty(&self) -> TensorElemType {
+        self.elem_ty
+    }
+
+    pub fn dims_mut(&mut self) -> &mut Dimensions {
+        &mut self.dims
+    }
+
+    pub fn elem_ty_mut(&mut self) -> &mut TensorElemType {
+        &mut self.elem_ty
     }
 }
 

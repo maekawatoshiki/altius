@@ -12,9 +12,10 @@ fn mobilenet() {
 
     // Change input batch size from 1 to 4.
     model.values.inner_mut()[input_value]
-        .1
+        .tensor_def
         .as_mut()
         .unwrap()
+        .dims_mut()
         .as_mut_slice()[0] = 4;
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();

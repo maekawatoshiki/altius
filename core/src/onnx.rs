@@ -43,27 +43,43 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
     // Load inputs.
     for x in graph.input.iter() {
         let val = x.r#type.as_ref().unwrap().value.as_ref().unwrap();
-        match val {
-            type_proto::Value::TensorType(tensor) => {
-                for d in &tensor.shape.as_ref().unwrap().dim {
-                    match d.value.as_ref().unwrap() {
-                        tensor_shape_proto::dimension::Value::DimValue(_i) => {}
-                        _ => {
-                            return Err(ModelLoadError::Todo("Dynamic shape is not allowed".into()))
-                        }
-                    }
+        let mut dims = vec![];
+        let mut is_dynamic_shape = false;
+        let tensor = if let type_proto::Value::TensorType(tensor) = val {
+            tensor
+        } else {
+            return Err(ModelLoadError::Todo(
+                "Graph input must be tensor type".into(),
+            ));
+        };
+        for d in tensor
+            .shape
+            .as_ref()
+            .unwrap()
+            .dim
+            .iter()
+            .map(|d| d.value.as_ref().unwrap())
+        {
+            match d {
+                tensor_shape_proto::dimension::Value::DimValue(i) => dims.push(*i),
+                _ => {
+                    is_dynamic_shape = true;
+                    break;
                 }
             }
-            _ => {
-                return Err(ModelLoadError::Todo(
-                    "Graph input must be tensor type".into(),
-                ))
-            }
         }
-        let val = *name_to_val
-            .entry(x.name())
-            .or_insert_with(|| model.values.new_val_named(x.name()));
-        model.inputs.push(val);
+        let input = if is_dynamic_shape {
+            *name_to_val
+                .entry(x.name())
+                .or_insert_with(|| model.values.new_val_named(x.name()))
+        } else {
+            *name_to_val.entry(x.name()).or_insert_with(|| {
+                model
+                    .values
+                    .new_val_named_and_shaped(x.name(), Dimensions::from_i64(&dims))
+            })
+        };
+        model.inputs.push(input);
     }
 
     // Load outputs.

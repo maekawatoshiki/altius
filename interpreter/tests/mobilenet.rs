@@ -7,8 +7,15 @@ use std::path::Path;
 fn mobilenet() {
     env_logger::init();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
-    let model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
+    let mut model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
     let input_value = model.lookup_named_value("input").unwrap();
+
+    // Change input batch size from 1 to 4.
+    model.values.inner_mut()[input_value]
+        .1
+        .as_mut()
+        .unwrap()
+        .as_mut_slice()[0] = 4;
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
     let resized = image::imageops::resize(&image, 224, 224, image::imageops::FilterType::Triangle);

@@ -17,7 +17,7 @@ pub struct Model {
 impl Model {
     pub fn lookup_named_value(&self, name: &str) -> Option<ValueId> {
         self.values.inner().iter().find_map(|(id, value)| {
-            if value.0.as_ref().map_or(false, |nm| nm == name) {
+            if value.name.as_ref().map_or(false, |nm| nm == name) {
                 Some(id)
             } else {
                 None

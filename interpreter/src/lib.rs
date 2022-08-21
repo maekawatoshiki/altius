@@ -563,9 +563,9 @@ fn infer_shapes(
     let mut values = model.inits.clone();
 
     for &val_id in &model.inputs {
-        let dims = &model.values.inner()[val_id].1;
-        if let Some(dims) = dims {
-            let tensor = Tensor::zeros::<f32>(dims.clone()); // TODO: f32?
+        let tensor_def = &model.values.inner()[val_id].tensor_def;
+        if let Some(tensor_def) = tensor_def {
+            let tensor = Tensor::zeros_of_type(tensor_def.elem_ty(), tensor_def.dims().clone());
             values.insert(val_id, tensor);
         }
     }

@@ -10,7 +10,7 @@ use crate::{
         Cast, Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, ReduceMin,
         Resize, Squeeze, Transpose,
     },
-    tensor::{Tensor, TensorElemType},
+    tensor::{Tensor, TensorDef, TensorElemType},
 };
 
 use tensor_proto::DataType;
@@ -74,9 +74,13 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 .or_insert_with(|| model.values.new_val_named(x.name()))
         } else {
             *name_to_val.entry(x.name()).or_insert_with(|| {
-                model
-                    .values
-                    .new_val_named_and_shaped(x.name(), Dimensions::from_i64(&dims))
+                model.values.new_val_named_and_shaped(
+                    x.name(),
+                    TensorDef::new(
+                        Dimensions::from_i64(&dims),
+                        DataType::from_i32(tensor.elem_type()).unwrap().into(),
+                    ),
+                )
             })
         };
         model.inputs.push(input);
@@ -299,6 +303,18 @@ fn get_tensor(tensor: &TensorProto) -> Tensor {
             tensor.raw_data().to_vec(),
         ),
         e => todo!("data type: {e:?}"),
+    }
+}
+
+impl From<DataType> for TensorElemType {
+    fn from(ty: DataType) -> Self {
+        match ty {
+            DataType::Bool => TensorElemType::Bool,
+            DataType::Int32 => TensorElemType::I32,
+            DataType::Int64 => TensorElemType::I64,
+            DataType::Float => TensorElemType::F32,
+            _ => todo!("Unsupported tensor element type: {ty:?}"),
+        }
     }
 }
 

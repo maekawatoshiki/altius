@@ -75,12 +75,12 @@ pub struct LeakyReLU {
     pub alpha: f32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cast {
     pub to: TensorElemType,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Flatten {
     pub axis: i64,
 }
@@ -95,27 +95,27 @@ pub struct Resize {
     pub nearest_mode: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Concat {
     pub axis: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Transpose {
     pub perm: Vec<i64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Squeeze {
     pub axes: Vec<i64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Unsqueeze {
     pub axes: Vec<i64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ReduceMin {
     pub axes: Vec<i64>,
     pub keep_dims: i64,
@@ -320,9 +320,9 @@ pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<Tensor
                 let out0 = (input[2] as f32 / stride[0] as f32).ceil() as usize;
                 let out1 = (input[3] as f32 / stride[1] as f32).ceil() as usize;
                 let pad0 =
-                    ((out0 - 1) * stride[0] + ((kernel[0] - 1) * 1 + 1)).saturating_sub(input[2]);
+                    ((out0 - 1) * stride[0] + ((kernel[0] - 1) + 1)).saturating_sub(input[2]);
                 let pad1 =
-                    ((out1 - 1) * stride[1] + ((kernel[1] - 1) * 1 + 1)).saturating_sub(input[3]);
+                    ((out1 - 1) * stride[1] + ((kernel[1] - 1) + 1)).saturating_sub(input[3]);
                 assert!(auto_pad == "SAME_UPPER");
                 let new_padding = vec![pad0 / 2, pad1 / 2, pad0 - pad0 / 2, pad1 - pad1 / 2];
                 conv.padding = new_padding.into();
@@ -344,8 +344,8 @@ pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<Tensor
             let output_shape = vec![
                 input[0],
                 weight[0],
-                (h_in + pad_h - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
-                (w_in + pad_w - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
+                (h_in + pad_h - (kernel[0] - 1) - 1) / stride[0] + 1,
+                (w_in + pad_w - (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
             defs.push(TensorDef::new(
                 output_shape.into(),
@@ -416,9 +416,9 @@ pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<Tensor
                 let out0 = (input[2] as f32 / stride[0] as f32).ceil() as usize;
                 let out1 = (input[3] as f32 / stride[1] as f32).ceil() as usize;
                 let pad0 =
-                    ((out0 - 1) * stride[0] + ((kernel[0] - 1) * 1 + 1)).saturating_sub(input[2]);
+                    ((out0 - 1) * stride[0] + ((kernel[0] - 1) + 1)).saturating_sub(input[2]);
                 let pad1 =
-                    ((out1 - 1) * stride[1] + ((kernel[1] - 1) * 1 + 1)).saturating_sub(input[3]);
+                    ((out1 - 1) * stride[1] + ((kernel[1] - 1) + 1)).saturating_sub(input[3]);
                 assert!(auto_pad == "SAME_UPPER");
                 let new_padding = vec![pad0 / 2, pad1 / 2, pad0 - pad0 / 2, pad1 - pad1 / 2];
                 maxpool.padding = new_padding.into();
@@ -430,8 +430,8 @@ pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<Tensor
             let output_shape = vec![
                 input[0],
                 input[1],
-                (h_in + (padding[0] + padding[2]) - 1 * (kernel[0] - 1) - 1) / stride[0] + 1,
-                (w_in + (padding[1] + padding[3]) - 1 * (kernel[1] - 1) - 1) / stride[1] + 1,
+                (h_in + (padding[0] + padding[2]) - (kernel[0] - 1) - 1) / stride[0] + 1,
+                (w_in + (padding[1] + padding[3]) - (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
             // defs.push(output_shape.into());
             defs.push(TensorDef::new(
@@ -541,7 +541,7 @@ pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<Tensor
             assert!(!unsqueeze.axes.is_empty());
             assert!(unsqueeze.axes.iter().all(|&x| x >= 0));
             let in_dims = inputs[Node::UNSQUEEZE_IN].dims().as_slice().to_vec();
-            let mut dims = in_dims.clone();
+            let mut dims = in_dims;
             for &x in unsqueeze.axes.iter() {
                 dims.insert(x as usize, 1);
             }
@@ -616,7 +616,7 @@ pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<Tensor
                 dims[axis] = out_dim;
             }
             defs.push(TensorDef::new(
-                dims.into(),
+                dims,
                 inputs[Node::SLICE_IN_DATA].elem_ty(),
             ))
         }

@@ -15,20 +15,19 @@ fn main() {
     let mut inputs = vec![];
     for line in fs::read_to_string(Path::new(&mnist_root).join("MNIST_test.txt"))
         .unwrap()
-        .split("\n")
+        .split('\n')
     {
         if line.is_empty() {
             continue;
         }
-        let nums: Vec<&str> = line.split(",").collect();
+        let nums: Vec<&str> = line.split(',').collect();
         let expected: i32 = nums[0].parse().unwrap();
         let pixels: Tensor = Tensor::new(
             vec![1, 1, 28, 28].into(),
             nums[1..]
                 .iter()
                 .map(|s| s.parse::<f32>().unwrap() / 255.0)
-                .collect::<Vec<_>>()
-                .into(),
+                .collect::<Vec<_>>(),
         );
         inputs.push((expected, pixels));
     }

@@ -296,7 +296,7 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             }
         }
 
-        return;
+        
     }
 }
 

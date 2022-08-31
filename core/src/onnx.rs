@@ -7,8 +7,8 @@ use crate::{
     dim::Dimensions,
     model::Model,
     node::{
-        Cast, Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool, Node, Op, ReduceMin,
-        Resize, Squeeze, Transpose,
+        BatchNormalization, Cast, Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool,
+        Node, Op, ReduceMin, Resize, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorDef, TensorElemType},
 };
@@ -248,6 +248,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 beta: get_attribute(&node.attribute, "beta").map_or(1.0, |a| a.f()),
                 trans_a: get_attribute(&node.attribute, "transA").map_or(false, |a| a.i() == 1),
                 trans_b: get_attribute(&node.attribute, "transB").map_or(false, |a| a.i() == 1),
+            }),
+            "BatchNormalization" => Op::BatchNormalization(BatchNormalization {
+                epsilon: get_attribute(&node.attribute, "epsilon").map_or(1e-5, |a| a.f()),
+                momentum: get_attribute(&node.attribute, "momentum").map_or(1e-5, |a| a.f()),
+                training_mode: get_attribute(&node.attribute, "training_mode")
+                    .map_or(false, |a| a.i() != 0),
             }),
             op => todo!("op: {}", op),
         };

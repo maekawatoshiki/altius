@@ -44,6 +44,7 @@ pub enum Op {
     NonMaxSuppression,
     MatMul,
     Gemm(Gemm),
+    BatchNormalization(BatchNormalization),
     HardSigmoid(HardSigmoid),
 }
 
@@ -127,6 +128,13 @@ pub struct Gemm {
     pub beta: f32,
     pub trans_a: bool,
     pub trans_b: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct BatchNormalization {
+    pub epsilon: f32,
+    pub momentum: f32,
+    pub training_mode: bool,
 }
 
 impl Node {
@@ -230,6 +238,12 @@ impl Node {
     pub const GEMM_IN_C: usize = 2;
     pub const GEMM_OUT: usize = 0;
 
+    pub const BATCHNORM_IN_X: usize = 0;
+    pub const BATCHNORM_IN_SCALE: usize = 1;
+    pub const BATCHNORM_IN_B: usize = 2;
+    pub const BATCHNORM_IN_INPUT_MEAN: usize = 3;
+    pub const BATCHNORM_IN_INPUT_VAR: usize = 4;
+
     pub const HARDSIGMOID_IN: usize = 0;
     pub const HARDSIGMOID_OUT: usize = 0;
 
@@ -296,6 +310,7 @@ impl Op {
             Op::NonMaxSuppression => "NonMaxSuppression",
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
+            Op::BatchNormalization(_) => "BatchNormalization",
             Op::HardSigmoid(_) => "HardSigmoid",
         }
     }
@@ -615,10 +630,7 @@ pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<Tensor
                 assert!(out_dim > 0);
                 dims[axis] = out_dim;
             }
-            defs.push(TensorDef::new(
-                dims,
-                inputs[Node::SLICE_IN_DATA].elem_ty(),
-            ))
+            defs.push(TensorDef::new(dims, inputs[Node::SLICE_IN_DATA].elem_ty()))
         }
         Op::NonMaxSuppression => {
             todo!()
@@ -677,6 +689,10 @@ pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<Tensor
         }
         Op::Exp => {
             let input = inputs[Node::EXP_IN];
+            defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
+        }
+        Op::BatchNormalization(_) => {
+            let input = inputs[Node::BATCHNORM_IN_X];
             defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
         }
     }

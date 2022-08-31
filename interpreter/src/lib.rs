@@ -3,8 +3,8 @@ mod conv2d;
 use altius_core::{
     model::Model,
     node::{
-        compute_output_tensor_defs, Cast, Concat, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool,
-        Node, NodeId, Op, Squeeze, Transpose,
+        compute_output_tensor_defs, BatchNormalization, Cast, Concat, Flatten, Gemm, HardSigmoid,
+        LeakyReLU, MaxPool, Node, NodeId, Op, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorDef},
     value::ValueId,
@@ -167,6 +167,9 @@ impl<'a> Interpreter<'a> {
             Op::Loop => compute_loop(node, &inputs, &mut outputs),
             Op::Tile => compute_tile(node, &inputs, &mut outputs),
             Op::Cast(ref cast) => compute_cast(cast, &inputs, &mut outputs),
+            Op::BatchNormalization(ref batchnorm) => {
+                compute_batch_normalization(batchnorm, &inputs, &mut outputs)
+            }
             Op::Slice => todo!("slice"),
             Op::NonMaxSuppression => todo!("nms"),
         }
@@ -525,6 +528,14 @@ fn compute_cast(cast: &Cast, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     } else {
         todo!()
     }
+}
+
+fn compute_batch_normalization(
+    _batchnorm: &BatchNormalization,
+    _inputs: &[&Tensor],
+    _outputs: &mut [Tensor],
+) {
+    todo!("batch normalization")
 }
 
 fn compute_reshape(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

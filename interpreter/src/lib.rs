@@ -6,7 +6,7 @@ use altius_core::{
         compute_output_tensor_defs, BatchNormalization, Cast, Concat, Flatten, Gemm, HardSigmoid,
         LeakyReLU, MaxPool, Node, NodeId, Op, Squeeze, Transpose,
     },
-    tensor::{Tensor, TensorDef},
+    tensor::{Tensor, TensorDef, TensorElemType},
     value::ValueId,
 };
 use conv2d::Conv2dCtx;
@@ -531,11 +531,56 @@ fn compute_cast(cast: &Cast, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_batch_normalization(
-    _batchnorm: &BatchNormalization,
-    _inputs: &[&Tensor],
-    _outputs: &mut [Tensor],
+    batchnorm: &BatchNormalization,
+    inputs: &[&Tensor],
+    outputs: &mut [Tensor],
 ) {
-    todo!("batch normalization")
+    let data = inputs[Node::BATCHNORM_IN_X];
+    let scale = inputs[Node::BATCHNORM_IN_SCALE];
+    let bias = inputs[Node::BATCHNORM_IN_B];
+    let input_mean = inputs[Node::BATCHNORM_IN_INPUT_MEAN];
+    let input_var = inputs[Node::BATCHNORM_IN_INPUT_VAR];
+    let output = &mut outputs[Node::BATCHNORM_OUT_Y];
+
+    assert!(!batchnorm.training_mode, "Training mode is not supported.");
+    assert!(
+        data.elem_ty() == TensorElemType::F32,
+        "Input data type must be f32."
+    );
+    assert!(data.dims().len() == 4, "Input data rank must be 4.");
+    assert!(scale.dims().len() == 1, "Scale rank must be 1.");
+    assert!(bias.dims().len() == 1, "Bias rank must be 1.");
+    assert!(input_mean.dims().len() == 1, "Input mean rank must be 1.");
+    assert!(input_var.dims().len() == 1, "Input var rank must be 1.");
+
+    let num_batch = data.dims()[0];
+    let num_channel = data.dims()[1];
+    let num_dim0 = data.dims()[2];
+    let num_dim1 = data.dims()[3];
+    let data_strides = data.strides();
+    let data_raw = data.data::<f32>();
+    let scale_raw = scale.data::<f32>();
+    let bias_raw = bias.data::<f32>();
+    let input_mean_raw = input_mean.data::<f32>();
+    let input_var_raw = input_var.data::<f32>();
+    let output_raw = output.data_mut::<f32>();
+
+    for n in 0..num_batch {
+        let off_n = n * data_strides[0];
+        for b in 0..num_channel {
+            let off_b = off_n + b * data_strides[1];
+            for h in 0..num_dim0 {
+                let off_h = off_b + h * data_strides[2];
+                for w in 0..num_dim1 {
+                    let off_w = off_h + w; // * data_strides[3];
+                    output_raw[off_w] = ((data_raw[off_w] - input_mean_raw[b])
+                        / (input_var_raw[b] + batchnorm.epsilon).sqrt())
+                        * scale_raw[b]
+                        + bias_raw[b];
+                }
+            }
+        }
+    }
 }
 
 fn compute_reshape(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

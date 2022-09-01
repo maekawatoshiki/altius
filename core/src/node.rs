@@ -243,6 +243,7 @@ impl Node {
     pub const BATCHNORM_IN_B: usize = 2;
     pub const BATCHNORM_IN_INPUT_MEAN: usize = 3;
     pub const BATCHNORM_IN_INPUT_VAR: usize = 4;
+    pub const BATCHNORM_OUT_Y: usize = 0;
 
     pub const HARDSIGMOID_IN: usize = 0;
     pub const HARDSIGMOID_OUT: usize = 0;

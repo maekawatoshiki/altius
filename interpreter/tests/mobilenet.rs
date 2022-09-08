@@ -12,7 +12,7 @@ fn mobilenet() {
 
     // Change input batch size from 1 to 4.
     model.values.inner_mut()[input_value]
-        .tensor_def
+        .shape
         .as_mut()
         .unwrap()
         .dims

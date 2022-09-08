@@ -11,7 +11,7 @@ rustc-hash = "1.1.0"
 prost = "^0.10"
 thiserror = "1.0.31"
 log = "0.4.17"
-mimalloc = { version = "0.1.29", default-features = false }
+mimalloc = { version = "0.1.29", default-features = false, features = ["local_dynamic_tls"] }
 
 [build-dependencies]
 prost-build = "^0.10"

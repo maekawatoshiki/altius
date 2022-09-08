@@ -672,40 +672,17 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 inputs[Node::GEMM_IN_A].elem_ty(),
             ));
         }
-        Op::ReLU => {
-            let input = inputs[Node::RELU_IN];
-            defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
-        }
-        Op::LeakyReLU(_) => {
-            let input = inputs[Node::LEAKYRELU_IN];
-            defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
-        }
-        Op::Sigmoid => {
-            let input = inputs[Node::SIGMOID_IN];
-            defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
-        }
-        Op::Clip => {
-            let input = inputs[Node::CLIP_IN];
-            defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
-        }
-        Op::Cast(_) => {
-            let input = inputs[Node::CAST_IN];
-            defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
-        }
-        Op::HardSigmoid(_) => {
-            let input = inputs[Node::HARDSIGMOID_IN];
-            defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
-        }
-        Op::Round => {
-            let input = inputs[Node::ROUND_IN];
-            defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
-        }
-        Op::Exp => {
-            let input = inputs[Node::EXP_IN];
-            defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
-        }
-        Op::BatchNormalization(_) => {
-            let input = inputs[Node::BATCHNORM_IN_X];
+        // Element-wise operations.
+        Op::ReLU
+        | Op::LeakyReLU(_)
+        | Op::Sigmoid
+        | Op::Clip
+        | Op::Cast(_)
+        | Op::HardSigmoid(_)
+        | Op::Round
+        | Op::Exp
+        | Op::BatchNormalization(_) => {
+            let input = inputs[0];
             defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
         }
     }

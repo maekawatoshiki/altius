@@ -25,6 +25,7 @@ pub enum Op {
     ReLU,
     LeakyReLU(LeakyReLU),
     Sigmoid,
+    Clip,
     Cast(Cast),
     MaxPool(MaxPool),
     GlobalAveragePool,
@@ -168,6 +169,9 @@ impl Node {
     pub const SIGMOID_IN: usize = 0;
     pub const SIGMOID_OUT: usize = 0;
 
+    pub const CLIP_IN: usize = 0;
+    pub const CLIP_OUT: usize = 0;
+
     pub const CAST_IN: usize = 0;
     pub const CAST_OUT: usize = 0;
 
@@ -292,6 +296,7 @@ impl Op {
             Op::ReLU => "ReLU",
             Op::LeakyReLU(_) => "LeakyReLU",
             Op::Sigmoid => "Sigmoid",
+            Op::Clip => "Clip",
             Op::Cast(_) => "Cast",
             Op::MaxPool(_) => "MaxPool",
             Op::GlobalAveragePool => "GlobalAveragePool",
@@ -674,6 +679,10 @@ pub fn compute_output_tensor_defs(op: &mut Op, inputs: &[&Tensor]) -> Vec<Tensor
         }
         Op::Sigmoid => {
             let input = inputs[Node::SIGMOID_IN];
+            defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
+        }
+        Op::Clip => {
+            let input = inputs[Node::CLIP_IN];
             defs.push(TensorDef::new(input.dims().clone(), input.elem_ty()));
         }
         Op::Cast(_) => {

@@ -10,7 +10,7 @@ use crate::{
         BatchNormalization, Cast, Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool,
         Node, Op, ReduceMin, Resize, Squeeze, Transpose,
     },
-    tensor::{Tensor, TensorDef, TensorElemType},
+    tensor::{Tensor, TensorElemType, TypedShape},
 };
 
 use tensor_proto::DataType;
@@ -76,7 +76,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             *name_to_val.entry(x.name()).or_insert_with(|| {
                 model.values.new_val_named_and_shaped(
                     x.name(),
-                    TensorDef::new(
+                    TypedShape::new(
                         Dimensions::from_i64(&dims),
                         DataType::from_i32(tensor.elem_type()).unwrap().into(),
                     ),

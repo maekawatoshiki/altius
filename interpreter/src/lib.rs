@@ -3,10 +3,10 @@ mod conv2d;
 use altius_core::{
     model::Model,
     node::{
-        compute_output_tensor_defs, BatchNormalization, Cast, Concat, Flatten, Gemm, HardSigmoid,
+        compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gemm, HardSigmoid,
         LeakyReLU, MaxPool, Node, NodeId, Op, Squeeze, Transpose,
     },
-    tensor::{Tensor, TensorDef, TensorElemType},
+    tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
 };
 use conv2d::Conv2dCtx;
@@ -38,22 +38,22 @@ pub struct Interpreter<'a> {
     #[cfg(feature = "cuda")]
     cudnn_ctx: SafeCudnnContext,
     sorted_nodes: Vec<NodeId>,
-    inferred_tensor_defs: FxHashMap<NodeId, (Op, Vec<TensorDef>)>,
+    inferred_shapes: FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     enable_profiling: bool,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new(model: &'a Model) -> Self {
         let sorted_nodes = model.topo_sort_nodes();
-        let mut inferred_tensor_defs = FxHashMap::default();
-        infer_tensor_defs(model, &sorted_nodes, &mut inferred_tensor_defs);
+        let mut inferred_shapes = FxHashMap::default();
+        infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
 
         Interpreter {
             model,
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
             sorted_nodes,
-            inferred_tensor_defs,
+            inferred_shapes,
             enable_profiling: false,
         }
     }
@@ -116,19 +116,19 @@ impl<'a> Interpreter<'a> {
             .iter()
             .map(|input| &values[input])
             .collect::<Vec<_>>();
-        // Use inferred tensor defs if any.
-        let (op, output_tensor_defs) = self
-            .inferred_tensor_defs
-            .get(&node_id)
-            .cloned()
-            .unwrap_or_else(|| {
-                let mut op = node.op.clone();
-                let output_tensor_defs = compute_output_tensor_defs(&mut op, &inputs);
-                (op, output_tensor_defs)
-            });
-        let mut outputs = output_tensor_defs
+        // Use inferred shapes if any.
+        let (op, output_shapes) =
+            self.inferred_shapes
+                .get(&node_id)
+                .cloned()
+                .unwrap_or_else(|| {
+                    let mut op = node.op.clone();
+                    let output_shapes = compute_output_shapes(&mut op, &inputs);
+                    (op, output_shapes)
+                });
+        let mut outputs = output_shapes
             .into_iter()
-            .map(|TensorDef { elem_ty, dims }| Tensor::zeros_of_type(elem_ty, dims))
+            .map(|TypedShape { elem_ty, dims }| Tensor::zeros_of_type(elem_ty, dims))
             .collect::<Vec<_>>();
 
         let start = Instant::now();
@@ -613,32 +613,32 @@ fn compute_flatten(_flatten: &Flatten, inputs: &[&Tensor], outputs: &mut [Tensor
 }
 
 // TODO: Better move to another file.
-/// Infer `TensorDef`s of output tensors for each node.
+/// Infer `TypedShape`s of output tensors for each node.
 /// It skips to infer on nodes without information for inference.
-fn infer_tensor_defs(
+fn infer_shapes(
     model: &Model,
     sorted_nodes: &[NodeId],
-    shapes: &mut FxHashMap<NodeId, (Op, Vec<TensorDef>)>,
+    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
 ) {
     let mut values = model.inits.clone();
 
     for &val_id in &model.inputs {
-        let tensor_def = &model.values.inner()[val_id].tensor_def;
-        if let Some(tensor_def) = tensor_def {
-            let tensor = Tensor::zeros_of_type(tensor_def.elem_ty, tensor_def.dims.clone());
+        let shape = &model.values.inner()[val_id].shape;
+        if let Some(shape) = shape {
+            let tensor = Tensor::zeros_of_type(shape.elem_ty, shape.dims.clone());
             values.insert(val_id, tensor);
         }
     }
 
     for &node in sorted_nodes {
-        infer_tensor_def(model, &mut values, shapes, node)
+        infer_shape(model, &mut values, shapes, node)
     }
 }
 
-fn infer_tensor_def(
+fn infer_shape(
     model: &Model,
     values: &mut FxHashMap<ValueId, Tensor>,
-    shapes: &mut FxHashMap<NodeId, (Op, Vec<TensorDef>)>,
+    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     node_id: NodeId,
 ) {
     let node = &model.nodes[node_id];
@@ -652,16 +652,13 @@ fn infer_tensor_def(
         };
         inputs.push(input);
     }
-    let output_tensor_defs = compute_output_tensor_defs(&mut op, &inputs);
+    let output_shapes = compute_output_shapes(&mut op, &inputs);
     let mut outputs = vec![];
-    for tensor_def in &output_tensor_defs {
-        outputs.push(Tensor::zeros_of_type(
-            tensor_def.elem_ty,
-            tensor_def.dims.clone(),
-        ));
+    for shape in &output_shapes {
+        outputs.push(Tensor::zeros_of_type(shape.elem_ty, shape.dims.clone()));
     }
     for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
         values.insert(val, output);
     }
-    shapes.insert(node_id, (op, output_tensor_defs));
+    shapes.insert(node_id, (op, output_shapes));
 }

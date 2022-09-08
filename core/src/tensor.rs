@@ -8,8 +8,9 @@ pub struct Tensor {
     elem_ty: TensorElemType,
 }
 
+/// Represents a type and shape of a tensor.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TensorDef {
+pub struct TypedShape {
     pub dims: Dimensions,
     pub elem_ty: TensorElemType,
 }
@@ -197,7 +198,7 @@ impl Tensor {
     }
 }
 
-impl TensorDef {
+impl TypedShape {
     pub fn new(dims: Dimensions, elem_ty: TensorElemType) -> Self {
         Self { dims, elem_ty }
     }

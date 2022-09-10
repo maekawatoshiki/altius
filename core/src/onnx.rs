@@ -255,6 +255,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 training_mode: get_attribute(&node.attribute, "training_mode")
                     .map_or(false, |a| a.i() != 0),
             }),
+            "Clip" => Op::Clip,
             op => todo!("op: {}", op),
         };
 

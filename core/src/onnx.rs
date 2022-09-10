@@ -8,7 +8,7 @@ use crate::{
     model::Model,
     node::{
         BatchNormalization, Cast, Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool,
-        Node, Op, ReduceMin, Resize, Squeeze, Transpose,
+        Node, Op, ReduceMin, Resize, Shape, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
 };
@@ -256,6 +256,10 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     .map_or(false, |a| a.i() != 0),
             }),
             "Clip" => Op::Clip,
+            "Shape" => Op::Shape(Shape {
+                end: get_attribute(&node.attribute, "end").map_or(None, |a| a.i),
+                start: get_attribute(&node.attribute, "start").map_or(0, |a| a.i()),
+            }),
             op => todo!("op: {}", op),
         };
 

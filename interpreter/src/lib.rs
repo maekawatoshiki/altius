@@ -172,6 +172,7 @@ impl<'a> Interpreter<'a> {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
             Op::Slice => todo!("slice"),
+            Op::Shape(_) => todo!("shape"),
             Op::NonMaxSuppression => todo!("nms"),
         }
 
@@ -299,8 +300,6 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                 }
             }
         }
-
-        
     }
 }
 

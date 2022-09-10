@@ -325,7 +325,7 @@ impl Op {
 /// Computes the output shape for `op`.
 /// `op` could be overwritten. (e.g. paddings given auto_pad)
 pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape> {
-    let mut defs = vec![];
+    let mut shapes = vec![];
     match op {
         Op::Conv2d(conv) => {
             let auto_pad = &conv.auto_pad;
@@ -368,7 +368,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 (h_in + pad_h - (kernel[0] - 1) - 1) / stride[0] + 1,
                 (w_in + pad_w - (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 output_shape.into(),
                 inputs[Node::CONV2D_IN].elem_ty(),
             ));
@@ -385,7 +385,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                         && in_b[2] == 1
                 }
             ); // TODO: Support broadcasting.
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 in_a.clone(),
                 inputs[Node::ADD_IN_A].elem_ty(),
             ));
@@ -394,7 +394,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let in_a = inputs[Node::SUB_IN_A].dims();
             let in_b = inputs[Node::SUB_IN_B].dims();
             assert!(in_a == in_b);
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 in_a.clone(),
                 inputs[Node::SUB_IN_A].elem_ty(),
             ));
@@ -412,7 +412,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                         && in_a[3] == 1
                 }
             ); // TODO: Support broadcasting.
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 in_b.clone(),
                 inputs[Node::MUL_IN_B].elem_ty(),
             ));
@@ -421,7 +421,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let in_a = inputs[Node::DIV_IN_A].dims();
             let in_b = inputs[Node::DIV_IN_B].dims();
             assert!(in_a == in_b);
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 in_a.clone(),
                 inputs[Node::DIV_IN_A].elem_ty(),
             ));
@@ -454,8 +454,8 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 (h_in + (padding[0] + padding[2]) - (kernel[0] - 1) - 1) / stride[0] + 1,
                 (w_in + (padding[1] + padding[3]) - (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
-            // defs.push(output_shape.into());
-            defs.push(TypedShape::new(
+            // shapes.push(output_shape.into());
+            shapes.push(TypedShape::new(
                 output_shape.into(),
                 inputs[Node::MAXPOOL_IN].elem_ty(),
             ));
@@ -463,7 +463,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         Op::GlobalAveragePool => {
             let input = &inputs[Node::GLOBALAVERAGEPOOL_IN].dims();
             assert!(input.len() == 4);
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 vec![input[0], input[1], 1, 1].into(),
                 inputs[Node::GLOBALAVERAGEPOOL_IN].elem_ty(),
             ));
@@ -485,7 +485,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                     }
                 })
                 .collect::<Vec<_>>();
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 shape.into(),
                 inputs[Node::RESHAPE_IN].elem_ty(),
             ))
@@ -495,7 +495,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             assert!(flatten.axis >= 0);
             let x: Dimensions = dims[..flatten.axis as usize].to_vec().into();
             let y: Dimensions = dims[flatten.axis as usize..].to_vec().into();
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 vec![x.total_elems(), y.total_elems()].into(),
                 inputs[Node::FLATTEN_IN].elem_ty(),
             ));
@@ -510,7 +510,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             assert!(x.dims().len() == 4);
             let roi = &inputs[Node::RESIZE_IN_ROI].data::<f32>();
             let scales = &inputs[Node::RESIZE_IN_SCALES].data::<f32>();
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 vec![
                     (x.dims()[0] as f32 * (roi[4] - roi[0]) * scales[0]).floor() as usize,
                     (x.dims()[1] as f32 * (roi[5] - roi[1]) * scales[1]).floor() as usize,
@@ -528,7 +528,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 sum += i.dims()[concat.axis as usize];
             }
             dims.as_mut_slice()[concat.axis as usize] = sum;
-            defs.push(TypedShape::new(dims, inputs[Node::CONCAT_IN].elem_ty()))
+            shapes.push(TypedShape::new(dims, inputs[Node::CONCAT_IN].elem_ty()))
         }
         Op::Transpose(trans) => {
             assert!(!trans.perm.is_empty());
@@ -537,7 +537,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             for i in 0..in_dims.len() {
                 dims[i] = in_dims[trans.perm[i] as usize];
             }
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 dims.into(),
                 inputs[Node::TRANSPOSE_IN].elem_ty(),
             ))
@@ -553,7 +553,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 }
                 dims.push(x);
             }
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 dims.into(),
                 inputs[Node::SQUEEZE_IN].elem_ty(),
             ))
@@ -566,7 +566,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             for &x in unsqueeze.axes.iter() {
                 dims.insert(x as usize, 1);
             }
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 dims.into(),
                 inputs[Node::UNSQUEEZE_IN].elem_ty(),
             ))
@@ -586,7 +586,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             if dims.is_empty() {
                 dims.push(1);
             }
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 dims.into(),
                 inputs[Node::REDUCEMIN_IN].elem_ty(),
             ))
@@ -599,8 +599,8 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let v_initial = inputs[2].data::<i32>();
             assert!(v_initial[0] == 0);
             todo!()
-            // defs.push(vec![1].into());
-            // defs.push(vec![m[0] as usize].into());
+            // shapes.push(vec![1].into());
+            // shapes.push(vec![m[0] as usize].into());
         }
         Op::Tile => {
             let in_dims = inputs[Node::TILE_IN].dims();
@@ -609,7 +609,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             for (i, &x) in in_dims.as_slice().iter().enumerate() {
                 dims.push(x * reps[i as usize] as usize);
             }
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 dims.into(),
                 inputs[Node::TILE_IN].elem_ty(),
             ));
@@ -639,7 +639,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 assert!(out_dim > 0);
                 dims[axis] = out_dim;
             }
-            defs.push(TypedShape::new(dims, inputs[Node::SLICE_IN_DATA].elem_ty()))
+            shapes.push(TypedShape::new(dims, inputs[Node::SLICE_IN_DATA].elem_ty()))
         }
         Op::NonMaxSuppression => {
             todo!()
@@ -648,7 +648,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let in_a = &inputs[Node::MATMUL_IN_A].dims();
             let in_b = &inputs[Node::MATMUL_IN_B].dims();
             assert_eq!(in_a[1], in_b[0]);
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 vec![in_a[0], in_b[1]].into(),
                 inputs[Node::MATMUL_IN_A].elem_ty(),
             ));
@@ -667,7 +667,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 (in_b[0], in_b[1])
             };
             assert_eq!(in_a1, in_b0);
-            defs.push(TypedShape::new(
+            shapes.push(TypedShape::new(
                 vec![in_a0, in_b1].into(),
                 inputs[Node::GEMM_IN_A].elem_ty(),
             ));
@@ -683,8 +683,8 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         | Op::Exp
         | Op::BatchNormalization(_) => {
             let input = inputs[0];
-            defs.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
+            shapes.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
         }
     }
-    defs
+    shapes
 }

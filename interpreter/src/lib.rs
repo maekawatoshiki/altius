@@ -174,6 +174,7 @@ impl<'a> Interpreter<'a> {
             Op::Slice => todo!("slice"),
             Op::Shape(_) => todo!("shape"),
             Op::NonMaxSuppression => todo!("nms"),
+            Op::Constant(_) => todo!("constant"),
         }
 
         let elapsed = start.elapsed();

@@ -1,6 +1,6 @@
 use crate::dim::{Dimension, Dimensions};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tensor {
     dims: Dimensions,
     stride: Dimensions,

@@ -48,6 +48,7 @@ pub enum Op {
     Gemm(Gemm),
     BatchNormalization(BatchNormalization),
     HardSigmoid(HardSigmoid),
+    Constant(Constant),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -144,6 +145,13 @@ pub struct BatchNormalization {
     pub epsilon: f32,
     pub momentum: f32,
     pub training_mode: bool,
+}
+
+/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Constant
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Constant {
+    pub value: Tensor,
+    // TODO: Other attributes
 }
 
 impl Node {
@@ -327,6 +335,7 @@ impl Op {
             Op::Gemm(_) => "Gemm",
             Op::BatchNormalization(_) => "BatchNormalization",
             Op::HardSigmoid(_) => "HardSigmoid",
+            Op::Constant(_) => "Constant",
         }
     }
 }
@@ -683,6 +692,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 vec![in_a0, in_b1].into(),
                 inputs[Node::GEMM_IN_A].elem_ty(),
             ));
+        }
+        Op::Constant(_) => {
+            todo!()
         }
         // Element-wise operations.
         Op::ReLU

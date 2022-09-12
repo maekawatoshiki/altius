@@ -7,8 +7,8 @@ use crate::{
     dim::Dimensions,
     model::Model,
     node::{
-        BatchNormalization, Cast, Concat, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU, MaxPool,
-        Node, Op, ReduceMin, Resize, Shape, Squeeze, Transpose,
+        BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU,
+        MaxPool, Node, Op, ReduceMin, Resize, Shape, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
 };
@@ -257,8 +257,18 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             }),
             "Clip" => Op::Clip,
             "Shape" => Op::Shape(Shape {
-                end: get_attribute(&node.attribute, "end").map_or(None, |a| a.i),
+                end: get_attribute(&node.attribute, "end").and_then(|a| a.i),
                 start: get_attribute(&node.attribute, "start").map_or(0, |a| a.i()),
+            }),
+            "Constant" => Op::Constant(Constant {
+                value: get_tensor(get_attribute(&node.attribute, "value").map_or_else(
+                    || {
+                        Err(ModelLoadError::Todo(
+                            "Constant.value must be specified for now".into(),
+                        ))
+                    },
+                    |a| Ok(a.t.as_ref().unwrap()),
+                )?),
             }),
             op => todo!("op: {}", op),
         };

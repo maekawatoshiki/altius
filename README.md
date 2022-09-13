@@ -5,6 +5,10 @@
 
 Small DNN runtime written in Rust
 
+# Requirements
+
+- [git-lfs](https://github.com/git-lfs/git-lfs) to pull ONNX models
+
 # Run
 
 ```sh

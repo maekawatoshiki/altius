@@ -1,5 +1,5 @@
 use altius_core::{onnx::load_onnx, tensor::Tensor};
-use altius_interpreter::Interpreter;
+use altius_session::Interpreter;
 use std::cmp::Ordering;
 use std::path::Path;
 

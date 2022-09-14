@@ -109,7 +109,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         }
     }
 
-    output.set_raw_vec(output_.into_raw_vec())
+    output.set_raw_vec(output_.into_raw_vec());
 }
 
 #[cfg(feature = "cuda")]

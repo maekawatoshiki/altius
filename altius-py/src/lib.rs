@@ -1,10 +1,10 @@
 extern crate altius_core;
-extern crate altius_interpreter;
+extern crate altius_session;
 
 use std::collections::HashMap;
 
 use altius_core::{model::Model, tensor::Tensor};
-use altius_interpreter::Interpreter;
+use altius_session::Interpreter;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 
 use numpy::ndarray::ArrayD;

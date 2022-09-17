@@ -1,3 +1,5 @@
+use rand::{distributions::Standard, thread_rng, Rng};
+
 use crate::dim::{Dimension, Dimensions};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,6 +76,40 @@ impl Tensor {
             TensorElemType::F32 => Self::new(dims, vec![0.0f32; total_elems]),
             TensorElemType::I32 => Self::new(dims, vec![0i32; total_elems]),
             TensorElemType::I64 => Self::new(dims, vec![0i64; total_elems]),
+        }
+    }
+
+    pub fn rand<T>(dims: Dimensions) -> Self
+    where
+        T: TensorElemTypeExt,
+    {
+        let total_elems = dims.total_elems();
+        let rng = thread_rng();
+        match T::get_type() {
+            TensorElemType::Bool => Self::new(
+                dims,
+                rng.sample_iter(Standard)
+                    .take(total_elems)
+                    .collect::<Vec<u8>>(),
+            ),
+            TensorElemType::F32 => Self::new(
+                dims,
+                rng.sample_iter(Standard)
+                    .take(total_elems)
+                    .collect::<Vec<f32>>(),
+            ),
+            TensorElemType::I32 => Self::new(
+                dims,
+                rng.sample_iter(Standard)
+                    .take(total_elems)
+                    .collect::<Vec<i32>>(),
+            ),
+            TensorElemType::I64 => Self::new(
+                dims,
+                rng.sample_iter(Standard)
+                    .take(total_elems)
+                    .collect::<Vec<i64>>(),
+            ),
         }
     }
 

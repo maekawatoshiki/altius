@@ -153,7 +153,7 @@ impl<'a> Interpreter<'a> {
             Op::MatMul => compute_mat_mul(node, &inputs, &mut outputs),
             Op::Gemm(ref gemm) => compute_gemm(gemm, &inputs, &mut outputs),
             Op::ReLU => compute_relu(node, &inputs, &mut outputs),
-            Op::HardSigmoid(ref hs) => compute_hard_sigomid(hs, &inputs, &mut outputs),
+            Op::HardSigmoid(ref hs) => compute_hard_sigmoid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
             Op::Sigmoid => todo!("sigmoid"),
             Op::Clip => todo!("clip"),
@@ -445,7 +445,7 @@ fn compute_relu(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     }
 }
 
-fn compute_hard_sigomid(hs: &HardSigmoid, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_hard_sigmoid(hs: &HardSigmoid, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input = inputs[Node::HARDSIGMOID_IN];
     let output = &mut outputs[Node::HARDSIGMOID_OUT];
 

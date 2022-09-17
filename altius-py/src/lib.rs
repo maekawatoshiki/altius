@@ -4,7 +4,7 @@ extern crate altius_session;
 use std::collections::HashMap;
 
 use altius_core::{model::Model, tensor::Tensor};
-use altius_session::Interpreter;
+use altius_session::interpreter::Interpreter;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 
 use numpy::ndarray::ArrayD;

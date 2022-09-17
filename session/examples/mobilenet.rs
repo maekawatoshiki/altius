@@ -1,5 +1,5 @@
 use altius_core::{onnx::load_onnx, tensor::Tensor};
-use altius_session::Interpreter;
+use altius_session::interpreter::Interpreter;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
@@ -31,8 +31,10 @@ fn main() {
 
     let i = Interpreter::new(&model).with_profiling(opt.profile);
     #[cfg(feature = "cuda")]
-    Interpreter::new(&model).run(vec![(input_value, input.clone())]); // First run is slow so
-                                                                      // ignore it.
+    Interpreter::new(&model)
+        .run(vec![(input_value, input.clone())])
+        .unwrap(); // First run is slow so
+                   // ignore it.
     let out = i.run(vec![(input_value, input)]).expect("Inference failed");
     let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
     out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));

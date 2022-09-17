@@ -4,7 +4,7 @@ use altius_core::{
 };
 
 #[cfg(feature = "cuda")]
-use crate::SafeCudnnContext;
+use super::SafeCudnnContext;
 #[cfg(feature = "cuda")]
 pub use cudnn::{
     ActivationDescriptor, ActivationMode, ConvDescriptor, ConvFwdAlgo, ConvMode, FilterDescriptor,

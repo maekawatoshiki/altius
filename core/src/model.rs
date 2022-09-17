@@ -1,5 +1,5 @@
 use crate::{
-    node::{NodeArena, NodeId},
+    node::{Node, NodeArena, NodeId},
     tensor::Tensor,
     value::{ValueArena, ValueId},
 };
@@ -15,6 +15,10 @@ pub struct Model {
 }
 
 impl Model {
+    pub fn add_node(&mut self, node: Node) -> NodeId {
+        self.nodes.alloc(node)
+    }
+
     pub fn lookup_named_value(&self, name: &str) -> Option<ValueId> {
         self.values.inner().iter().find_map(|(id, value)| {
             if value.name.as_ref().map_or(false, |nm| nm == name) {

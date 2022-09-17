@@ -13,6 +13,15 @@ fn test_op_add() {
     op_add(vec![128, 3, 224, 224].into());
 }
 
+#[test]
+#[should_panic]
+fn test_op_sub() {
+    op_sub(vec![1, 2].into());
+    op_sub(vec![3, 1, 10].into());
+    op_sub(vec![128, 3, 224, 224].into());
+}
+
+#[cfg(test)]
 fn op_add(shape: Dimensions) {
     let mut model = Model::default();
     let x = model.values.new_val_named("x");
@@ -33,6 +42,33 @@ fn op_add(shape: Dimensions) {
         .iter()
         .zip(y_val.data::<f32>().iter())
         .map(|(&x, &y)| x + y)
+        .collect::<Vec<_>>();
+    let actual = sess.run(vec![(x, x_val), (y, y_val)]).unwrap();
+    assert_eq!(actual.len(), 1);
+    assert!(allclose(actual[0].data::<f32>(), expected.as_slice()));
+}
+
+#[cfg(test)]
+fn op_sub(shape: Dimensions) {
+    let mut model = Model::default();
+    let x = model.values.new_val_named("x");
+    let y = model.values.new_val_named("y");
+    let z = model.values.new_val_named("z");
+
+    model.add_node(Node::new(Op::Sub).with_ins(vec![x, y]).with_out(z));
+    model.inputs.push(x);
+    model.inputs.push(y);
+    model.outputs.push(z);
+
+    let sess = Interpreter::new(&model);
+    let x_val = Tensor::rand::<f32>(shape.to_owned());
+    let y_val = Tensor::rand::<f32>(shape);
+
+    let expected = x_val
+        .data::<f32>()
+        .iter()
+        .zip(y_val.data::<f32>().iter())
+        .map(|(&x, &y)| x - y)
         .collect::<Vec<_>>();
     let actual = sess.run(vec![(x, x_val), (y, y_val)]).unwrap();
     assert_eq!(actual.len(), 1);

@@ -51,13 +51,17 @@ macro_rules! op {
                 .collect::<Vec<_>>();
             let actual = sess.run(vec![(x, x_val), (y, y_val)]).unwrap();
             assert_eq!(actual.len(), 1);
-            assert!(allclose(actual[0].data::<f32>(), expected.as_slice()));
+            assert!(allclose(actual[0].data::<f32>(), expected.as_slice()),
+                "actual: {:?} vs expected: {:?}",
+                &actual[0].data::<f32>()[..10], &expected.as_slice()[..10]);
         }
     };
 }
 
 op!(op_add, Add, +);
 op!(op_sub, Sub, -);
+op!(op_mul, Mul, *);
+op!(op_div, Div, /);
 
 test_op!(test_op_add_1, op_add, vec![1, 2]);
 test_op!(test_op_add_2, op_add, vec![3, 1, 10]);
@@ -66,6 +70,14 @@ test_op!(test_op_add_3, op_add, vec![128, 3, 224, 224]);
 test_op!(!test_op_sub_1, op_sub, vec![1, 2]);
 test_op!(!test_op_sub_2, op_sub, vec![3, 1, 10]);
 test_op!(!test_op_sub_3, op_sub, vec![128, 3, 224, 224]);
+
+test_op!(test_op_mul_1, op_mul, vec![1, 2]);
+test_op!(test_op_mul_2, op_mul, vec![3, 1, 10]);
+test_op!(test_op_mul_3, op_mul, vec![128, 3, 224, 224]);
+
+test_op!(test_op_div_1, op_div, vec![1, 2]);
+test_op!(test_op_div_2, op_div, vec![3, 1, 10]);
+test_op!(test_op_div_3, op_div, vec![128, 3, 224, 224]);
 
 #[cfg(test)]
 fn allclose(x: &[f32], y: &[f32]) -> bool {
@@ -76,7 +88,8 @@ fn allclose(x: &[f32], y: &[f32]) -> bool {
         return false;
     }
 
-    x.iter()
-        .zip(y.iter())
-        .all(|(x, y)| (x - y).abs() <= (atol + rtol * y.abs()))
+    x.iter().zip(y.iter()).all(|(x, y)| {
+        ((x - y).abs() <= (atol + rtol * y.abs()))
+            || (x.is_infinite() && y.is_infinite() && x.is_sign_positive() == y.is_sign_positive())
+    })
 }

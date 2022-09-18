@@ -53,6 +53,7 @@ jobs:
         RUST_LOG=debug cargo test --release
     - name: Coverage
       run: |
+            export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python && \
             cargo install cargo-tarpaulin && \
             cargo tarpaulin --verbose -p altius-core altius-session altius-py --out Xml && \
             bash <(curl -s https://codecov.io/bash)

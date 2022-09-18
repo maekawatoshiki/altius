@@ -29,7 +29,7 @@ def test_add_4():
 
 
 @pytest.mark.xfail
-def test_add_4():
+def test_add_5():
     with tempfile.TemporaryDirectory() as tmpdir:
         op_add(os.path.join(tmpdir, "model.onnx"), "Add", [1, 3, 28, 28], [3, 1, 2])
 
@@ -56,6 +56,36 @@ def test_sub_3():
 def test_sub_4():
     with tempfile.TemporaryDirectory() as tmpdir:
         op_bin(os.path.join(tmpdir, "model.onnx"), "Sub", [1, 3, 28, 28], [3, 1, 1])
+
+
+def test_mul_1():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Mul", [1, 2])
+
+
+def test_mul_2():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Mul", [1, 2, 3, 4, 5, 6, 7])
+
+
+def test_mul_3():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Mul", [128, 3, 224, 224])
+
+
+def test_div_1():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Div", [1, 2])
+
+
+def test_div_2():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Div", [1, 2, 3, 4, 5, 6, 7])
+
+
+def test_div_3():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Div", [128, 3, 224, 224])
 
 
 def op_bin(filepath, op_type, shape_x, shape_y=None, shape_z=None):

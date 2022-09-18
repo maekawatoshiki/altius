@@ -67,12 +67,7 @@ impl Tensor {
 
     pub fn zeros<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
         let total_elems = dims.total_elems();
-        match T::get_type() {
-            TensorElemType::Bool => Self::new(dims, vec![0u8; total_elems]),
-            TensorElemType::F32 => Self::new(dims, vec![0.0f32; total_elems]),
-            TensorElemType::I32 => Self::new(dims, vec![0i32; total_elems]),
-            TensorElemType::I64 => Self::new(dims, vec![0i64; total_elems]),
-        }
+        Self::new(dims, vec![T::zero(); total_elems])
     }
 
     pub fn zeros_of_type(ty: TensorElemType, dims: Dimensions) -> Self {

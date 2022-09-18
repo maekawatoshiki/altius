@@ -152,7 +152,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 })
             }
             "LeakyRelu" => Op::LeakyReLU(LeakyReLU {
-                alpha: get_attribute(&node.attribute, "alpha").unwrap().f(),
+                alpha: get_attribute(&node.attribute, "alpha").map_or(0.01, |a| a.f()),
             }),
             "Resize" => {
                 let coordinate_transformation_mode =

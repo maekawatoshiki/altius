@@ -12,6 +12,6 @@ fi
 
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
-maturin develop -r 
+maturin develop -r --target-dir ./target
 
 python -m pytest . -n 8

@@ -315,7 +315,10 @@ fn compute_strides(dims: &Dimensions) -> Dimensions {
 
 #[test]
 fn create_tensors() {
-    let _ = Tensor::zeros::<f32>(Dimensions(vec![1, 1, 28, 28]));
+    assert!(Tensor::zeros::<u8>(Dimensions(vec![1, 1, 28, 28])).verify());
+    assert!(Tensor::zeros::<f32>(Dimensions(vec![1, 1, 28, 28])).verify());
+    assert!(Tensor::zeros::<i32>(Dimensions(vec![1, 1, 28, 28])).verify());
+    assert!(Tensor::zeros::<i64>(Dimensions(vec![1, 1, 28, 28])).verify());
     let t = Tensor::new(
         vec![4, 4].into(),
         vec![
@@ -339,4 +342,24 @@ fn test_zeros() {
     assert!(all_zero(zeros_f32.data::<f32>()));
     assert!(all_zero(zeros_i32.data::<i32>()));
     assert!(all_zero(zeros_i64.data::<i64>()));
+}
+
+#[test]
+fn test_tensor_elem_type() {
+    assert_eq!(TensorElemType::Bool.size(), 1);
+    assert_eq!(TensorElemType::F32.size(), 4);
+    assert_eq!(TensorElemType::I32.size(), 4);
+    assert_eq!(TensorElemType::I64.size(), 8);
+    assert!(TensorElemType::Bool.is_bool());
+    assert!(TensorElemType::F32.is_f32());
+    assert!(TensorElemType::I32.is_i32());
+    assert!(TensorElemType::I64.is_i64());
+}
+
+#[test]
+fn test_tensor_elem_type_ext() {
+    assert!(<u8 as TensorElemTypeExt>::get_type().is_bool());
+    assert!(<f32 as TensorElemTypeExt>::get_type().is_f32());
+    assert!(<i32 as TensorElemTypeExt>::get_type().is_i32());
+    assert!(<i64 as TensorElemTypeExt>::get_type().is_i64());
 }

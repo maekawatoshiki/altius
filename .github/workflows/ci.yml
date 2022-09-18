@@ -53,7 +53,10 @@ jobs:
         RUST_LOG=debug cargo test --release
     - name: Coverage
       run: |
-            export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python && \
-            cargo install cargo-tarpaulin && \
-            cargo tarpaulin --verbose -p altius-core altius-session altius-py --out Xml && \
+            export RUSTFLAGS="-Cinstrument-coverage" && \
+            export LLVM_PROFILE_FILE="coverage-%p-%m.profraw" && \
+            rustup component add llvm-tools-preview && \
+            cargo install grcov && \
+            cargo test --release && \
+            grcov . --binary-path ./target/release/ -s . -t cobertura --branch --ignore-not-existing --ignore "*cargo*" -o coverage.xml && \
             bash <(curl -s https://codecov.io/bash)

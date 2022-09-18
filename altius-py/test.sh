@@ -10,6 +10,8 @@ else
   source $VENVDIR/bin/activate
 fi
 
+export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+
 maturin develop -r 
 
 python -m pytest . -n 8

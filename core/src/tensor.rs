@@ -1,6 +1,12 @@
-use rand::{distributions::Standard, thread_rng, Rng};
+use std::cell::RefCell;
 
 use crate::dim::{Dimension, Dimensions};
+use rand::{
+    distributions::Standard, prelude::Distribution, rngs::StdRng, thread_rng, Rng, SeedableRng,
+};
+
+thread_local!(static RNG: RefCell<StdRng> =
+    RefCell::new(StdRng::from_rng(thread_rng()).expect("Failed to seed StdRng.")));
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tensor {
@@ -82,35 +88,22 @@ impl Tensor {
     pub fn rand<T>(dims: Dimensions) -> Self
     where
         T: TensorElemTypeExt,
+        Standard: Distribution<T>,
     {
         let total_elems = dims.total_elems();
-        let rng = thread_rng();
-        match T::get_type() {
-            TensorElemType::Bool => Self::new(
-                dims,
-                rng.sample_iter(Standard)
+        Self::new(
+            dims,
+            RNG.with(|r| {
+                (&mut *r.borrow_mut())
+                    .sample_iter(Standard)
                     .take(total_elems)
-                    .collect::<Vec<u8>>(),
-            ),
-            TensorElemType::F32 => Self::new(
-                dims,
-                rng.sample_iter(Standard)
-                    .take(total_elems)
-                    .collect::<Vec<f32>>(),
-            ),
-            TensorElemType::I32 => Self::new(
-                dims,
-                rng.sample_iter(Standard)
-                    .take(total_elems)
-                    .collect::<Vec<i32>>(),
-            ),
-            TensorElemType::I64 => Self::new(
-                dims,
-                rng.sample_iter(Standard)
-                    .take(total_elems)
-                    .collect::<Vec<i64>>(),
-            ),
-        }
+                    .collect::<Vec<T>>()
+            }),
+        )
+    }
+
+    pub fn seed_rng_from_u64(seed: u64) {
+        RNG.with(|r| *r.borrow_mut() = StdRng::seed_from_u64(seed));
     }
 
     pub fn set_raw_vec<T>(&mut self, data: Vec<T>) {

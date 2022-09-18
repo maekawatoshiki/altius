@@ -10,4 +10,6 @@ else
   source $VENVDIR/bin/activate
 fi
 
+maturin develop -r 
+
 python -m pytest . -n 8

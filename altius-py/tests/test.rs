@@ -14,15 +14,17 @@ fn run_test() {
     // `./test.sh`.
     let root = get_project_root().unwrap();
     let target_mtime = mtime_recursive(&root.join("target/")).unwrap();
-    let src_mtime = mtime_recursive(&Path::new(".env")).unwrap(); // TODO: Better not hard-code
-                                                                  // venv dir.
-    assert!(std::process::Command::new("bash")
-        .arg("./test.sh")
-        .arg(if target_mtime > src_mtime {
+    // TODO: Better not hard-code venv dir `,env`.
+    let build = mtime_recursive(&Path::new(".env")).map_or("build", |src_mtime| {
+        if target_mtime > src_mtime {
             "build"
         } else {
             ""
-        })
+        }
+    });
+    assert!(std::process::Command::new("bash")
+        .arg("./test.sh")
+        .arg(build)
         .spawn()
         .unwrap()
         .wait()

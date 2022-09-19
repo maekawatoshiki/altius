@@ -59,6 +59,6 @@ jobs:
             cargo install grcov && \
             cargo test --release && \
             mkdir -p /tmp/cov/ && \
-            cp -rf ./target/release/* ./altius-py/target/release/* /tmp/cov/ & \\
+            cp -rf ./target/release/* ./altius-py/target/release/* /tmp/cov/ && \
             grcov . --binary-path /tmp/cov/ -s . -t cobertura --branch --ignore-not-existing --ignore "*cargo*" -o coverage.xml && \
             bash <(curl -s https://codecov.io/bash)

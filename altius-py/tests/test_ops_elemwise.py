@@ -50,6 +50,18 @@ def test_sigmoid_2():
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Sigmoid", [3, 1, 28, 28])
 
 
+@pytest.mark.xfail
+def test_clip_1():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_elemwise(os.path.join(tmpdir, "model.onnx"), "Clip", [1, 2])
+
+
+@pytest.mark.xfail
+def test_clip_2():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_elemwise(os.path.join(tmpdir, "model.onnx"), "Clip", [3, 1, 28, 28])
+
+
 def op_elemwise(filepath, op_type, shape):
     inputs = [helper.make_tensor_value_info("x", TensorProto.FLOAT, shape)]
     outputs = [helper.make_tensor_value_info("y", TensorProto.FLOAT, shape)]

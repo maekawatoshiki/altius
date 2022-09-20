@@ -152,7 +152,7 @@ impl<'a> Interpreter<'a> {
             Op::ReLU => compute_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(ref hs) => compute_hard_sigmoid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
-            Op::Sigmoid => todo!("sigmoid"),
+            Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
             Op::Resize(_) => todo!("resize"),
             Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
@@ -465,6 +465,19 @@ fn compute_leaky_relu(leaky: &LeakyReLU, inputs: &[&Tensor], outputs: &mut [Tens
         .zip(output.data_mut::<f32>().iter_mut())
     {
         *o = if *i < 0.0 { leaky.alpha * i } else { *i };
+    }
+}
+
+fn compute_sigmoid(inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input = inputs[Node::SIGMOID_IN];
+    let output = &mut outputs[Node::SIGMOID_OUT];
+
+    for (i, o) in input
+        .data::<f32>()
+        .iter()
+        .zip(output.data_mut::<f32>().iter_mut())
+    {
+        *o = 1. / (1. + (-i).exp())
     }
 }
 

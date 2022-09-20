@@ -174,8 +174,8 @@ impl<'a> Interpreter<'a> {
             Op::Constant(_) => todo!("constant"),
         }
 
-        let elapsed = start.elapsed();
         if self.enable_profiling {
+            let elapsed = start.elapsed();
             *profile.entry(op.name()).or_insert(Duration::ZERO) += elapsed;
         }
 

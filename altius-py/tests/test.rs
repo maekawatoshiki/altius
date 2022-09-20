@@ -14,7 +14,7 @@ fn run_test() {
     // `./test.sh`.
     let root = get_project_root().unwrap();
     let target_mtime = mtime_recursive(&root.join("target/")).unwrap();
-    // TODO: Better not hard-code venv dir `,env`.
+    // TODO: Better not hard-code venv dir `.env`.
     let build = mtime_recursive(&Path::new(".env")).map_or("build", |src_mtime| {
         if target_mtime > src_mtime {
             "build"

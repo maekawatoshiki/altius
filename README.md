@@ -8,6 +8,7 @@ Small DNN runtime written in Rust
 # Requirements
 
 - [git-lfs](https://github.com/git-lfs/git-lfs) to pull ONNX models
+- Python 3.x (Used in some tests; You can disable them by just ignoring tests in `./altius-py`)
 
 # Run
 
@@ -23,8 +24,7 @@ cargo run --release --example mobilenet --features cuda # -- --profile
 cd altius-py
 python -m venv .env
 source .env/bin/activate
-pip install maturin
 pip install -r requirements.txt
 maturin develop -r
-python test.py
+python mobilenet.py
 ```

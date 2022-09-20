@@ -191,7 +191,8 @@ impl Tensor {
         dims
     }
 
-    pub fn data<T>(&self) -> &[T] {
+    pub fn data<T: TensorElemTypeExt>(&self) -> &[T] {
+        assert_eq!(self.elem_ty, T::get_type());
         unsafe {
             std::slice::from_raw_parts(
                 self.data.as_ptr() as *const T,
@@ -200,7 +201,8 @@ impl Tensor {
         }
     }
 
-    pub fn data_mut<T>(&mut self) -> &mut [T] {
+    pub fn data_mut<T: TensorElemTypeExt>(&mut self) -> &mut [T] {
+        assert_eq!(self.elem_ty, T::get_type());
         unsafe {
             std::slice::from_raw_parts_mut(
                 self.data.as_ptr() as *mut T,

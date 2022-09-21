@@ -23,8 +23,6 @@ pub struct Conv2dCtx<'a> {
 
 #[cfg(not(feature = "cuda"))]
 pub fn compute(ctx: &mut Conv2dCtx) {
-    use ndarray::{linalg, s, Array4, Array6, ArrayView3, ArrayView4};
-
     let input = &ctx.inputs[Node::CONV2D_IN];
     let weight = &ctx.inputs[Node::CONV2D_WEIGHT];
     let output = &mut ctx.outputs[0];
@@ -37,8 +35,10 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let input_c = input.dims()[1];
     let input_h = input.dims()[2];
     let input_w = input.dims()[3];
+    let input_hw = input_h * input_w;
     let output_h = output.dims()[2];
     let output_w = output.dims()[3];
+    let output_hw = output_h * output_w;
     let _dilation = 1;
     let group = ctx.op.group as usize;
     let in_c_per_g = input_c / group;
@@ -50,66 +50,112 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let _pad_b = padding[2];
     let _pad_r = padding[3];
 
-    let mut input_ = Array4::zeros([
-        batch_size,
-        input_c,
-        input_h + pad_t * 2,
-        input_w + pad_l * 2,
-    ]);
-    input_
-        .slice_mut(s![.., .., pad_t..input_h + pad_t, pad_l..input_w + pad_l])
-        .assign(&ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap());
-    let weight_ = ArrayView3::from_shape(
-        [group, out_c_per_g, in_c_per_g * kernel[0] * kernel[1]],
-        weight.data::<f32>(),
-    )
-    .unwrap();
-    let mut output_: Array4<f32> = ctx.inputs.get(Node::CONV2D_BIAS).map_or_else(
-        || Array4::zeros([batch_size, group, out_c_per_g, output_h * output_w]),
-        |bias| {
-            ArrayView4::from_shape([1, group, out_c_per_g, 1], bias.data::<f32>())
-                .unwrap()
-                .broadcast([batch_size, group, out_c_per_g, output_h * output_w])
-                .unwrap()
-                .to_owned()
-        },
+    if let Some(bias) = ctx.inputs.get(Node::CONV2D_BIAS) {
+        let mut output_ptr = output.data_mut::<f32>().as_mut_ptr();
+        let bias_ptr_ = bias.data::<f32>().as_ptr();
+        for _ in 0..batch_size {
+            let mut bias_ptr = bias_ptr_;
+            for _ in 0..group {
+                for _ in 0..out_c_per_g {
+                    for _ in 0..output_hw {
+                        unsafe { *output_ptr = *bias_ptr };
+                        output_ptr = unsafe { output_ptr.add(1) };
+                    }
+                    bias_ptr = unsafe { bias_ptr.add(1) };
+                }
+            }
+        }
+    }
+
+    let mut col = Tensor::zeros::<f32>(
+        vec![
+            batch_size, input_c, kernel[0], kernel[1], output_h, output_w,
+        ]
+        .into(),
     );
 
-    let mut col = Array6::<f32>::zeros([
-        batch_size, input_c, kernel[0], kernel[1], output_h, output_w,
-    ]);
-    // TODO: The following code gets slower when rewriting it without ndarray.
-    //       Thus, ndarray is the best solution so far.
-    for fy in 0..kernel[0] {
-        let fy_max = fy + stride[0] * output_h;
-        for fx in 0..kernel[1] {
-            let fx_max = fx + stride[1] * output_w;
-            col.slice_mut(s![.., .., fy, fx, .., ..])
-                .assign(&input_.slice(s![.., .., fy..fy_max;stride[0], fx..fx_max;stride[1]]))
+    let mut col_ptr = col.data_mut::<f32>().as_mut_ptr();
+    let mut input_ptr = input.data::<f32>().as_ptr();
+    assert!(input.dims().len() == 4);
+
+    if pad_t == 0 && pad_l == 0 && stride[0] == 1 && stride[1] == 1 {
+        // Simple case
+        for _b in 0..batch_size {
+            for _ic in 0..input_c {
+                for _fy in 0..kernel[0] {
+                    for _fx in 0..kernel[1] {
+                        unsafe { std::ptr::copy_nonoverlapping(input_ptr, col_ptr, input_hw) }
+                        col_ptr = unsafe { col_ptr.add(output_hw) };
+                    }
+                }
+                input_ptr = unsafe { input_ptr.add(input_hw) };
+            }
+        }
+    } else {
+        let stride_h = stride[0];
+        let stride_w = stride[1];
+        // TODO: ndarray is a bit faster than this implementation.
+        for _n in 0..batch_size {
+            for _ic in 0..input_c {
+                for fy in 0..kernel[0] {
+                    for fx in 0..kernel[1] {
+                        for oh in 0..output_h {
+                            let ih = fy + oh * stride_h;
+                            if pad_t <= ih && ih < input_h + pad_t {
+                                let jh = (ih - pad_t) * input_w;
+                                for ow in 0..output_w {
+                                    let iw = fx + ow * stride_w;
+                                    if pad_l <= iw && iw < input_w + pad_l {
+                                        let jw = jh + (iw - pad_l);
+                                        unsafe { *col_ptr = *input_ptr.add(jw) };
+                                    }
+                                    col_ptr = unsafe { col_ptr.add(1) };
+                                }
+                            } else {
+                                col_ptr = unsafe { col_ptr.add(output_h) };
+                            }
+                        }
+                    }
+                }
+                input_ptr = unsafe { input_ptr.add(input_hw) };
+            }
         }
     }
-    let col = col
-        .into_shape([
-            batch_size,
-            group,
-            in_c_per_g * kernel[0] * kernel[1],
-            output_h * output_w,
-        ])
-        .unwrap();
 
-    for n in 0..batch_size {
-        for g in 0..group {
-            linalg::general_mat_mul(
-                1.0,
-                &weight_.slice(s![g, .., ..]),
-                &col.slice(s![n, g, .., ..]),
-                1.0,
-                &mut output_.slice_mut(s![n, g, .., ..]),
-            );
+    let mut col_ptr = col.data::<f32>().as_ptr();
+    let col_stride = in_c_per_g * kernel[0] * kernel[1] * output_h * output_w;
+    let weight_ptr = weight.data::<f32>().as_ptr();
+    let weight_stride = out_c_per_g * in_c_per_g * kernel[0] * kernel[1];
+    let mut output_ptr = output.data_mut::<f32>().as_mut_ptr();
+    let output_stride = out_c_per_g * output_hw;
+    let k = in_c_per_g * kernel[0] * kernel[1];
+
+    for _ in 0..batch_size {
+        let mut weight_ptr = weight_ptr;
+        for _ in 0..group {
+            unsafe {
+                matrixmultiply::sgemm(
+                    out_c_per_g,
+                    k,
+                    output_hw,
+                    1.0,
+                    weight_ptr,
+                    k as isize,
+                    1,
+                    col_ptr,
+                    output_hw as isize,
+                    1,
+                    1.0,
+                    output_ptr,
+                    output_hw as isize,
+                    1,
+                );
+                col_ptr = col_ptr.add(col_stride);
+                weight_ptr = weight_ptr.add(weight_stride);
+                output_ptr = output_ptr.add(output_stride);
+            };
         }
     }
-
-    output.set_raw_vec(output_.into_raw_vec());
 }
 
 #[cfg(feature = "cuda")]

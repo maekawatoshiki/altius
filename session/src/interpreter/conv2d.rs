@@ -80,45 +80,41 @@ pub fn compute(ctx: &mut Conv2dCtx) {
 
     if pad_t == 0 && pad_l == 0 && stride[0] == 1 && stride[1] == 1 {
         // Simple case
-        for _b in 0..batch_size {
-            for _ic in 0..input_c {
-                for _fy in 0..kernel[0] {
-                    for _fx in 0..kernel[1] {
-                        unsafe { std::ptr::copy_nonoverlapping(input_ptr, col_ptr, input_hw) }
-                        col_ptr = unsafe { col_ptr.add(output_hw) };
-                    }
+        for _ in 0..batch_size * input_c {
+            for _fy in 0..kernel[0] {
+                for _fx in 0..kernel[1] {
+                    unsafe { std::ptr::copy_nonoverlapping(input_ptr, col_ptr, input_hw) }
+                    col_ptr = unsafe { col_ptr.add(output_hw) };
                 }
-                input_ptr = unsafe { input_ptr.add(input_hw) };
             }
+            input_ptr = unsafe { input_ptr.add(input_hw) };
         }
     } else {
         let stride_h = stride[0];
         let stride_w = stride[1];
         // TODO: ndarray is a bit faster than this implementation.
-        for _n in 0..batch_size {
-            for _ic in 0..input_c {
-                for fy in 0..kernel[0] {
-                    for fx in 0..kernel[1] {
-                        for oh in 0..output_h {
-                            let ih = fy + oh * stride_h;
-                            if pad_t <= ih && ih < input_h + pad_t {
-                                let jh = (ih - pad_t) * input_w;
-                                for ow in 0..output_w {
-                                    let iw = fx + ow * stride_w;
-                                    if pad_l <= iw && iw < input_w + pad_l {
-                                        let jw = jh + (iw - pad_l);
-                                        unsafe { *col_ptr = *input_ptr.add(jw) };
-                                    }
-                                    col_ptr = unsafe { col_ptr.add(1) };
+        for _ in 0..batch_size * input_c {
+            for fy in 0..kernel[0] {
+                for fx in 0..kernel[1] {
+                    for oh in 0..output_h {
+                        let ih = fy + oh * stride_h;
+                        if pad_t <= ih && ih < input_h + pad_t {
+                            let jh = (ih - pad_t) * input_w;
+                            for ow in 0..output_w {
+                                let iw = fx + ow * stride_w;
+                                if pad_l <= iw && iw < input_w + pad_l {
+                                    let jw = jh + (iw - pad_l);
+                                    unsafe { *col_ptr = *input_ptr.add(jw) };
                                 }
-                            } else {
-                                col_ptr = unsafe { col_ptr.add(output_h) };
+                                col_ptr = unsafe { col_ptr.add(1) };
                             }
+                        } else {
+                            col_ptr = unsafe { col_ptr.add(output_h) };
                         }
                     }
                 }
-                input_ptr = unsafe { input_ptr.add(input_hw) };
             }
+            input_ptr = unsafe { input_ptr.add(input_hw) };
         }
     }
 

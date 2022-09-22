@@ -67,7 +67,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         }
     }
 
-    let mut col = Tensor::zeros::<f32>(
+    let mut col = Tensor::uninit::<f32>(
         vec![
             batch_size, input_c, kernel[0], kernel[1], output_h, output_w,
         ]
@@ -93,7 +93,9 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         let stride_h = stride[0];
         let stride_w = stride[1];
         // TODO: ndarray is a bit faster than this implementation.
-        for _ in 0..batch_size * input_c {
+        let mut count = batch_size * input_c;
+        use std::simd;
+        while count > 0 {
             for fy in 0..kernel[0] {
                 for fx in 0..kernel[1] {
                     for oh in 0..output_h {
@@ -105,16 +107,36 @@ pub fn compute(ctx: &mut Conv2dCtx) {
                                 if pad_l <= iw && iw < input_w + pad_l {
                                     let jw = jh + (iw - pad_l);
                                     unsafe { *col_ptr = *input_ptr.add(jw) };
+                                } else {
+                                    unsafe { *col_ptr = 0f32 };
                                 }
                                 col_ptr = unsafe { col_ptr.add(1) };
                             }
                         } else {
-                            col_ptr = unsafe { col_ptr.add(output_h) };
+                            let mut count = output_w;
+                            while count > 4 {
+                                // unsafe { *col_ptr = 0f32 };
+                                unsafe {
+                                    std::ptr::copy_nonoverlapping(
+                                        simd::f32x4::splat(0f32).to_array().as_ptr(),
+                                        col_ptr,
+                                        4,
+                                    )
+                                };
+                                col_ptr = unsafe { col_ptr.add(4) };
+                                count -= 4;
+                            }
+                            while count > 0 {
+                                unsafe { *col_ptr = 0f32 };
+                                col_ptr = unsafe { col_ptr.add(1) };
+                                count -= 1;
+                            }
                         }
                     }
                 }
             }
             input_ptr = unsafe { input_ptr.add(input_hw) };
+            count -= 1;
         }
     }
 
@@ -126,6 +148,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let output_stride = out_c_per_g * output_hw;
     let k = in_c_per_g * kernel[0] * kernel[1];
 
+    // log::info!("{} {} {}", out_c_per_g, k, output_hw);
     for _ in 0..batch_size {
         let mut weight_ptr = weight_ptr;
         for _ in 0..group {

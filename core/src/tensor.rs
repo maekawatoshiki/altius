@@ -68,6 +68,18 @@ impl Tensor {
     pub fn zeros<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
         let total_elems = dims.total_elems();
         Self::new(dims, vec![T::zero(); total_elems])
+        // unsafe {
+        //     let mut v: Vec<T> = Vec::with_capacity(total_elems);
+        //     v.set_len(total_elems);
+        //     Self::new(dims, v)
+        // }
+    }
+
+    pub fn uninit<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
+        let total_elems = dims.total_elems();
+        let mut data: Vec<T> = Vec::with_capacity(total_elems);
+        unsafe { data.set_len(total_elems) };
+        Self::new(dims, data)
     }
 
     pub fn zeros_of_type(ty: TensorElemType, dims: Dimensions) -> Self {

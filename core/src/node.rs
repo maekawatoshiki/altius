@@ -54,6 +54,7 @@ pub enum Op {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Conv2d {
     pub auto_pad: String,
+    pub dilations: Dimensions,
     pub group: i64,
     pub kernel_shape: Dimensions,
     pub strides: Dimensions,
@@ -350,8 +351,11 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let kernel = &conv.kernel_shape;
             let stride = &conv.strides;
             let padding = &conv.padding;
+            let dilations = &conv.dilations;
             let input = inputs[Node::CONV2D_IN].dims();
             let weight = inputs[Node::CONV2D_WEIGHT].dims();
+
+            assert_eq!(dilations.len(), 2);
 
             let pad_h;
             let pad_w;
@@ -380,11 +384,12 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
 
             let h_in = input[2];
             let w_in = input[3];
+
             let output_shape = vec![
                 input[0],
                 weight[0],
-                (h_in + pad_h - (kernel[0] - 1) - 1) / stride[0] + 1,
-                (w_in + pad_w - (kernel[1] - 1) - 1) / stride[1] + 1,
+                (h_in + pad_h - dilations[0] * (kernel[0] - 1) - 1) / stride[0] + 1,
+                (w_in + pad_w - dilations[1] * (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
             shapes.push(TypedShape::new(
                 output_shape.into(),

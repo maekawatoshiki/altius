@@ -17,3 +17,4 @@ models/dog.jpg filter=lfs diff=lfs merge=lfs -text
 models/yolov3/altius.onnx filter=lfs diff=lfs merge=lfs -text
 models/yolov3/ort_0.onnx filter=lfs diff=lfs merge=lfs -text
 models/yolov3/ort_1.onnx filter=lfs diff=lfs merge=lfs -text
+models/fcn-resnet50.onnx filter=lfs diff=lfs merge=lfs -text

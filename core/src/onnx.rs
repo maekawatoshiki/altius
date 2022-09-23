@@ -142,9 +142,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                     Dimensions::from_i64(&get_attribute(&node.attribute, "strides").unwrap().ints);
                 let padding = get_attribute(&node.attribute, "pads")
                     .map_or(vec![0, 0].into(), |a| Dimensions::from_i64(&a.ints));
+                let dilations = get_attribute(&node.attribute, "dilations")
+                    .map_or(vec![1, 1].into(), |a| Dimensions::from_i64(&a.ints));
                 let group = get_attribute(&node.attribute, "group").map_or(1, |a| a.i());
                 Op::Conv2d(Conv2d {
                     auto_pad,
+                    dilations,
                     kernel_shape,
                     strides,
                     group,

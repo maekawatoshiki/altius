@@ -30,6 +30,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let kernel = &ctx.op.kernel_shape;
     let padding = &ctx.op.padding;
     let stride = &ctx.op.strides;
+    let dilations = &ctx.op.dilations;
 
     let batch_size = input.dims()[0];
     let input_c = input.dims()[1];
@@ -43,7 +44,12 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let group = ctx.op.group as usize;
     let in_c_per_g = input_c / group;
     let out_c_per_g = output.dims()[1] / group;
+    let stride_h = stride[0];
+    let stride_w = stride[1];
+    let dilation_h = dilations[0];
+    let dilation_w = dilations[1];
 
+    assert_eq!(dilations.len(), 2);
     assert!(padding.len() == 4);
     let pad_t = padding[0];
     let pad_l = padding[1];
@@ -78,7 +84,13 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let mut input_ptr = input.data::<f32>().as_ptr();
     assert!(input.dims().len() == 4);
 
-    if pad_t == 0 && pad_l == 0 && stride[0] == 1 && stride[1] == 1 {
+    if pad_t == 0
+        && pad_l == 0
+        && stride_h == 1
+        && stride_w == 1
+        && dilation_h == 1
+        && dilation_w == 1
+    {
         // Simple case
         for _ in 0..batch_size * input_c {
             for _fy in 0..kernel[0] {
@@ -89,9 +101,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
             }
             input_ptr = unsafe { input_ptr.add(input_hw) };
         }
-    } else {
-        let stride_h = stride[0];
-        let stride_w = stride[1];
+    } else if dilation_h == 1 && dilation_w == 1 {
         // TODO: ndarray is a bit faster than this implementation.
         for _ in 0..batch_size * input_c {
             for fy in 0..kernel[0] {
@@ -102,6 +112,31 @@ pub fn compute(ctx: &mut Conv2dCtx) {
                             let jh = (ih - pad_t) * input_w;
                             for ow in 0..output_w {
                                 let iw = fx + ow * stride_w;
+                                if pad_l <= iw && iw < input_w + pad_l {
+                                    let jw = jh + (iw - pad_l);
+                                    unsafe { *col_ptr = *input_ptr.add(jw) };
+                                }
+                                col_ptr = unsafe { col_ptr.add(1) };
+                            }
+                        } else {
+                            col_ptr = unsafe { col_ptr.add(output_h) };
+                        }
+                    }
+                }
+            }
+            input_ptr = unsafe { input_ptr.add(input_hw) };
+        }
+    } else {
+        // TODO: ndarray is a bit faster than this implementation.
+        for _ in 0..batch_size * input_c {
+            for fy in 0..kernel[0] {
+                for fx in 0..kernel[1] {
+                    for oh in 0..output_h {
+                        let ih = fy * dilation_h + oh * stride_h;
+                        if pad_t <= ih && ih < input_h + pad_t {
+                            let jh = (ih - pad_t) * input_w;
+                            for ow in 0..output_w {
+                                let iw = fx * dilation_w + ow * stride_w;
                                 if pad_l <= iw && iw < input_w + pad_l {
                                     let jw = jh + (iw - pad_l);
                                     unsafe { *col_ptr = *input_ptr.add(jw) };

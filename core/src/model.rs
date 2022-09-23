@@ -41,8 +41,21 @@ impl Model {
         value_users
     }
 
+    pub fn get_value_parents(&self) -> FxHashMap<ValueId, NodeId> {
+        let mut value_parents: FxHashMap<ValueId, NodeId> = FxHashMap::default();
+
+        for (node_id, node) in self.nodes.iter() {
+            for &output in node.outputs.iter() {
+                value_parents.insert(output, node_id);
+            }
+        }
+
+        value_parents
+    }
+
     pub fn topo_sort_nodes(&self) -> Vec<NodeId> {
         let value_users = self.get_value_users();
+        let value_parents = self.get_value_parents();
 
         let mut nodes = vec![];
         let mut num_node_inputs = FxHashMap::default();
@@ -51,7 +64,10 @@ impl Model {
         let consts = &self.inputs.iter().copied().collect::<FxHashSet<_>>()
             | &self.inits.keys().copied().collect::<FxHashSet<_>>();
         for (id, node) in self.nodes.iter() {
-            let inputs = &node.inputs.clone().into_iter().collect::<FxHashSet<_>>() - &consts;
+            let mut inputs = &node.inputs.clone().into_iter().collect::<FxHashSet<_>>() - &consts;
+            inputs.retain(|i| value_parents.contains_key(i)); // NOTE: Some of node inputs might be
+                                                              // optional (so they don't have their
+                                                              // parents).
             num_node_inputs.insert(id, inputs.len());
             if inputs.is_empty() {
                 que.push(id);

@@ -37,6 +37,7 @@ pub struct Interpreter<'a> {
     sorted_nodes: Vec<NodeId>,
     inferred_shapes: FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     enable_profiling: bool,
+    dummy_value: Tensor,
 }
 
 impl<'a> Interpreter<'a> {
@@ -52,6 +53,7 @@ impl<'a> Interpreter<'a> {
             sorted_nodes,
             inferred_shapes,
             enable_profiling: false,
+            dummy_value: Tensor::zeros::<f32>(vec![0].into()),
         }
     }
 
@@ -111,7 +113,7 @@ impl<'a> Interpreter<'a> {
         let inputs = node
             .inputs
             .iter()
-            .map(|input| &values[input])
+            .map(|input| values.get(input).unwrap_or(&self.dummy_value))
             .collect::<Vec<_>>();
         // Use inferred shapes if any.
         let (op, output_shapes) =

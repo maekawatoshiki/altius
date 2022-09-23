@@ -5,7 +5,7 @@ use altius_core::{
     model::Model,
     node::{
         compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gemm, HardSigmoid,
-        LeakyReLU, MaxPool, Node, NodeId, Op, Squeeze, Transpose,
+        LeakyReLU, MaxPool, Node, NodeId, Op, Resize, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -156,7 +156,7 @@ impl<'a> Interpreter<'a> {
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
-            Op::Resize(_) => todo!("resize"),
+            Op::Resize(ref resize) => compute_resize(resize, &inputs, &mut outputs),
             Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
             Op::Transpose(ref trans) => compute_transpose(trans, &inputs, &mut outputs),
             Op::Squeeze(ref squeeze) => compute_squeeze(squeeze, &inputs, &mut outputs),
@@ -472,6 +472,34 @@ fn compute_sigmoid(inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = 1. / (1. + (-i).exp())
+    }
+}
+
+fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    log::info!("Resize: Current implementation is incorrect.");
+
+    assert_eq!(inputs.len(), 4);
+    let input = inputs[Node::RESIZE_IN_X];
+    // let sizes = inputs[Node::RESIZE_IN_SIZES];
+    let output = &mut outputs[Node::RESIZE_OUT];
+
+    let batch_size = input.dims()[0];
+    let input_c = input.dims()[1];
+    let input_h = input.dims()[2];
+    // let input_w = input.dims()[3];
+    let output_h = output.dims()[2];
+    let output_w = output.dims()[3];
+
+    let z = output_h / input_h;
+
+    for n in 0..batch_size {
+        for c in 0..input_c {
+            for h in 0..output_h {
+                for w in 0..output_w {
+                    *output.at_4d_mut(n, c, h, w) = input.at_4d(n, c, h / z, w / z)
+                }
+            }
+        }
     }
 }
 

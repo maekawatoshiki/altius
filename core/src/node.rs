@@ -524,25 +524,34 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             ));
         }
         Op::Resize(resize) => {
-            // TODO: Support other cases.
-            assert!(resize.coordinate_transformation_mode == "asymmetric");
-            assert!(resize.mode == "nearest");
-            assert!(resize.nearest_mode == "floor");
-            assert!(inputs.len() == 3);
-            let x = &inputs[Node::RESIZE_IN_X];
-            assert!(x.dims().len() == 4);
-            let roi = &inputs[Node::RESIZE_IN_ROI].data::<f32>();
-            let scales = &inputs[Node::RESIZE_IN_SCALES].data::<f32>();
-            shapes.push(TypedShape::new(
-                vec![
-                    (x.dims()[0] as f32 * (roi[4] - roi[0]) * scales[0]).floor() as usize,
-                    (x.dims()[1] as f32 * (roi[5] - roi[1]) * scales[1]).floor() as usize,
-                    (x.dims()[2] as f32 * (roi[6] - roi[2]) * scales[2]).floor() as usize,
-                    (x.dims()[3] as f32 * (roi[7] - roi[3]) * scales[3]).floor() as usize,
-                ]
-                .into(),
-                inputs[Node::RESIZE_IN_X].elem_ty(),
-            ))
+            if inputs.len() == 4 {
+                let sizes = &inputs[Node::RESIZE_IN_SIZES];
+                assert!(sizes.dims().len() == 1 && sizes.dims()[0] == 4);
+                shapes.push(TypedShape::new(
+                    Dimensions::from_i64(sizes.data::<i64>()),
+                    inputs[Node::RESIZE_IN_X].elem_ty(),
+                ))
+            } else {
+                // TODO: Support other cases.
+                assert!(resize.coordinate_transformation_mode == "asymmetric");
+                assert!(resize.mode == "nearest");
+                assert!(resize.nearest_mode == "floor");
+                assert!(inputs.len() == 3);
+                let x = &inputs[Node::RESIZE_IN_X];
+                assert!(x.dims().len() == 4);
+                let roi = &inputs[Node::RESIZE_IN_ROI].data::<f32>();
+                let scales = &inputs[Node::RESIZE_IN_SCALES].data::<f32>();
+                shapes.push(TypedShape::new(
+                    vec![
+                        (x.dims()[0] as f32 * (roi[4] - roi[0]) * scales[0]).floor() as usize,
+                        (x.dims()[1] as f32 * (roi[5] - roi[1]) * scales[1]).floor() as usize,
+                        (x.dims()[2] as f32 * (roi[6] - roi[2]) * scales[2]).floor() as usize,
+                        (x.dims()[3] as f32 * (roi[7] - roi[3]) * scales[3]).floor() as usize,
+                    ]
+                    .into(),
+                    inputs[Node::RESIZE_IN_X].elem_ty(),
+                ))
+            }
         }
         Op::Concat(concat) => {
             let mut dims = inputs[Node::CONCAT_IN].dims().clone();

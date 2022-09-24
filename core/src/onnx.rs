@@ -138,8 +138,8 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 let kernel_shape = Dimensions::from_i64(
                     &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,
                 );
-                let strides =
-                    Dimensions::from_i64(&get_attribute(&node.attribute, "strides").unwrap().ints);
+                let strides = get_attribute(&node.attribute, "strides")
+                    .map_or(vec![1, 1].into(), |a| Dimensions::from_i64(&a.ints));
                 let padding = get_attribute(&node.attribute, "pads")
                     .map_or(vec![0, 0].into(), |a| Dimensions::from_i64(&a.ints));
                 let dilations = get_attribute(&node.attribute, "dilations")

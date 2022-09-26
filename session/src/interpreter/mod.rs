@@ -93,15 +93,11 @@ impl<'a> Interpreter<'a> {
             log::info!("Profile: {:#?}", profile);
         }
 
-        Ok(values
-            .into_iter()
-            .filter_map(|(id, t)| {
-                if self.model.outputs.contains(&id) {
-                    Some(t)
-                } else {
-                    None
-                }
-            })
+        Ok(self
+            .model
+            .outputs
+            .iter()
+            .map(|id| values.remove(id).unwrap())
             .collect())
     }
 

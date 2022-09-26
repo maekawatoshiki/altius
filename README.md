@@ -13,9 +13,12 @@ Small DNN runtime written in Rust
 # Run
 
 ```sh
+export RUST_LOG=debug
 cargo run --release --example mnist
 cargo run --release --example mobilenet
 cargo run --release --example mobilenet --features cuda # -- --profile
+NO_AFFINITY=1 OPENBLAS_NUM_THREADS=8 cargo run --release --example mobilenet --features openblas # -- --profile
+cargo run --release --example mobilenet --features accelerate # for macOS
 ```
 
 # Run from Python

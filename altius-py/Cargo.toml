@@ -19,4 +19,6 @@ numpy = "^0.16.0"
 cargo-util = "0.2.1"
 
 [features]
-threading = [ "altius-session/threading" ]
+matrixmultiply-threading = [ "altius-session/matrixmultiply-threading" ]
+openblas = [ "altius-session/openblas" ]
+accelerate = [ "altius-session/accelerate" ]

@@ -14,13 +14,15 @@ cust = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 ndarray = "0.15.6"
 matrixmultiply = "0.3.2"
 thiserror = "1.0.31"
-blas-src = { version = "0.8", features = ["accelerate"] }
-cblas-sys = "*"
-# ndarray = { version = "0.15.4", features = ["matrixmultiply-threading"] }
+blas-src = { version = "0.8", optional = true }
+cblas-sys = { version = "*", optional = true }
 
 [features]
 cuda = ["cudnn", "cust"]
-threading = [ "matrixmultiply/threading" ]
+matrixmultiply-threading = [ "matrixmultiply/threading" ]
+openblas = [ "blas-src/openblas", "cblas" ]
+accelerate = [ "blas-src/accelerate", "cblas" ]
+cblas = [ "cblas-sys" ]
 
 [dev-dependencies]
 env_logger = "0.9.0"

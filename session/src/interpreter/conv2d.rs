@@ -135,37 +135,6 @@ pub fn compute(ctx: &mut Conv2dCtx) {
             }
             input_ptr = unsafe { input_ptr.add(input_hw) };
         }
-
-        // TODO: ndarray is a bit faster than this implementation.
-        // let outer = batch_size * input_c;
-        // for _ in 0..outer {
-        //     for fy in 0..kernel_h {
-        //         let ih = fy as isize - pad_t as isize;
-        //         for fx in 0..kernel_w {
-        //             let iw = fx as isize - pad_l as isize;
-        //             let mut ih = ih;
-        //             for _oh in 0..output_h {
-        //                 if ih < 0 || ih >= input_h as isize {
-        //                     col_ptr = unsafe { col_ptr.add(output_w) };
-        //                     ih += stride_h as isize;
-        //                     continue;
-        //                 }
-        //                 let jh = ih as usize * input_w;
-        //                 let mut iw = iw;
-        //                 for _ow in 0..output_w {
-        //                     if 0 <= iw && iw < input_w as isize {
-        //                         let jw = jh + iw as usize;
-        //                         unsafe { *col_ptr = *input_ptr.add(jw) };
-        //                     }
-        //                     iw += stride_w as isize;
-        //                     col_ptr = unsafe { col_ptr.add(1) };
-        //                 }
-        //                 ih += stride_h as isize;
-        //             }
-        //         }
-        //     }
-        //     input_ptr = unsafe { input_ptr.add(input_hw) };
-        // }
     } else {
         // TODO: ndarray is a bit faster than this implementation.
         for _ in 0..batch_size * input_c {

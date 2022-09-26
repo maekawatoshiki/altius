@@ -103,51 +103,67 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         }
     } else if dilation_h == 1 && dilation_w == 1 {
         // TODO: ndarray is a bit faster than this implementation.
+        let kh = kernel[0];
+        let kw = kernel[1];
         for _ in 0..batch_size * input_c {
-            for fy in 0..kernel[0] {
-                for fx in 0..kernel[1] {
-                    for oh in 0..output_h {
-                        let ih = fy + oh * stride_h;
+            let mut ih = 0;
+            for _fy in 0..kh {
+                let mut iw = 0;
+                for _fx in 0..kw {
+                    let mut ih = ih;
+                    for _oh in 0..output_h {
                         if pad_t <= ih && ih < input_h + pad_t {
                             let jh = (ih - pad_t) * input_w;
-                            for ow in 0..output_w {
-                                let iw = fx + ow * stride_w;
+                            let mut iw = iw;
+                            for _ow in 0..output_w {
                                 if pad_l <= iw && iw < input_w + pad_l {
                                     let jw = jh + (iw - pad_l);
                                     unsafe { *col_ptr = *input_ptr.add(jw) };
                                 }
+                                iw += stride_w;
                                 col_ptr = unsafe { col_ptr.add(1) };
                             }
                         } else {
                             col_ptr = unsafe { col_ptr.add(output_h) };
                         }
+                        ih += stride_h;
                     }
+                    iw += 1;
                 }
+                ih += 1;
             }
             input_ptr = unsafe { input_ptr.add(input_hw) };
         }
     } else {
         // TODO: ndarray is a bit faster than this implementation.
+        let kh = kernel[0];
+        let kw = kernel[1];
         for _ in 0..batch_size * input_c {
-            for fy in 0..kernel[0] {
-                for fx in 0..kernel[1] {
-                    for oh in 0..output_h {
-                        let ih = fy * dilation_h + oh * stride_h;
+            let mut ih = 0;
+            for _fy in 0..kh {
+                let mut iw = 0;
+                for _fx in 0..kw {
+                    let mut ih = ih;
+                    for _oh in 0..output_h {
                         if pad_t <= ih && ih < input_h + pad_t {
                             let jh = (ih - pad_t) * input_w;
-                            for ow in 0..output_w {
-                                let iw = fx * dilation_w + ow * stride_w;
+                            let mut iw = iw;
+                            for _ow in 0..output_w {
                                 if pad_l <= iw && iw < input_w + pad_l {
                                     let jw = jh + (iw - pad_l);
                                     unsafe { *col_ptr = *input_ptr.add(jw) };
                                 }
+                                iw += stride_w;
                                 col_ptr = unsafe { col_ptr.add(1) };
                             }
                         } else {
                             col_ptr = unsafe { col_ptr.add(output_h) };
                         }
+                        ih += stride_h;
                     }
+                    iw += dilation_w;
                 }
+                ih += dilation_h;
             }
             input_ptr = unsafe { input_ptr.add(input_hw) };
         }
@@ -165,21 +181,37 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         let mut weight_ptr = weight_ptr;
         for _ in 0..group {
             unsafe {
-                matrixmultiply::sgemm(
-                    out_c_per_g,
-                    k,
-                    output_hw,
-                    1.0,
+                // matrixmultiply::sgemm(
+                //     out_c_per_g,
+                //     k,
+                //     output_hw,
+                //     1.0,
+                //     weight_ptr,
+                //     k as isize,
+                //     1,
+                //     col_ptr,
+                //     output_hw as isize,
+                //     1,
+                //     1.0,
+                //     output_ptr,
+                //     output_hw as isize,
+                //     1,
+                // );
+                cblas_sys::cblas_sgemm(
+                    cblas_sys::CblasRowMajor,
+                    cblas_sys::CblasNoTrans,
+                    cblas_sys::CblasNoTrans,
+                    out_c_per_g as i32,
+                    output_hw as i32,
+                    k as i32,
+                    1.0f32,
                     weight_ptr,
-                    k as isize,
-                    1,
-                    col_ptr,
-                    output_hw as isize,
-                    1,
-                    1.0,
-                    output_ptr,
-                    output_hw as isize,
-                    1,
+                    k as i32,
+                    col_ptr as *const _,
+                    output_hw as i32,
+                    1.0f32,
+                    output_ptr as *mut f32,
+                    output_hw as i32,
                 );
                 col_ptr = col_ptr.add(col_stride);
                 weight_ptr = weight_ptr.add(weight_stride);

@@ -15,6 +15,8 @@ use conv2d::Conv2dCtx;
 use cudnn::CudnnContext;
 use ndarray::{linalg, Array2, ArrayView2, ArrayView4};
 use rustc_hash::FxHashMap;
+
+use std::simd::Simd;
 use std::time::{Duration, Instant};
 
 #[cfg(feature = "cuda")]
@@ -273,13 +275,25 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let output = &mut outputs[Node::ADD_OUT];
 
     if input_a.dims() == input_b.dims() {
-        for (i, (a, b)) in input_a
-            .data::<f32>()
-            .iter()
-            .zip(input_b.data::<f32>().iter())
-            .enumerate()
-        {
-            output.data_mut::<f32>()[i] = a + b;
+        let mut input_a = input_a.data::<f32>();
+        let mut input_b = input_b.data::<f32>();
+        let mut output = output.data_mut::<f32>();
+        let mut len = output.len();
+        const SIMD_LEN: usize = 4;
+
+        while len >= SIMD_LEN {
+            let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
+            let b = Simd::<f32, SIMD_LEN>::from_slice(&input_b[0..SIMD_LEN]);
+            let c = a + b;
+            output[0..SIMD_LEN].copy_from_slice(c.as_array());
+            input_a = &input_a[SIMD_LEN..];
+            input_b = &input_b[SIMD_LEN..];
+            output = &mut output[SIMD_LEN..];
+            len -= SIMD_LEN
+        }
+
+        for (i, (a, b)) in input_a.iter().zip(input_b.iter()).enumerate() {
+            output[i] = a + b;
         }
 
         return;

@@ -233,39 +233,48 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
     assert!(input.dims().len() == 4);
     assert!(output.dims().len() == 4);
 
-    for n in 0..output.dims()[0] {
-        for z in 0..input.dims()[1] {
+    let batches = output.dims()[0];
+    let channels = output.dims()[1];
+    let outer = batches * channels;
+    let output_h = output.dims()[2];
+    let output_w = output.dims()[3];
+    let input_h = input.dims()[2];
+    let input_w = input.dims()[3];
+    let kernel_h = kernel[0];
+    let kernel_w = kernel[1];
+    let stride_h = stride[0];
+    let stride_w = stride[1];
+    let input_hw = input_h * input_w;
+    let output_hw = output_h * output_w;
+
+    let mut input = input.data::<f32>();
+    let mut output = output.data_mut::<f32>();
+
+    for _ in 0..outer {
+        let mut y = 0isize; // TODO: pad
+        for ay in 0..output_h {
             let mut x = 0isize; // TODO: pad
-            for ax in 0..output.dims()[2] {
-                let mut y = 0isize; // TODO: pad
-                for ay in 0..output.dims()[3] {
-                    let mut max = f32::MIN;
-                    for fx in 0..kernel[0] as isize {
-                        for fy in 0..kernel[1] as isize {
-                            let ox = x + fx;
-                            let oy = y + fy;
-
-                            if ox < 0
-                                || oy < 0
-                                || ox >= input.dims()[2] as isize
-                                || oy >= input.dims()[3] as isize
-                            {
-                                continue;
-                            }
-
-                            let val = input.at_4d(n, z, ox as usize, oy as usize);
-
-                            if val >= max {
-                                max = val;
-                            }
+            let output = &mut output[ay * output_w..];
+            for ax in 0..output_w {
+                let mut max = f32::MIN;
+                for fy in 0..kernel_h {
+                    let oy = y + fy as isize;
+                    let input = &input[oy as usize * input_w..];
+                    for fx in 0..kernel_w {
+                        let ox = x + fx as isize;
+                        if ox < 0 || oy < 0 || ox >= input_w as isize || oy >= input_h as isize {
+                            continue;
                         }
+                        max = input[ox as usize].max(max);
                     }
-                    *output.at_4d_mut(n, z, ax, ay) = if max == f32::MIN { 0.0 } else { max };
-                    y += stride[1] as isize
                 }
-                x += stride[0] as isize
+                output[ax] = if max == f32::MIN { 0.0 } else { max };
+                x += stride_w as isize
             }
+            y += stride_h as isize
         }
+        input = &input[input_hw..];
+        output = &mut output[output_hw..];
     }
 }
 

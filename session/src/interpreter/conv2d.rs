@@ -106,15 +106,13 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         let kh = kernel[0];
         let kw = kernel[1];
         for _ in 0..batch_size * input_c {
-            let mut ih = 0;
-            for _fy in 0..kh {
-                let mut iw = 0;
-                for _fx in 0..kw {
-                    let mut ih = ih;
+            for fy in 0..kh {
+                for fx in 0..kw {
+                    let mut ih = fy;
                     for _oh in 0..output_h {
                         if pad_t <= ih && ih < input_h + pad_t {
                             let jh = (ih - pad_t) * input_w;
-                            let mut iw = iw;
+                            let mut iw = fx;
                             for _ow in 0..output_w {
                                 if pad_l <= iw && iw < input_w + pad_l {
                                     let jw = jh + (iw - pad_l);
@@ -128,9 +126,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
                         }
                         ih += stride_h;
                     }
-                    iw += 1;
                 }
-                ih += 1;
             }
             input_ptr = unsafe { input_ptr.add(input_hw) };
         }
@@ -139,15 +135,13 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         let kh = kernel[0];
         let kw = kernel[1];
         for _ in 0..batch_size * input_c {
-            let mut ih = 0;
-            for _fy in 0..kh {
-                let mut iw = 0;
-                for _fx in 0..kw {
-                    let mut ih = ih;
+            for fy in 0..kh {
+                for fx in 0..kw {
+                    let mut ih = fy * dilation_h;
                     for _oh in 0..output_h {
                         if pad_t <= ih && ih < input_h + pad_t {
                             let jh = (ih - pad_t) * input_w;
-                            let mut iw = iw;
+                            let mut iw = fx * dilation_w;
                             for _ow in 0..output_w {
                                 if pad_l <= iw && iw < input_w + pad_l {
                                     let jw = jh + (iw - pad_l);
@@ -161,9 +155,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
                         }
                         ih += stride_h;
                     }
-                    iw += dilation_w;
                 }
-                ih += dilation_h;
             }
             input_ptr = unsafe { input_ptr.add(input_hw) };
         }

@@ -509,21 +509,32 @@ fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) 
     let output_h = output.dims()[2];
     let output_w = output.dims()[3];
 
-    let z = output_h / input_h;
+    let z = output_h as f32 / input_h as f32; // 33
 
     for n in 0..batch_size {
         for c in 0..input_c {
             for h in 0..output_h {
                 for w in 0..output_w {
-                    *output.at_4d_mut(n, c, h, w) = input.at_4d(n, c, h / z, w / z)
+                    *output.at_4d_mut(n, c, h, w) =
+                        input.at_4d(n, c, (h as f32 / z) as usize, (w as f32 / z) as usize)
                 }
             }
         }
     }
 }
 
-fn compute_concat(_concat: &Concat, _inputs: &[&Tensor], _outputs: &mut [Tensor]) {
-    todo!("concat")
+fn compute_concat(concat: &Concat, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let output = &mut outputs[Node::CONCAT_OUT];
+
+    assert_eq!(output.dims().len(), 4);
+    assert_eq!(concat.axis, 1);
+
+    let mut output = output.data_mut::<f32>();
+    for input in inputs {
+        let input = input.data::<f32>();
+        output[0..input.len()].copy_from_slice(input);
+        output = &mut output[input.len()..];
+    }
 }
 
 fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [Tensor]) {

@@ -48,6 +48,8 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let stride_w = stride[1];
     let dilation_h = dilations[0];
     let dilation_w = dilations[1];
+    let kernel_h = kernel[0];
+    let kernel_w = kernel[1];
 
     assert_eq!(dilations.len(), 2);
     assert!(padding.len() == 4);
@@ -91,40 +93,43 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         && dilation_h == 1
         && dilation_w == 1
     {
+        let mut outer = batch_size * input_c;
+        let inner = kernel_h * kernel_w;
         // Simple case
-        for _ in 0..batch_size * input_c {
-            for _fy in 0..kernel[0] {
-                for _fx in 0..kernel[1] {
-                    unsafe { std::ptr::copy_nonoverlapping(input_ptr, col_ptr, input_hw) }
-                    col_ptr = unsafe { col_ptr.add(output_hw) };
-                }
+        while outer > 0 {
+            let mut inner = inner;
+            while inner > 0 {
+                unsafe { std::ptr::copy_nonoverlapping(input_ptr, col_ptr, input_hw) }
+                col_ptr = unsafe { col_ptr.add(output_hw) };
+                inner -= 1
             }
             input_ptr = unsafe { input_ptr.add(input_hw) };
+            outer -= 1
         }
     } else if dilation_h == 1 && dilation_w == 1 {
         // TODO: ndarray is a bit faster than this implementation.
-        let kh = kernel[0];
-        let kw = kernel[1];
-        for _ in 0..batch_size * input_c {
-            for fy in 0..kh {
-                for fx in 0..kw {
-                    let mut ih = fy;
+        let outer = batch_size * input_c;
+        for _ in 0..outer {
+            for fy in 0..kernel_h {
+                for fx in 0..kernel_w {
+                    let mut ih = fy as isize - pad_t as isize;
                     for _oh in 0..output_h {
-                        if pad_t <= ih && ih < input_h + pad_t {
-                            let jh = (ih - pad_t) * input_w;
-                            let mut iw = fx;
-                            for _ow in 0..output_w {
-                                if pad_l <= iw && iw < input_w + pad_l {
-                                    let jw = jh + (iw - pad_l);
-                                    unsafe { *col_ptr = *input_ptr.add(jw) };
-                                }
-                                iw += stride_w;
-                                col_ptr = unsafe { col_ptr.add(1) };
-                            }
-                        } else {
-                            col_ptr = unsafe { col_ptr.add(output_h) };
+                        if ih < 0 || ih >= input_h as isize {
+                            col_ptr = unsafe { col_ptr.add(output_w) };
+                            ih += stride_h as isize;
+                            continue;
                         }
-                        ih += stride_h;
+                        let jh = ih as usize * input_w;
+                        let mut iw = fx as isize - pad_l as isize;
+                        for _ow in 0..output_w {
+                            if 0 <= iw && iw < input_w as isize {
+                                let jw = jh + iw as usize;
+                                unsafe { *col_ptr = *input_ptr.add(jw) };
+                            }
+                            iw += stride_w as isize;
+                            col_ptr = unsafe { col_ptr.add(1) };
+                        }
+                        ih += stride_h as isize;
                     }
                 }
             }
@@ -132,11 +137,9 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         }
     } else {
         // TODO: ndarray is a bit faster than this implementation.
-        let kh = kernel[0];
-        let kw = kernel[1];
         for _ in 0..batch_size * input_c {
-            for fy in 0..kh {
-                for fx in 0..kw {
+            for fy in 0..kernel_h {
+                for fx in 0..kernel_w {
                     let mut ih = fy * dilation_h;
                     for _oh in 0..output_h {
                         if pad_t <= ih && ih < input_h + pad_t {
@@ -151,7 +154,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
                                 col_ptr = unsafe { col_ptr.add(1) };
                             }
                         } else {
-                            col_ptr = unsafe { col_ptr.add(output_h) };
+                            col_ptr = unsafe { col_ptr.add(output_w) };
                         }
                         ih += stride_h;
                     }

@@ -173,38 +173,42 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         let mut weight_ptr = weight_ptr;
         for _ in 0..group {
             unsafe {
-                // matrixmultiply::sgemm(
-                //     out_c_per_g,
-                //     k,
-                //     output_hw,
-                //     1.0,
-                //     weight_ptr,
-                //     k as isize,
-                //     1,
-                //     col_ptr,
-                //     output_hw as isize,
-                //     1,
-                //     1.0,
-                //     output_ptr,
-                //     output_hw as isize,
-                //     1,
-                // );
-                cblas_sys::cblas_sgemm(
-                    cblas_sys::CblasRowMajor,
-                    cblas_sys::CblasNoTrans,
-                    cblas_sys::CblasNoTrans,
-                    out_c_per_g as i32,
-                    output_hw as i32,
-                    k as i32,
-                    1.0f32,
+                #[cfg(not(feature = "cblas"))]
+                matrixmultiply::sgemm(
+                    out_c_per_g,
+                    k,
+                    output_hw,
+                    1.0,
                     weight_ptr,
-                    k as i32,
-                    col_ptr as *const _,
-                    output_hw as i32,
-                    1.0f32,
-                    output_ptr as *mut f32,
-                    output_hw as i32,
+                    k as isize,
+                    1,
+                    col_ptr,
+                    output_hw as isize,
+                    1,
+                    1.0,
+                    output_ptr,
+                    output_hw as isize,
+                    1,
                 );
+                #[cfg(feature = "cblas")]
+                {
+                    cblas_sys::cblas_sgemm(
+                        cblas_sys::CblasRowMajor,
+                        cblas_sys::CblasNoTrans,
+                        cblas_sys::CblasNoTrans,
+                        out_c_per_g as i32,
+                        output_hw as i32,
+                        k as i32,
+                        1.0f32,
+                        weight_ptr,
+                        k as i32,
+                        col_ptr as *const _,
+                        output_hw as i32,
+                        1.0f32,
+                        output_ptr as *mut f32,
+                        output_hw as i32,
+                    );
+                }
                 col_ptr = col_ptr.add(col_stride);
                 weight_ptr = weight_ptr.add(weight_stride);
                 output_ptr = output_ptr.add(output_stride);

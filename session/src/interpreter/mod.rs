@@ -495,7 +495,7 @@ fn compute_sigmoid(inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    log::info!("Resize: Current implementation is incorrect.");
+    log::info!("Resize: Current implementation uses bilinear interpolation!");
 
     assert_eq!(inputs.len(), 4);
     let input = inputs[Node::RESIZE_IN_X];
@@ -505,18 +505,35 @@ fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) 
     let batch_size = input.dims()[0];
     let input_c = input.dims()[1];
     let input_h = input.dims()[2];
-    // let input_w = input.dims()[3];
+    let input_w = input.dims()[3];
     let output_h = output.dims()[2];
     let output_w = output.dims()[3];
 
-    let z = output_h as f32 / input_h as f32; // 33
+    let z = output_h as f32 / input_h as f32;
 
     for n in 0..batch_size {
         for c in 0..input_c {
             for h in 0..output_h {
                 for w in 0..output_w {
-                    *output.at_4d_mut(n, c, h, w) =
-                        input.at_4d(n, c, (h as f32 / z) as usize, (w as f32 / z) as usize)
+                    let ihf = (h as f32 / z - 0.5).max(0.);
+                    let iwf = (w as f32 / z - 0.5).max(0.);
+                    let ih = ihf as usize;
+                    let iw = iwf as usize;
+                    let ih0 = ih.min(input_h - 1);
+                    let ih1 = (ih + 1).min(input_h - 1);
+                    let iw0 = iw.min(input_w - 1);
+                    let iw1 = (iw + 1).min(input_w - 1);
+
+                    let v00 = input.at_4d(n, c, ih0, iw0);
+                    let v01 = input.at_4d(n, c, ih0, iw1);
+                    let v10 = input.at_4d(n, c, ih1, iw0);
+                    let v11 = input.at_4d(n, c, ih1, iw1);
+
+                    let hd = v00 + (v10 - v00) * (ihf - ih as f32);
+                    let hw = v01 + (v11 - v01) * (ihf - ih as f32);
+                    let r = hd + (hw - hd) * (iwf - iw as f32);
+
+                    *output.at_4d_mut(n, c, h, w) = r;
                 }
             }
         }

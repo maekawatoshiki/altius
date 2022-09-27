@@ -498,6 +498,7 @@ fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) 
     log::info!("Resize: Current implementation uses bilinear interpolation!");
 
     assert_eq!(inputs.len(), 4);
+
     let input = inputs[Node::RESIZE_IN_X];
     // let sizes = inputs[Node::RESIZE_IN_SIZES];
     let output = &mut outputs[Node::RESIZE_OUT];
@@ -508,35 +509,42 @@ fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) 
     let input_w = input.dims()[3];
     let output_h = output.dims()[2];
     let output_w = output.dims()[3];
+    let input_hw = input_h * input_w;
+    let outer = batch_size * input_c;
 
-    let z = output_h as f32 / input_h as f32;
+    let scale = output_h as f32 / input_h as f32;
 
-    for n in 0..batch_size {
-        for c in 0..input_c {
-            for h in 0..output_h {
-                for w in 0..output_w {
-                    let ihf = (h as f32 / z - 0.5).max(0.);
-                    let iwf = (w as f32 / z - 0.5).max(0.);
-                    let ih = ihf as usize;
-                    let iw = iwf as usize;
-                    let ih0 = ih.min(input_h - 1);
-                    let ih1 = (ih + 1).min(input_h - 1);
-                    let iw0 = iw.min(input_w - 1);
-                    let iw1 = (iw + 1).min(input_w - 1);
+    let mut input = input.data::<f32>();
+    let mut output = output.data_mut::<f32>();
 
-                    let v00 = input.at_4d(n, c, ih0, iw0);
-                    let v01 = input.at_4d(n, c, ih0, iw1);
-                    let v10 = input.at_4d(n, c, ih1, iw0);
-                    let v11 = input.at_4d(n, c, ih1, iw1);
+    for _ in 0..outer {
+        for h in 0..output_h {
+            let ihf = (h as f32 / scale - 0.5).max(0.);
+            let ih = ihf as usize;
+            let ih0 = ih.min(input_h - 1);
+            let ih1 = (ih + 1).min(input_h - 1);
+            let ih0w = input_w * ih0;
+            let ih1w = input_w * ih1;
+            for w in 0..output_w {
+                let iwf = (w as f32 / scale - 0.5).max(0.);
+                let iw = iwf as usize;
+                let iw0 = iw.min(input_w - 1);
+                let iw1 = (iw + 1).min(input_w - 1);
 
-                    let hd = v00 + (v10 - v00) * (ihf - ih as f32);
-                    let hw = v01 + (v11 - v01) * (ihf - ih as f32);
-                    let r = hd + (hw - hd) * (iwf - iw as f32);
+                let v00 = input[ih0w + iw0];
+                let v01 = input[ih0w + iw1];
+                let v10 = input[ih1w + iw0];
+                let v11 = input[ih1w + iw1];
 
-                    *output.at_4d_mut(n, c, h, w) = r;
-                }
+                let hd = v00 + (v10 - v00) * (ihf - ih as f32);
+                let hw = v01 + (v11 - v01) * (ihf - ih as f32);
+                let r = hd + (hw - hd) * (iwf - iw as f32);
+
+                output[0] = r;
+                output = &mut output[1..];
             }
         }
+        input = &input[input_hw..];
     }
 }
 

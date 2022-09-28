@@ -47,6 +47,7 @@ pub enum Op {
     Loop,
     Tile,
     Slice,
+    Gather(Gather),
     Shape(Shape),
     NonMaxSuppression,
     MatMul,
@@ -142,6 +143,12 @@ pub struct ReduceMin {
 pub struct ReduceMean {
     pub axes: Vec<i64>,
     pub keep_dims: i64,
+}
+
+/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Gather
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Gather {
+    pub axis: i64,
 }
 
 /// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Shape
@@ -353,6 +360,7 @@ impl Op {
             Op::Loop => "Loop",
             Op::Tile => "Tile",
             Op::Slice => "Slice",
+            Op::Gather(_) => "Gather",
             Op::Shape(_) => "Shape",
             Op::NonMaxSuppression => "NonMaxSuppression",
             Op::MatMul => "MatMul",
@@ -703,6 +711,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 dims[axis] = out_dim;
             }
             shapes.push(TypedShape::new(dims, inputs[Node::SLICE_IN_DATA].elem_ty()))
+        }
+        Op::Gather(_) => {
+            todo!("Gather")
         }
         Op::Shape(_) => {
             todo!()

@@ -142,7 +142,7 @@ pub struct ReduceMin {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ReduceMean {
     pub axes: Vec<i64>,
-    pub keep_dims: i64,
+    pub keep_dims: bool,
 }
 
 /// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Gather
@@ -659,8 +659,25 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 inputs[Node::REDUCEMIN_IN].elem_ty(),
             ))
         }
-        Op::ReduceMean(_rmean) => {
-            todo!("ReduceMean")
+        Op::ReduceMean(rmean) => {
+            let in_dims = inputs[0].dims();
+            let keepdims = if rmean.keep_dims { Some(1) } else { None };
+            let mut dims = in_dims
+                .as_slice()
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &d)| {
+                    if rmean.axes.contains(&(i as i64)) {
+                        keepdims
+                    } else {
+                        Some(d)
+                    }
+                })
+                .collect::<Vec<_>>();
+            if dims.is_empty() {
+                dims.push(1);
+            }
+            shapes.push(TypedShape::new(dims.into(), inputs[0].elem_ty()))
         }
         Op::Loop => {
             assert!(inputs.len() == 3);

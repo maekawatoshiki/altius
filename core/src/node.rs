@@ -28,6 +28,7 @@ pub enum Op {
     LeakyReLU(LeakyReLU),
     Sigmoid,
     Clip,
+    Softmax(Softmax),
     Cast(Cast),
     MaxPool(MaxPool),
     GlobalAveragePool,
@@ -81,6 +82,12 @@ pub struct HardSigmoid {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct LeakyReLU {
     pub alpha: f32,
+}
+
+/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Softmax
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Softmax {
+    pub axis: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -326,6 +333,7 @@ impl Op {
             Op::LeakyReLU(_) => "LeakyReLU",
             Op::Sigmoid => "Sigmoid",
             Op::Clip => "Clip",
+            Op::Softmax(_) => "Softmax",
             Op::Cast(_) => "Cast",
             Op::MaxPool(_) => "MaxPool",
             Op::GlobalAveragePool => "GlobalAveragePool",
@@ -730,6 +738,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         }
         Op::Constant(_) => {
             todo!()
+        }
+        Op::Softmax(_softmax) => {
+            todo!("Softmax")
         }
         // Element-wise operations.
         Op::Sqrt

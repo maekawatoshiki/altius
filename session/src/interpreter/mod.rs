@@ -143,6 +143,7 @@ impl<'a> Interpreter<'a> {
             Op::Sub => todo!("sub"),
             Op::Mul => compute_mul(node, &inputs, &mut outputs),
             Op::Div => compute_div(node, &inputs, &mut outputs),
+            Op::Pow => todo!("Pow"),
             Op::MaxPool(ref maxpool) => compute_max_pool(maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => compute_gavg_pool(node, &inputs, &mut outputs),
             Op::Reshape => compute_reshape(node, &inputs, &mut outputs),

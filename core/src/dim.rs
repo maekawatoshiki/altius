@@ -17,6 +17,10 @@ impl Dimensions {
         self.0.is_empty()
     }
 
+    pub fn is_scalar(&self) -> bool {
+        self.is_empty() || (self.len() == 1 && matches!(self.0[0], 0 | 1))
+    }
+
     pub fn total_elems(&self) -> usize {
         self.0.iter().product()
     }

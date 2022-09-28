@@ -482,7 +482,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         }
         Op::Pow => {
             let (in_a, in_b) = (inputs[0].dims(), inputs[1].dims());
-            assert!(in_a == in_b);
+            assert!(in_a == in_b || in_b.is_scalar());
             shapes.push(TypedShape::new(in_a.clone(), inputs[0].elem_ty()));
         }
         Op::MaxPool(maxpool) => {

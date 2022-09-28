@@ -155,6 +155,7 @@ impl<'a> Interpreter<'a> {
             Op::HardSigmoid(ref hs) => compute_hard_sigmoid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
+            Op::Erf => todo!("Erf"),
             Op::Clip => todo!("clip"),
             Op::Softmax(_) => todo!("Softmax"),
             Op::Resize(ref resize) => compute_resize(resize, &inputs, &mut outputs),

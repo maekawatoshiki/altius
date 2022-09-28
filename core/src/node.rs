@@ -37,6 +37,7 @@ pub enum Op {
     Squeeze(Squeeze),
     Unsqueeze(Unsqueeze),
     ReduceMin(ReduceMin),
+    ReduceMean(ReduceMean),
     Round,
     Exp,
     Loop,
@@ -122,6 +123,13 @@ pub struct Unsqueeze {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ReduceMin {
+    pub axes: Vec<i64>,
+    pub keep_dims: i64,
+}
+
+/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#ReduceMean
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ReduceMean {
     pub axes: Vec<i64>,
     pub keep_dims: i64,
 }
@@ -325,6 +333,7 @@ impl Op {
             Op::Squeeze(_) => "Squeeze",
             Op::Unsqueeze(_) => "Unsqueeze",
             Op::ReduceMin(_) => "ReduceMin",
+            Op::ReduceMean(_) => "ReduceMean",
             Op::Round => "Round",
             Op::Exp => "Exp",
             Op::Loop => "Loop",
@@ -622,6 +631,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 dims.into(),
                 inputs[Node::REDUCEMIN_IN].elem_ty(),
             ))
+        }
+        Op::ReduceMean(_rmean) => {
+            todo!("ReduceMean")
         }
         Op::Loop => {
             assert!(inputs.len() == 3);

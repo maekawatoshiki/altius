@@ -7,8 +7,9 @@ use crate::{
     dim::Dimensions,
     model::Model,
     node::{
-        BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU,
-        MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape, Softmax, Squeeze, Transpose,
+        BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gather, Gemm, HardSigmoid,
+        LeakyReLU, MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape, Softmax, Squeeze,
+        Transpose,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
 };
@@ -132,6 +133,9 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             "Exp" => Op::Exp,
             "Tile" => Op::Tile,
             "Slice" => Op::Slice,
+            "Gather" => Op::Gather(Gather {
+                axis: get_attribute(&node.attribute, "axis").map_or(0, |a| a.i()),
+            }),
             "NonMaxSuppression" => Op::NonMaxSuppression,
             "Reshape" => Op::Reshape,
             "MatMul" => Op::MatMul,

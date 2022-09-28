@@ -174,6 +174,7 @@ impl<'a> Interpreter<'a> {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
             Op::Slice => todo!("slice"),
+            Op::Gather(_) => todo!("Gather"),
             Op::Shape(_) => todo!("shape"),
             Op::NonMaxSuppression => todo!("nms"),
             Op::Constant(_) => todo!("constant"),

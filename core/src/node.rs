@@ -22,6 +22,7 @@ pub enum Op {
     Sub,
     Mul,
     Div,
+    Pow,
     ReLU,
     LeakyReLU(LeakyReLU),
     Sigmoid,
@@ -318,6 +319,7 @@ impl Op {
             Op::Sub => "Sub",
             Op::Mul => "Mul",
             Op::Div => "Div",
+            Op::Pow => "Pow",
             Op::ReLU => "ReLU",
             Op::LeakyReLU(_) => "LeakyReLU",
             Op::Sigmoid => "Sigmoid",
@@ -457,6 +459,11 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 in_a.clone(),
                 inputs[Node::DIV_IN_A].elem_ty(),
             ));
+        }
+        Op::Pow => {
+            let (in_a, in_b) = (inputs[0].dims(), inputs[1].dims());
+            assert!(in_a == in_b);
+            shapes.push(TypedShape::new(in_a.clone(), inputs[0].elem_ty()));
         }
         Op::MaxPool(maxpool) => {
             let auto_pad = &maxpool.auto_pad;

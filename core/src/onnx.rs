@@ -120,6 +120,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             "Sub" => Op::Sub,
             "Mul" => Op::Mul,
             "Div" => Op::Div,
+            "Pow" => Op::Pow,
             "Relu" => Op::ReLU,
             "Sigmoid" => Op::Sigmoid,
             "Round" => Op::Round,

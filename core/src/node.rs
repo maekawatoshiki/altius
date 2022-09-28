@@ -23,6 +23,7 @@ pub enum Op {
     Mul,
     Div,
     Pow,
+    Sqrt,
     ReLU,
     LeakyReLU(LeakyReLU),
     Sigmoid,
@@ -320,6 +321,7 @@ impl Op {
             Op::Mul => "Mul",
             Op::Div => "Div",
             Op::Pow => "Pow",
+            Op::Sqrt => "Sqrt",
             Op::ReLU => "ReLU",
             Op::LeakyReLU(_) => "LeakyReLU",
             Op::Sigmoid => "Sigmoid",
@@ -730,7 +732,8 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             todo!()
         }
         // Element-wise operations.
-        Op::ReLU
+        Op::Sqrt
+        | Op::ReLU
         | Op::LeakyReLU(_)
         | Op::Sigmoid
         | Op::Clip

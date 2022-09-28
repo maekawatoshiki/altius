@@ -214,7 +214,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             }),
             "ReduceMean" => Op::ReduceMean(ReduceMean {
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
-                keep_dims: get_attribute(&node.attribute, "keepdims").map_or(1, |a| a.i()),
+                keep_dims: get_attribute(&node.attribute, "keepdims").map_or(true, |a| a.i() != 0),
             }),
             "Loop" => {
                 // TODO

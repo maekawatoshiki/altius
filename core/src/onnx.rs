@@ -8,7 +8,7 @@ use crate::{
     model::Model,
     node::{
         BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU,
-        MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape, Squeeze, Transpose,
+        MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape, Softmax, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
 };
@@ -124,6 +124,9 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             "Sqrt" => Op::Sqrt,
             "Relu" => Op::ReLU,
             "Sigmoid" => Op::Sigmoid,
+            "Softmax" => Op::Softmax(Softmax {
+                axis: get_attribute(&node.attribute, "axis").map_or(-1, |a| a.i()),
+            }),
             "Round" => Op::Round,
             "Exp" => Op::Exp,
             "Tile" => Op::Tile,

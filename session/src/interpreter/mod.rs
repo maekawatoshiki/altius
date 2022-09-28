@@ -156,6 +156,7 @@ impl<'a> Interpreter<'a> {
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
+            Op::Softmax(_) => todo!("Softmax"),
             Op::Resize(ref resize) => compute_resize(resize, &inputs, &mut outputs),
             Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
             Op::Transpose(ref trans) => compute_transpose(trans, &inputs, &mut outputs),

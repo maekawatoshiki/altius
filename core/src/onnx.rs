@@ -8,7 +8,7 @@ use crate::{
     model::Model,
     node::{
         BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gemm, HardSigmoid, LeakyReLU,
-        MaxPool, Node, Op, ReduceMin, Resize, Shape, Squeeze, Transpose,
+        MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
 };
@@ -199,6 +199,10 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
             }),
             "ReduceMin" => Op::ReduceMin(ReduceMin {
+                axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
+                keep_dims: get_attribute(&node.attribute, "keepdims").map_or(1, |a| a.i()),
+            }),
+            "ReduceMean" => Op::ReduceMean(ReduceMean {
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
                 keep_dims: get_attribute(&node.attribute, "keepdims").map_or(1, |a| a.i()),
             }),

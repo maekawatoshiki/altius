@@ -160,6 +160,7 @@ impl<'a> Interpreter<'a> {
             Op::Squeeze(ref squeeze) => compute_squeeze(squeeze, &inputs, &mut outputs),
             Op::Unsqueeze(_) => todo!("unsqueeze"),
             Op::ReduceMin(_) => todo!("reduce min"),
+            Op::ReduceMean(_) => todo!("ReduceMean"),
             Op::Round => todo!("round"),
             Op::Exp => todo!("exp"),
             Op::Loop => compute_loop(node, &inputs, &mut outputs),

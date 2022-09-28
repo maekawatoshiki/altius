@@ -124,6 +124,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             "Sqrt" => Op::Sqrt,
             "Relu" => Op::ReLU,
             "Sigmoid" => Op::Sigmoid,
+            "Erf" => Op::Erf,
             "Softmax" => Op::Softmax(Softmax {
                 axis: get_attribute(&node.attribute, "axis").map_or(-1, |a| a.i()),
             }),

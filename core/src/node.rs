@@ -27,6 +27,7 @@ pub enum Op {
     ReLU,
     LeakyReLU(LeakyReLU),
     Sigmoid,
+    Erf,
     Clip,
     Softmax(Softmax),
     Cast(Cast),
@@ -332,6 +333,7 @@ impl Op {
             Op::ReLU => "ReLU",
             Op::LeakyReLU(_) => "LeakyReLU",
             Op::Sigmoid => "Sigmoid",
+            Op::Erf => "Erf",
             Op::Clip => "Clip",
             Op::Softmax(_) => "Softmax",
             Op::Cast(_) => "Cast",
@@ -747,6 +749,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         | Op::ReLU
         | Op::LeakyReLU(_)
         | Op::Sigmoid
+        | Op::Erf
         | Op::Clip
         | Op::Cast(_)
         | Op::HardSigmoid(_)

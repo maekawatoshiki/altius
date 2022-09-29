@@ -13,7 +13,7 @@ use altius_core::{
 use conv2d::Conv2dCtx;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-use ndarray::{linalg, Array2, ArrayView2, ArrayView4};
+use ndarray::{linalg, Array2, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
 
 use std::simd::Simd;
@@ -573,21 +573,36 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
     let output = &mut outputs[Node::TRANSPOSE_OUT];
     assert!(input.elem_ty().is_f32());
 
-    if input.dims().len() == 2 {
-        let in_view = ArrayView2::from_shape(input.fixed_dims::<2>(), input.data::<f32>()).unwrap();
-        in_view.permuted_axes([transpose.perm[0] as usize, transpose.perm[1] as usize]);
-        output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
-    } else if input.dims().len() == 4 {
-        let in_view = ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap();
-        in_view.permuted_axes([
-            transpose.perm[0] as usize,
-            transpose.perm[1] as usize,
-            transpose.perm[2] as usize,
-            transpose.perm[3] as usize,
-        ]);
-        output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
-    } else {
-        todo!()
+    // TODO: Refactor.
+    match input.dims().len() {
+        2 => {
+            let in_view =
+                ArrayView2::from_shape(input.fixed_dims::<2>(), input.data::<f32>()).unwrap();
+            in_view.permuted_axes([transpose.perm[0] as usize, transpose.perm[1] as usize]);
+            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+        }
+        3 => {
+            let in_view =
+                ArrayView3::from_shape(input.fixed_dims::<3>(), input.data::<f32>()).unwrap();
+            in_view.permuted_axes([
+                transpose.perm[0] as usize,
+                transpose.perm[1] as usize,
+                transpose.perm[2] as usize,
+            ]);
+            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+        }
+        4 => {
+            let in_view =
+                ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap();
+            in_view.permuted_axes([
+                transpose.perm[0] as usize,
+                transpose.perm[1] as usize,
+                transpose.perm[2] as usize,
+                transpose.perm[3] as usize,
+            ]);
+            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+        }
+        _ => todo!("Transpose: Unsupported shape."),
     }
 }
 

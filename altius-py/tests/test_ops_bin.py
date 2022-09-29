@@ -75,6 +75,11 @@ def test_mul_3():
         op_bin(os.path.join(tmpdir, "model.onnx"), "Mul", [128, 3, 224, 224])
 
 
+def test_mul_4():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Mul", [3, 15, 15], [15])
+
+
 def test_div_1():
     with tempfile.TemporaryDirectory() as tmpdir:
         op_bin(os.path.join(tmpdir, "model.onnx"), "Div", [1, 2])

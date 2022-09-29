@@ -461,6 +461,17 @@ fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
+    if input_b.dims().is_scalar() {
+        let b = input_b.data::<f32>()[0];
+        let output = output.data_mut::<f32>();
+
+        for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
+            *o = a * b;
+        }
+
+        return;
+    }
+
     todo!(
         "A shape: {:?}, B shape: {:?}",
         input_a.dims(),

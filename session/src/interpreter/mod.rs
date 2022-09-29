@@ -594,7 +594,7 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let [k, n] = input_b.fixed_dims::<2>();
         let output = &mut outputs[Node::GEMM_OUT];
 
-        for i in 0..adim.len() {
+        for i in 0..adim[0] {
             let a = ArrayView2::from_shape([m, k], input_a.slice_at(&[i])).unwrap();
             let b = ArrayView2::from_shape([k, n], input_b.data::<f32>()).unwrap();
             let mut c = Array2::zeros([m, n]);
@@ -608,7 +608,7 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let [_, k, n] = input_b.fixed_dims::<3>();
         let output = &mut outputs[Node::GEMM_OUT];
 
-        for i in 0..adim.len() {
+        for i in 0..adim[0] {
             let a = ArrayView2::from_shape([m, k], input_a.slice_at(&[i])).unwrap();
             let b = ArrayView2::from_shape([k, n], input_b.slice_at(&[i])).unwrap();
             let mut c = Array2::zeros([m, n]);

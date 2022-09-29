@@ -15,6 +15,7 @@ use conv2d::Conv2dCtx;
 use cudnn::CudnnContext;
 use ndarray::{linalg, s, Array2, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
+use statrs::function::erf::erf;
 
 use std::simd::Simd;
 use std::time::{Duration, Instant};
@@ -155,7 +156,7 @@ impl<'a> Interpreter<'a> {
             Op::HardSigmoid(ref hs) => compute_hard_sigmoid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
-            Op::Erf => todo!("Erf"),
+            Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
             Op::Softmax(ref softmax) => compute_softmax(softmax, &inputs, &mut outputs),
             Op::Resize(ref resize) => compute_resize(resize, &inputs, &mut outputs),
@@ -697,6 +698,16 @@ fn compute_sigmoid(inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = 1. / (1. + (-i).exp())
+    }
+}
+
+fn compute_erf(inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input: &[f32] = inputs[0].data();
+    let output: &mut [f32] = outputs[0].data_mut();
+
+    for (&i, o) in input.iter().zip(output.iter_mut()) {
+        // TODO: `statrs` crate is used only for this `erf` function...
+        *o = erf(i as f64) as f32;
     }
 }
 

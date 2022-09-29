@@ -144,7 +144,7 @@ impl<'a> Interpreter<'a> {
             Op::Mul => compute_mul(node, &inputs, &mut outputs),
             Op::Div => compute_div(node, &inputs, &mut outputs),
             Op::Pow => compute_pow(node, &inputs, &mut outputs),
-            Op::Sqrt => todo!("Sqrt"),
+            Op::Sqrt => compute_sqrt(node, &inputs, &mut outputs),
             Op::MaxPool(ref maxpool) => compute_max_pool(maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => compute_gavg_pool(node, &inputs, &mut outputs),
             Op::Reshape => compute_reshape(node, &inputs, &mut outputs),
@@ -329,9 +329,9 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Node::ADD_IN_A];
-    let input_b = inputs[Node::ADD_IN_B];
-    let output = &mut outputs[Node::ADD_OUT];
+    let input_a = inputs[Node::SUB_IN_A];
+    let input_b = inputs[Node::SUB_IN_B];
+    let output = &mut outputs[Node::SUB_OUT];
 
     if input_a.dims() == input_b.dims() {
         let mut input_a = input_a.data::<f32>();
@@ -467,9 +467,9 @@ fn compute_div(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Node::MUL_IN_A];
-    let input_b = inputs[Node::MUL_IN_B];
-    let output = &mut outputs[Node::MUL_OUT];
+    let input_a = inputs[0];
+    let input_b = inputs[1];
+    let output = &mut outputs[0];
 
     if input_a.dims() == input_b.dims() {
         for (i, (a, b)) in input_a
@@ -501,6 +501,19 @@ fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         input_a.dims(),
         input_b.dims()
     )
+}
+
+fn compute_sqrt(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input = inputs[0];
+    let output = &mut outputs[0];
+
+    for (i, o) in input
+        .data::<f32>()
+        .iter()
+        .zip(output.data_mut::<f32>().iter_mut())
+    {
+        *o = i.sqrt();
+    }
 }
 
 fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

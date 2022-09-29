@@ -5,7 +5,7 @@ use altius_core::{
     model::Model,
     node::{
         compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gemm, HardSigmoid,
-        LeakyReLU, MaxPool, Node, NodeId, Op, Resize, Squeeze, Transpose,
+        LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -164,7 +164,7 @@ impl<'a> Interpreter<'a> {
             Op::Squeeze(ref squeeze) => compute_squeeze(squeeze, &inputs, &mut outputs),
             Op::Unsqueeze(_) => todo!("unsqueeze"),
             Op::ReduceMin(_) => todo!("reduce min"),
-            Op::ReduceMean(_) => todo!("ReduceMean"),
+            Op::ReduceMean(ref rmean) => compute_reduce_mean(rmean, &inputs, &mut outputs),
             Op::Round => todo!("round"),
             Op::Exp => todo!("exp"),
             Op::Loop => compute_loop(node, &inputs, &mut outputs),
@@ -611,6 +611,36 @@ fn compute_squeeze(_squeeze: &Squeeze, inputs: &[&Tensor], outputs: &mut [Tensor
     assert!(input.elem_ty().is_f32());
     let output = &mut outputs[Node::SQUEEZE_OUT];
     output.set_raw_vec(input.data::<f32>().to_vec());
+}
+
+fn compute_reduce_mean(rmean: &ReduceMean, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input = inputs[0];
+    let output = &mut outputs[0];
+    let axes = rmean
+        .axes
+        .iter()
+        .map(|&axis| {
+            if axis < 0 {
+                (input.dims().len() as i64 + axis) as usize
+            } else {
+                axis as usize
+            }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(axes.len(), 1);
+    let axis = axes[0];
+    assert_eq!(input.dims().len(), 3);
+    assert_eq!(axis, 2);
+    assert!(rmean.keep_dims);
+    for i in 0..input.dims()[0] {
+        for j in 0..input.dims()[1] {
+            let mut sum = 0f32;
+            for k in 0..input.dims()[2] {
+                sum += input.at_3d(i, j, k);
+            }
+            *output.at_3d_mut(i, j, 0) = sum;
+        }
+    }
 }
 
 fn compute_loop(_node: &Node, _inputs: &[&Tensor], _outputs: &mut [Tensor]) {

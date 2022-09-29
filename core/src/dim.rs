@@ -40,6 +40,42 @@ impl Dimensions {
     pub fn from_i64(dims: &[i64]) -> Self {
         Self(dims.iter().map(|&x| x as Dimension).collect())
     }
+
+    pub fn broadcast(&self, other: impl AsRef<Self>) -> Option<Self> {
+        broadcast(&[self, other.as_ref()])
+    }
+}
+
+pub fn broadcast(shapes: &[impl AsRef<Dimensions>]) -> Option<Dimensions> {
+    let mut shape = vec![];
+    let max_len = shapes
+        .iter()
+        .map(AsRef::as_ref)
+        .map(Dimensions::len)
+        .max()?;
+    for i in 0..max_len {
+        let mut size = 1;
+        for shape in shapes.iter().map(AsRef::as_ref) {
+            let len = shape.len();
+            let dim = if i < len { shape[len - i - 1] } else { 1 };
+            if dim == 1 {
+                continue;
+            }
+            if size != 1 && dim != size {
+                return None;
+            }
+            size = dim
+        }
+        shape.push(size)
+    }
+    shape.reverse();
+    Some(shape.into())
+}
+
+impl AsRef<Dimensions> for Dimensions {
+    fn as_ref(&self) -> &Dimensions {
+        self
+    }
 }
 
 impl<I> Index<I> for Dimensions
@@ -71,4 +107,59 @@ impl From<Vec<Dimension>> for Dimensions {
 #[test]
 fn total_elems() {
     assert_eq!(Dimensions(vec![1, 1, 28, 28]).total_elems(), 784)
+}
+
+#[test]
+fn broadcast_1() {
+    let one = Dimensions::from(vec![1]);
+    let shape = broadcast(&[&one]).unwrap();
+    assert_eq!(shape, one)
+}
+
+#[test]
+fn broadcast_2() {
+    let one = Dimensions::from(vec![1]);
+    let four = Dimensions::from(vec![4, 1]);
+    let shape = broadcast(&[one, four]).unwrap();
+    assert_eq!(shape, vec![4, 1].into())
+}
+
+#[test]
+fn broadcast_3() {
+    let one = Dimensions::from(vec![1]);
+    let four = Dimensions::from(vec![4, 1]);
+    let shape = broadcast(&[four, one]).unwrap();
+    assert_eq!(shape, vec![4, 1].into())
+}
+
+#[test]
+#[should_panic]
+fn broadcast_4() {
+    let one = Dimensions::from(vec![10, 20]);
+    let four = Dimensions::from(vec![10, 20, 30]);
+    let _ = broadcast(&[four, one]).unwrap();
+}
+
+#[test]
+fn broadcast_5() {
+    let x = Dimensions::from(vec![1, 3, 3]);
+    let y = Dimensions::from(vec![5, 1, 3, 3]);
+    let shape = broadcast(&[x, y]).unwrap();
+    assert_eq!(shape, vec![5, 1, 3, 3].into())
+}
+
+#[test]
+fn broadcast_6() {
+    let x = Dimensions::from(vec![1, 3, 1]);
+    let y = Dimensions::from(vec![5, 3, 10]);
+    let shape = broadcast(&[x, y]).unwrap();
+    assert_eq!(shape, vec![5, 3, 10].into())
+}
+
+#[test]
+fn broadcast_7() {
+    let x = Dimensions::from(vec![1, 3, 4, 4]);
+    let y = Dimensions::from(vec![3, 1, 1]);
+    let shape = broadcast(&[x, y]).unwrap();
+    assert_eq!(shape, vec![1, 3, 4, 4,].into())
 }

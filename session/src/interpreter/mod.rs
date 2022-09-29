@@ -557,7 +557,7 @@ fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) 
 fn compute_concat(concat: &Concat, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let output = &mut outputs[Node::CONCAT_OUT];
 
-    assert_eq!(output.dims().len(), 4);
+    assert!(matches!(output.dims().len(), 3 | 4));
     assert_eq!(concat.axis, 1);
 
     let mut output = output.data_mut::<f32>();

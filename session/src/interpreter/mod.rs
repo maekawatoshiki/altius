@@ -1,4 +1,7 @@
 mod conv2d;
+mod gemm;
+
+use crate::interpreter::gemm::sgemm;
 
 use super::SessionError;
 use altius_core::{
@@ -670,41 +673,35 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     if adim.len() == 3 && bdim.len() == 2 {
         // TODO: Don't use ndarray.
-        let input_a = inputs[Node::GEMM_IN_A];
         let [_, m, _k] = input_a.fixed_dims::<3>();
         let [k, n] = input_b.fixed_dims::<2>();
 
         for i in 0..adim[0] {
-            let a = ArrayView2::from_shape([m, k], input_a.slice_at(&[i])).unwrap();
-            let b = ArrayView2::from_shape([k, n], input_b.data::<f32>()).unwrap();
-            let mut c = Array2::zeros([m, n]);
-            linalg::general_mat_mul(1., &a, &b, 0., &mut c);
-            output.slice_at_mut(&[i])[..(m * n)].copy_from_slice(c.as_slice().unwrap());
+            let a = input_a.slice_at(&[i]);
+            let b = input_b.data::<f32>();
+            let c = output.slice_at_mut(&[i]);
+            sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
         }
     } else if adim.len() == 3 && bdim.len() == 3 {
         // TODO: Don't use ndarray.
-        let input_a = inputs[Node::GEMM_IN_A];
         let [_, m, _k] = input_a.fixed_dims::<3>();
         let [_, k, n] = input_b.fixed_dims::<3>();
 
         for i in 0..adim[0] {
-            let a = ArrayView2::from_shape([m, k], input_a.slice_at(&[i])).unwrap();
-            let b = ArrayView2::from_shape([k, n], input_b.slice_at(&[i])).unwrap();
-            let mut c = Array2::zeros([m, n]);
-            linalg::general_mat_mul(1., &a, &b, 0., &mut c);
-            output.slice_at_mut(&[i])[..(m * n)].copy_from_slice(c.as_slice().unwrap());
+            let a = input_a.slice_at(&[i]);
+            let b = input_b.slice_at(&[i]);
+            let c = output.slice_at_mut(&[i]);
+            sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
         }
     } else {
         // TODO: Don't use ndarray.
-        let input_a = inputs[Node::MATMUL_IN_A];
         let [m, _k] = input_a.fixed_dims::<2>();
         let [k, n] = input_b.fixed_dims::<2>();
 
-        let a = ArrayView2::from_shape([m, k], input_a.data()).unwrap();
-        let b = ArrayView2::from_shape([k, n], input_b.data()).unwrap();
-        let mut c = Array2::zeros([m, n]);
-        linalg::general_mat_mul(1., &a, &b, 0., &mut c);
-        output.data_mut().copy_from_slice(c.as_slice().unwrap());
+        let a = input_a.data();
+        let b = input_b.data();
+        let c = output.data_mut();
+        sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
     }
 }
 

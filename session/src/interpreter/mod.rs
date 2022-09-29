@@ -140,7 +140,7 @@ impl<'a> Interpreter<'a> {
                 outputs: &mut outputs,
             }),
             Op::Add => compute_add(node, &inputs, &mut outputs),
-            Op::Sub => todo!("sub"),
+            Op::Sub => compute_sub(node, &inputs, &mut outputs),
             Op::Mul => compute_mul(node, &inputs, &mut outputs),
             Op::Div => compute_div(node, &inputs, &mut outputs),
             Op::Pow => todo!("Pow"),
@@ -326,6 +326,63 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             }
         }
     }
+}
+
+fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input_a = inputs[Node::ADD_IN_A];
+    let input_b = inputs[Node::ADD_IN_B];
+    let output = &mut outputs[Node::ADD_OUT];
+
+    if input_a.dims() == input_b.dims() {
+        let mut input_a = input_a.data::<f32>();
+        let mut input_b = input_b.data::<f32>();
+        let mut output = output.data_mut::<f32>();
+        let mut len = output.len();
+        const SIMD_LEN: usize = 4;
+
+        while len >= SIMD_LEN {
+            let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
+            let b = Simd::<f32, SIMD_LEN>::from_slice(&input_b[0..SIMD_LEN]);
+            let c = a - b;
+            output[0..SIMD_LEN].copy_from_slice(c.as_array());
+            input_a = &input_a[SIMD_LEN..];
+            input_b = &input_b[SIMD_LEN..];
+            output = &mut output[SIMD_LEN..];
+            len -= SIMD_LEN
+        }
+
+        for (i, (a, b)) in input_a.iter().zip(input_b.iter()).enumerate() {
+            output[i] = a - b;
+        }
+
+        return;
+    }
+
+    // TODO: We need multidirectional broadcast!
+
+    if input_a.dims().len() == 3
+        && input_b.dims().len() == 3
+        && input_b.dims()[input_b.dims().len() - 1] == 1
+    {
+        let dims = input_a.dims();
+        let max = dims.total_elems();
+        let n = dims.0.last().unwrap();
+        let input_a = input_a.data::<f32>();
+        let input_b = input_b.data::<f32>();
+        let output = output.data_mut::<f32>();
+
+        for i in 0..max {
+            output[i] = input_a[i] - input_b[i / n];
+        }
+
+        return;
+    }
+
+    todo!(
+        "A shape: {:?}, B shape: {:?}",
+        input_a.dims(),
+        input_b.dims()
+    )
 }
 
 fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

@@ -135,7 +135,7 @@ pub struct Unsqueeze {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ReduceMin {
     pub axes: Vec<i64>,
-    pub keep_dims: i64,
+    pub keep_dims: bool,
 }
 
 /// https://github.com/onnx/onnx/blob/main/docs/Operators.md#ReduceMean
@@ -673,39 +673,49 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             ))
         }
         Op::ReduceMin(rmin) => {
-            let in_dims = inputs[Node::REDUCEMIN_IN].dims();
-            let mut dims = vec![];
-            for (i, &x) in in_dims.as_slice().iter().enumerate() {
-                if rmin.axes.contains(&(i as i64)) {
-                    if rmin.keep_dims == 1 {
-                        dims.push(1);
-                    }
-                    continue;
-                }
-                dims.push(x);
-            }
-            if dims.is_empty() {
-                dims.push(1);
-            }
-            shapes.push(TypedShape::new(
-                dims.into(),
-                inputs[Node::REDUCEMIN_IN].elem_ty(),
-            ))
-        }
-        Op::ReduceMean(rmean) => {
             let in_dims = inputs[0].dims();
-            let keepdims = if rmean.keep_dims { Some(1) } else { None };
+            let keepdims = if rmin.keep_dims { Some(1) } else { None };
+            let axes = rmin
+                .axes
+                .iter()
+                .map(|&axis| {
+                    if axis < 0 {
+                        (in_dims.len() as i64 + axis) as usize
+                    } else {
+                        axis as usize
+                    }
+                })
+                .collect::<Vec<_>>();
             let mut dims = in_dims
                 .as_slice()
                 .iter()
                 .enumerate()
-                .filter_map(|(i, &d)| {
-                    if rmean.axes.contains(&(i as i64)) {
-                        keepdims
+                .filter_map(|(i, &d)| if axes.contains(&i) { keepdims } else { Some(d) })
+                .collect::<Vec<_>>();
+            if dims.is_empty() {
+                dims.push(1);
+            }
+            shapes.push(TypedShape::new(dims.into(), inputs[0].elem_ty()))
+        }
+        Op::ReduceMean(rmean) => {
+            let in_dims = inputs[0].dims();
+            let keepdims = if rmean.keep_dims { Some(1) } else { None };
+            let axes = rmean
+                .axes
+                .iter()
+                .map(|&axis| {
+                    if axis < 0 {
+                        (in_dims.len() as i64 + axis) as usize
                     } else {
-                        Some(d)
+                        axis as usize
                     }
                 })
+                .collect::<Vec<_>>();
+            let mut dims = in_dims
+                .as_slice()
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &d)| if axes.contains(&i) { keepdims } else { Some(d) })
                 .collect::<Vec<_>>();
             if dims.is_empty() {
                 dims.push(1);

@@ -130,6 +130,22 @@ impl Tensor {
         out
     }
 
+    pub fn slice_at(&self, indices: &[Dimension]) -> &[f32] {
+        let mut index = 0;
+        for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
+            index += d * idx;
+        }
+        &self.data::<f32>()[index..]
+    }
+
+    pub fn slice_at_mut(&mut self, indices: &[Dimension]) -> &mut [f32] {
+        let mut index = 0;
+        for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
+            index += d * idx;
+        }
+        &mut self.data_mut::<f32>()[index..]
+    }
+
     pub fn at(&self, indices: &[Dimension]) -> f32 {
         let mut index = 0;
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {

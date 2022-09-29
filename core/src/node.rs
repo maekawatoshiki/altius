@@ -427,101 +427,11 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 inputs[Node::CONV2D_IN].elem_ty(),
             ));
         }
-        Op::Add => {
-            let in_a = inputs[Node::ADD_IN_A].dims();
-            let in_b = inputs[Node::ADD_IN_B].dims();
-            assert!(
-                in_a == in_b
-                    || {
-                        in_a.len() == 4
-                            && in_b.len() == 3
-                            && in_a[1] == in_b[0]
-                            && in_b[1] == 1
-                            && in_b[2] == 1
-                    }
-                    || { in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] }
-                    || { in_a.len() == 1 && in_a[0] == in_b[in_b.len() - 1] }
-                    || in_b.is_scalar(),
-                "A shape: {in_a:?}, B shape: {in_b:?}"
-            ); // TODO: Support broadcasting.
-            if in_a.len() == 1 {
-                shapes.push(TypedShape::new(
-                    in_b.clone(),
-                    inputs[Node::ADD_IN_A].elem_ty(),
-                ));
-            } else {
-                shapes.push(TypedShape::new(
-                    in_a.clone(),
-                    inputs[Node::ADD_IN_A].elem_ty(),
-                ));
-            }
-        }
-        Op::Sub => {
-            let in_a = inputs[Node::SUB_IN_A].dims();
-            let in_b = inputs[Node::SUB_IN_B].dims();
-            assert!(
-                in_a == in_b || (in_a.len() == in_b.len() && in_b[in_b.len() - 1] == 1),
-                "A shape: {in_a:?}, B shape: {in_b:?}"
-            );
-            shapes.push(TypedShape::new(
-                in_a.clone(),
-                inputs[Node::SUB_IN_A].elem_ty(),
-            ));
-        }
-        Op::Mul => {
-            let in_a = inputs[Node::MUL_IN_A].dims();
-            let in_b = inputs[Node::MUL_IN_B].dims();
-            assert!(
-                in_a == in_b
-                    || {
-                        in_a.len() == 4
-                            && in_b.len() == 4
-                            && in_a[0] == in_b[0]
-                            && in_a[1] == in_b[1]
-                            && in_a[2] == 1
-                            && in_a[3] == 1
-                    }
-                    || { in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] }
-                    || in_b.is_scalar(),
-                "A shape: {in_a:?}, B shape: {in_b:?}"
-            ); // TODO: Support broadcasting.
-
-            // TODO: FIXME: Too ad-hoc way.
-            if in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] {
-                shapes.push(TypedShape::new(
-                    in_a.clone(),
-                    inputs[Node::MUL_IN_A].elem_ty(),
-                ));
-            } else if in_b.is_scalar() {
-                shapes.push(TypedShape::new(
-                    in_a.clone(),
-                    inputs[Node::MUL_IN_A].elem_ty(),
-                ));
-            } else {
-                shapes.push(TypedShape::new(
-                    in_b.clone(),
-                    inputs[Node::MUL_IN_B].elem_ty(),
-                ));
-            }
-        }
-        Op::Div => {
-            let in_a = inputs[Node::DIV_IN_A].dims();
-            let in_b = inputs[Node::DIV_IN_B].dims();
-            assert!(
-                in_a == in_b
-                    || (in_a.len() == in_b.len() && in_b[in_b.len() - 1] == 1)
-                    || in_b.is_scalar(),
-                "A shape: {in_a:?}, B shape: {in_b:?}"
-            );
-            shapes.push(TypedShape::new(
-                in_a.clone(),
-                inputs[Node::DIV_IN_A].elem_ty(),
-            ));
-        }
-        Op::Pow => {
-            let (in_a, in_b) = (inputs[0].dims(), inputs[1].dims());
-            assert!(in_a == in_b || in_b.is_scalar());
-            shapes.push(TypedShape::new(in_a.clone(), inputs[0].elem_ty()));
+        Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Pow => {
+            let x = inputs[0].dims();
+            let y = inputs[1].dims();
+            let shape = x.broadcast(y).unwrap();
+            shapes.push(TypedShape::new(shape, inputs[0].elem_ty()));
         }
         Op::MaxPool(maxpool) => {
             let auto_pad = &maxpool.auto_pad;

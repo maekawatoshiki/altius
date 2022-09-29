@@ -130,20 +130,20 @@ impl Tensor {
         out
     }
 
-    pub fn slice_at(&self, indices: &[Dimension]) -> &[f32] {
+    pub fn slice_at<T: TensorElemTypeExt>(&self, indices: &[Dimension]) -> &[T] {
         let mut index = 0;
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
         }
-        &self.data::<f32>()[index..]
+        &self.data::<T>()[index..]
     }
 
-    pub fn slice_at_mut(&mut self, indices: &[Dimension]) -> &mut [f32] {
+    pub fn slice_at_mut<T: TensorElemTypeExt>(&mut self, indices: &[Dimension]) -> &mut [T] {
         let mut index = 0;
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
         }
-        &mut self.data_mut::<f32>()[index..]
+        &mut self.data_mut::<T>()[index..]
     }
 
     pub fn at(&self, indices: &[Dimension]) -> f32 {

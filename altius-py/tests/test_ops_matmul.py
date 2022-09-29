@@ -18,6 +18,13 @@ def test_matmul_2():
         op_matmul(os.path.join(tmpdir, "model.onnx"), [3, 5, 10], [10, 15], [3, 5, 15])
 
 
+def test_matmul_3():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_matmul(
+            os.path.join(tmpdir, "model.onnx"), [3, 5, 10], [3, 10, 15], [3, 5, 15]
+        )
+
+
 def op_matmul(
     filepath,
     shape_x,

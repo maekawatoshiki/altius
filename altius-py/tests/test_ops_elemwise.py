@@ -70,6 +70,16 @@ def test_sqrt_2():
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Sqrt", [3, 1, 28, 28])
 
 
+def test_softmax_1():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_elemwise(os.path.join(tmpdir, "model.onnx"), "Softmax", [1, 2, 3])
+
+
+def test_softmax_2():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_elemwise(os.path.join(tmpdir, "model.onnx"), "Softmax", [3, 28, 28])
+
+
 def op_elemwise(filepath, op_type, shape):
     inputs = [helper.make_tensor_value_info("x", TensorProto.FLOAT, shape)]
     outputs = [helper.make_tensor_value_info("y", TensorProto.FLOAT, shape)]

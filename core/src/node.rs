@@ -431,13 +431,17 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let in_a = inputs[Node::ADD_IN_A].dims();
             let in_b = inputs[Node::ADD_IN_B].dims();
             assert!(
-                in_a == in_b || {
-                    in_a.len() == 4
-                        && in_b.len() == 3
-                        && in_a[1] == in_b[0]
-                        && in_b[1] == 1
-                        && in_b[2] == 1
-                }
+                in_a == in_b
+                    || {
+                        in_a.len() == 4
+                            && in_b.len() == 3
+                            && in_a[1] == in_b[0]
+                            && in_b[1] == 1
+                            && in_b[2] == 1
+                    }
+                    || { in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] }
+                    || in_b.is_scalar(),
+                "A shape: {in_a:?}, B shape: {in_b:?}"
             ); // TODO: Support broadcasting.
             shapes.push(TypedShape::new(
                 in_a.clone(),
@@ -457,19 +461,31 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let in_a = inputs[Node::MUL_IN_A].dims();
             let in_b = inputs[Node::MUL_IN_B].dims();
             assert!(
-                in_a == in_b || {
-                    in_a.len() == 4
-                        && in_b.len() == 4
-                        && in_a[0] == in_b[0]
-                        && in_a[1] == in_b[1]
-                        && in_a[2] == 1
-                        && in_a[3] == 1
-                }
+                in_a == in_b
+                    || {
+                        in_a.len() == 4
+                            && in_b.len() == 4
+                            && in_a[0] == in_b[0]
+                            && in_a[1] == in_b[1]
+                            && in_a[2] == 1
+                            && in_a[3] == 1
+                    }
+                    || { in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] },
+                "A shape: {in_a:?}, B shape: {in_b:?}"
             ); // TODO: Support broadcasting.
-            shapes.push(TypedShape::new(
-                in_b.clone(),
-                inputs[Node::MUL_IN_B].elem_ty(),
-            ));
+
+            // TODO: FIXME: Too ad-hoc way.
+            if in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] {
+                shapes.push(TypedShape::new(
+                    in_a.clone(),
+                    inputs[Node::MUL_IN_A].elem_ty(),
+                ));
+            } else {
+                shapes.push(TypedShape::new(
+                    in_b.clone(),
+                    inputs[Node::MUL_IN_B].elem_ty(),
+                ));
+            }
         }
         Op::Div => {
             let in_a = inputs[Node::DIV_IN_A].dims();
@@ -741,7 +757,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         Op::MatMul => {
             let in_a = &inputs[Node::MATMUL_IN_A].dims();
             let in_b = &inputs[Node::MATMUL_IN_B].dims();
-            assert_eq!(in_a[1], in_b[0]);
+            assert_eq!(in_a[1], in_b[0], "A shape: {in_a:?}, B shape: {in_b:?}");
             shapes.push(TypedShape::new(
                 vec![in_a[0], in_b[1]].into(),
                 inputs[Node::MATMUL_IN_A].elem_ty(),

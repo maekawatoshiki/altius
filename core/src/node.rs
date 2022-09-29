@@ -828,9 +828,6 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         Op::Constant(_) => {
             todo!()
         }
-        Op::Softmax(_softmax) => {
-            todo!("Softmax")
-        }
         // Element-wise operations.
         Op::Sqrt
         | Op::ReLU
@@ -842,6 +839,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         | Op::HardSigmoid(_)
         | Op::Round
         | Op::Exp
+        | Op::Softmax(_)
         | Op::BatchNormalization(_) => {
             let input = inputs[0];
             shapes.push(TypedShape::new(input.dims().clone(), input.elem_ty()));

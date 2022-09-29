@@ -498,7 +498,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         Op::Div => {
             let in_a = inputs[Node::DIV_IN_A].dims();
             let in_b = inputs[Node::DIV_IN_B].dims();
-            assert!(in_a == in_b);
+            assert!(
+                in_a == in_b || in_b.is_scalar(),
+                "A shape: {in_a:?}, B shape: {in_b:?}"
+            );
             shapes.push(TypedShape::new(
                 in_a.clone(),
                 inputs[Node::DIV_IN_A].elem_ty(),
@@ -772,12 +775,22 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let in_a = &inputs[Node::MATMUL_IN_A].dims();
             let in_b = &inputs[Node::MATMUL_IN_B].dims();
             assert!(
-                in_a[1] == in_b[0] || (in_a.len() == 3 && in_b.len() == 2 && in_a[2] == in_b[0]),
+                in_a[1] == in_b[0]
+                    || (in_a.len() == 3 && in_b.len() == 2 && in_a[2] == in_b[0])
+                    || (in_a.len() == 3
+                        && in_b.len() == 3
+                        && in_a[0] == in_b[0]
+                        && in_a[2] == in_b[1]),
                 "A shape: {in_a:?}, B shape: {in_b:?}"
             );
-            if in_a.len() == 3 {
+            if in_a.len() == 3 && in_b.len() == 2 {
                 shapes.push(TypedShape::new(
                     vec![in_a[0], in_a[1], in_b[1]].into(),
+                    inputs[Node::MATMUL_IN_A].elem_ty(),
+                ));
+            } else if in_a.len() == 3 && in_b.len() == 3 {
+                shapes.push(TypedShape::new(
+                    vec![in_a[0], in_a[1], in_b[2]].into(),
                     inputs[Node::MATMUL_IN_A].elem_ty(),
                 ));
             } else {

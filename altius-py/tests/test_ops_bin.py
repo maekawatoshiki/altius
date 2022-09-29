@@ -90,6 +90,26 @@ def test_div_3():
         op_bin(os.path.join(tmpdir, "model.onnx"), "Div", [128, 3, 224, 224])
 
 
+def test_pow_1():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Pow", [1, 2])
+
+
+def test_pow_2():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Pow", [1, 2, 3, 4, 5, 6, 7])
+
+
+def test_pow_3():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Pow", [128, 3, 8, 8])
+
+
+def test_pow_4():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Pow", [128, 3, 8, 8], [1])
+
+
 def op_bin(filepath, op_type, shape_x, shape_y=None, shape_z=None):
     shape_y = shape_y if shape_y else shape_x
     shape_z = shape_z if shape_z else shape_x

@@ -67,9 +67,9 @@ test_op!(test_op_add_1, op_add, vec![1, 2]);
 test_op!(test_op_add_2, op_add, vec![3, 1, 10]);
 test_op!(test_op_add_3, op_add, vec![128, 3, 224, 224]);
 
-test_op!(!test_op_sub_1, op_sub, vec![1, 2]);
-test_op!(!test_op_sub_2, op_sub, vec![3, 1, 10]);
-test_op!(!test_op_sub_3, op_sub, vec![128, 3, 224, 224]);
+test_op!(test_op_sub_1, op_sub, vec![1, 2]);
+test_op!(test_op_sub_2, op_sub, vec![3, 1, 10]);
+test_op!(test_op_sub_3, op_sub, vec![128, 3, 224, 224]);
 
 test_op!(test_op_mul_1, op_mul, vec![1, 2]);
 test_op!(test_op_mul_2, op_mul, vec![3, 1, 10]);

@@ -143,7 +143,7 @@ impl<'a> Interpreter<'a> {
             Op::Sub => compute_sub(node, &inputs, &mut outputs),
             Op::Mul => compute_mul(node, &inputs, &mut outputs),
             Op::Div => compute_div(node, &inputs, &mut outputs),
-            Op::Pow => todo!("Pow"),
+            Op::Pow => compute_pow(node, &inputs, &mut outputs),
             Op::Sqrt => todo!("Sqrt"),
             Op::MaxPool(ref maxpool) => compute_max_pool(maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => compute_gavg_pool(node, &inputs, &mut outputs),
@@ -464,6 +464,43 @@ fn compute_div(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     }
 
     todo!()
+}
+
+fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input_a = inputs[Node::MUL_IN_A];
+    let input_b = inputs[Node::MUL_IN_B];
+    let output = &mut outputs[Node::MUL_OUT];
+
+    if input_a.dims() == input_b.dims() {
+        for (i, (a, b)) in input_a
+            .data::<f32>()
+            .iter()
+            .zip(input_b.data::<f32>().iter())
+            .enumerate()
+        {
+            output.data_mut::<f32>()[i] = a.powf(*b);
+        }
+        return;
+    }
+
+    // TODO: We need multidirectional broadcast!
+
+    if input_b.dims().is_scalar() {
+        let b = input_b.data::<f32>()[0];
+        let output = output.data_mut::<f32>();
+
+        for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
+            *o = a.powf(b);
+        }
+
+        return;
+    }
+
+    todo!(
+        "A shape: {:?}, B shape: {:?}",
+        input_a.dims(),
+        input_b.dims()
+    )
 }
 
 fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

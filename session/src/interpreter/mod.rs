@@ -13,7 +13,7 @@ use altius_core::{
 use conv2d::Conv2dCtx;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-use ndarray::{linalg, Array2, ArrayView2, ArrayView3, ArrayView4};
+use ndarray::{linalg, s, Array2, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
 
 use std::simd::Simd;
@@ -173,7 +173,7 @@ impl<'a> Interpreter<'a> {
             Op::BatchNormalization(ref batchnorm) => {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
-            Op::Slice => todo!("slice"),
+            Op::Slice => compute_slice(node, &inputs, &mut outputs),
             Op::Gather(_) => todo!("Gather"),
             Op::Shape(_) => todo!("shape"),
             Op::NonMaxSuppression => todo!("nms"),
@@ -896,6 +896,57 @@ fn compute_batch_normalization(
                 }
             }
         }
+    }
+}
+
+fn compute_slice(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let data = inputs[Node::SLICE_IN_DATA];
+    let starts = inputs[Node::SLICE_IN_STARTS].data::<i64>();
+    let ends = inputs[Node::SLICE_IN_ENDS].data::<i64>();
+    let axes = inputs[Node::SLICE_IN_AXES].data::<i64>();
+    let output = &mut outputs[Node::SLICE_OUT];
+
+    assert_eq!(data.dims().len(), 3);
+
+    let axes = axes
+        .iter()
+        .map(|&axis| {
+            if axis < 0 {
+                (data.dims().len() as i64 + axis) as usize
+            } else {
+                axis as usize
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let ones = vec![1i64; axes.len()];
+    let steps = inputs
+        .get(Node::SLICE_IN_STEPS)
+        .map_or(ones.as_slice(), |s| s.data::<i64>());
+
+    assert!(starts.iter().all(|&x| x >= 0));
+    assert!(ends.iter().all(|&x| x >= 0));
+    assert!(steps.iter().all(|&x| x >= 0));
+    assert!(starts.len() == 1, "More than one axis not yet supported.");
+
+    for (((&start, &end), &axis), &step) in starts
+        .iter()
+        .zip(ends.iter())
+        .zip(axes.iter())
+        .zip(steps.iter())
+    {
+        let start = start as usize;
+        let end = end as usize;
+        let step = step as usize;
+        assert_eq!(axis, 2);
+
+        let data = ArrayView3::from_shape(data.fixed_dims::<3>(), data.data::<f32>()).unwrap();
+        output.data_mut::<f32>().copy_from_slice(
+            data.slice(s![.., .., start..end;step])
+                .as_standard_layout()
+                .as_slice()
+                .unwrap(),
+        );
     }
 }
 

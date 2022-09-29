@@ -820,13 +820,14 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
         2 => {
             let in_view =
                 ArrayView2::from_shape(input.fixed_dims::<2>(), input.data::<f32>()).unwrap();
-            in_view.permuted_axes([transpose.perm[0] as usize, transpose.perm[1] as usize]);
+            let in_view =
+                in_view.permuted_axes([transpose.perm[0] as usize, transpose.perm[1] as usize]);
             output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
         }
         3 => {
             let in_view =
                 ArrayView3::from_shape(input.fixed_dims::<3>(), input.data::<f32>()).unwrap();
-            in_view.permuted_axes([
+            let in_view = in_view.permuted_axes([
                 transpose.perm[0] as usize,
                 transpose.perm[1] as usize,
                 transpose.perm[2] as usize,
@@ -836,7 +837,7 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
         4 => {
             let in_view =
                 ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap();
-            in_view.permuted_axes([
+            let in_view = in_view.permuted_axes([
                 transpose.perm[0] as usize,
                 transpose.perm[1] as usize,
                 transpose.perm[2] as usize,

@@ -327,7 +327,75 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                 }
             }
         }
+
+        return;
     }
+
+    if input_a.dims().len() == input_b.dims().len() && input_b.dims()[input_b.dims().len() - 1] == 1
+    {
+        let dims = input_a.dims();
+        let max = dims.total_elems();
+        let n = dims.0.last().unwrap();
+        let input_a = input_a.data::<f32>();
+        let input_b = input_b.data::<f32>();
+        let output = output.data_mut::<f32>();
+
+        for i in 0..max {
+            output[i] = input_a[i] - input_b[i / n];
+        }
+
+        return;
+    }
+
+    if input_b.dims().is_scalar() {
+        let b = input_b.data::<f32>()[0];
+        let output = output.data_mut::<f32>();
+
+        for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
+            *o = a + b;
+        }
+
+        return;
+    }
+
+    let adims = input_a.dims();
+    let bdims = input_b.dims();
+
+    if bdims.len() == 1 && adims[adims.len() - 1] == bdims[0] {
+        let dims = input_a.dims();
+        let len = dims.total_elems();
+        let max = dims.0.last().unwrap();
+        let input_a = input_a.data::<f32>();
+        let input_b = input_b.data::<f32>();
+        let output = output.data_mut::<f32>();
+
+        for i in 0..len {
+            output[i] = input_a[i] + input_b[i % max];
+        }
+
+        return;
+    }
+
+    if adims.len() == 1 && bdims[bdims.len() - 1] == adims[0] {
+        let dims = input_b.dims();
+        let len = dims.total_elems();
+        let max = dims.0.last().unwrap();
+        let input_a = input_a.data::<f32>();
+        let input_b = input_b.data::<f32>();
+        let output = output.data_mut::<f32>();
+
+        for i in 0..len {
+            output[i] = input_a[i % max] + input_b[i];
+        }
+
+        return;
+    }
+
+    todo!(
+        "A shape: {:?}, B shape: {:?}",
+        input_a.dims(),
+        input_b.dims()
+    )
 }
 
 fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

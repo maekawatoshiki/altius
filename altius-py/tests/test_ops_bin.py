@@ -100,6 +100,11 @@ def test_div_4():
         op_bin(os.path.join(tmpdir, "model.onnx"), "Div", [3, 28, 28], [3, 28, 1])
 
 
+def test_div_5():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Div", [3, 28, 28], [1])
+
+
 def test_pow_1():
     with tempfile.TemporaryDirectory() as tmpdir:
         op_bin(os.path.join(tmpdir, "model.onnx"), "Pow", [1, 2])

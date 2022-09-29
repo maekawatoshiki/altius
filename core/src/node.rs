@@ -459,7 +459,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         Op::Sub => {
             let in_a = inputs[Node::SUB_IN_A].dims();
             let in_b = inputs[Node::SUB_IN_B].dims();
-            assert!(in_a == in_b);
+            assert!(
+                in_a == in_b || (in_a.len() == in_b.len() && in_b[in_b.len() - 1] == 1),
+                "A shape: {in_a:?}, B shape: {in_b:?}"
+            );
             shapes.push(TypedShape::new(
                 in_a.clone(),
                 inputs[Node::SUB_IN_A].elem_ty(),
@@ -505,7 +508,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let in_a = inputs[Node::DIV_IN_A].dims();
             let in_b = inputs[Node::DIV_IN_B].dims();
             assert!(
-                in_a == in_b || in_b.is_scalar(),
+                in_a == in_b
+                    || (in_a.len() == in_b.len() && in_b[in_b.len() - 1] == 1)
+                    || in_b.is_scalar(),
                 "A shape: {in_a:?}, B shape: {in_b:?}"
             );
             shapes.push(TypedShape::new(

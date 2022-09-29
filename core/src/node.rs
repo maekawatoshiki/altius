@@ -768,8 +768,13 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             }
             shapes.push(TypedShape::new(dims, inputs[Node::SLICE_IN_DATA].elem_ty()))
         }
-        Op::Gather(_) => {
-            todo!("Gather")
+        Op::Gather(gather) => {
+            let mut data = inputs[0].dims().0.to_owned();
+            let indices = inputs[1].dims();
+            assert!(gather.axis >= 0);
+            assert!(indices.is_scalar(), "Indices shape: {indices:?}");
+            data.remove(gather.axis as usize);
+            shapes.push(TypedShape::new(data.into(), inputs[0].elem_ty()))
         }
         Op::Shape(_) => {
             todo!()

@@ -838,7 +838,7 @@ fn compute_reduce_mean(rmean: &ReduceMean, inputs: &[&Tensor], outputs: &mut [Te
             for k in 0..input.dims()[2] {
                 sum += input.at_3d(i, j, k);
             }
-            *output.at_3d_mut(i, j, 0) = sum;
+            *output.at_3d_mut(i, j, 0) = sum / input.dims()[2] as f32;
         }
     }
 }

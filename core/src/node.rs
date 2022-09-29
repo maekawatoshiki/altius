@@ -440,13 +440,21 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                             && in_b[2] == 1
                     }
                     || { in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] }
+                    || { in_a.len() == 1 && in_a[0] == in_b[in_b.len() - 1] }
                     || in_b.is_scalar(),
                 "A shape: {in_a:?}, B shape: {in_b:?}"
             ); // TODO: Support broadcasting.
-            shapes.push(TypedShape::new(
-                in_a.clone(),
-                inputs[Node::ADD_IN_A].elem_ty(),
-            ));
+            if in_a.len() == 1 {
+                shapes.push(TypedShape::new(
+                    in_b.clone(),
+                    inputs[Node::ADD_IN_A].elem_ty(),
+                ));
+            } else {
+                shapes.push(TypedShape::new(
+                    in_a.clone(),
+                    inputs[Node::ADD_IN_A].elem_ty(),
+                ));
+            }
         }
         Op::Sub => {
             let in_a = inputs[Node::SUB_IN_A].dims();

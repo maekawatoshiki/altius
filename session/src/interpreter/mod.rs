@@ -463,7 +463,31 @@ fn compute_div(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
-    todo!()
+    // TODO: We need multidirectional broadcast!
+
+    if input_a.dims().len() == 3
+        && input_b.dims().len() == 3
+        && input_b.dims()[input_b.dims().len() - 1] == 1
+    {
+        let dims = input_a.dims();
+        let max = dims.total_elems();
+        let n = dims.0.last().unwrap();
+        let input_a = input_a.data::<f32>();
+        let input_b = input_b.data::<f32>();
+        let output = output.data_mut::<f32>();
+
+        for i in 0..max {
+            output[i] = input_a[i] / input_b[i / n];
+        }
+
+        return;
+    }
+
+    todo!(
+        "A shape: {:?}, B shape: {:?}",
+        input_a.dims(),
+        input_b.dims()
+    )
 }
 
 fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

@@ -478,12 +478,18 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                             && in_a[2] == 1
                             && in_a[3] == 1
                     }
-                    || { in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] },
+                    || { in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] }
+                    || in_b.is_scalar(),
                 "A shape: {in_a:?}, B shape: {in_b:?}"
             ); // TODO: Support broadcasting.
 
             // TODO: FIXME: Too ad-hoc way.
             if in_b.len() == 1 && in_b[0] == in_a[in_a.len() - 1] {
+                shapes.push(TypedShape::new(
+                    in_a.clone(),
+                    inputs[Node::MUL_IN_A].elem_ty(),
+                ));
+            } else if in_b.is_scalar() {
                 shapes.push(TypedShape::new(
                     in_a.clone(),
                     inputs[Node::MUL_IN_A].elem_ty(),

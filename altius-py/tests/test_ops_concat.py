@@ -8,46 +8,24 @@ import numpy as np
 from onnx import helper, ValueInfoProto, TensorProto
 
 
-def test_matmul_1():
+def test_concat_1():
     with tempfile.TemporaryDirectory() as tmpdir:
-        op_matmul(os.path.join(tmpdir, "model.onnx"), [5, 10], [10, 15], [5, 15])
-
-
-def test_matmul_2():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        op_matmul(os.path.join(tmpdir, "model.onnx"), [3, 5, 10], [10, 15], [3, 5, 15])
-
-
-def test_matmul_3():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        op_matmul(
-            os.path.join(tmpdir, "model.onnx"), [3, 5, 10], [3, 10, 15], [3, 5, 15]
+        op_concat(
+            os.path.join(tmpdir, "model.onnx"),
+            [1, 1, 10],
+            [1, 3, 10],
+            [1, 4, 10],
+            axis=1,
         )
 
 
-def test_matmul_4():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        op_matmul(os.path.join(tmpdir, "model.onnx"), [1, 5, 10], [10, 15], [1, 5, 15])
-
-
-def op_matmul(
-    filepath,
-    shape_x,
-    shape_y,
-    shape_z,
-):
+def op_concat(filepath, shape_x, shape_y, shape_z, **kwargs):
     inputs = [
         helper.make_tensor_value_info("x", TensorProto.FLOAT, shape_x),
         helper.make_tensor_value_info("y", TensorProto.FLOAT, shape_y),
     ]
     outputs = [helper.make_tensor_value_info("z", TensorProto.FLOAT, shape_z)]
-    nodes = [
-        helper.make_node(
-            "MatMul",
-            ["x", "y"],
-            ["z"],
-        )
-    ]
+    nodes = [helper.make_node("Concat", ["x", "y"], ["z"], **kwargs)]
     graph = helper.make_graph(nodes, "graph", inputs, outputs)
     model = helper.make_model(graph)
 

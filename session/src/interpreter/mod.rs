@@ -602,7 +602,19 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             output.slice_at_mut(&[i])[..(m * n)].copy_from_slice(c.as_slice().unwrap());
         }
     } else if adim.len() == 3 && bdim.len() == 3 {
-        todo!()
+        // TODO: Don't use ndarray.
+        let input_a = inputs[Node::GEMM_IN_A];
+        let [_, m, _k] = input_a.fixed_dims::<3>();
+        let [_, k, n] = input_b.fixed_dims::<3>();
+        let output = &mut outputs[Node::GEMM_OUT];
+
+        for i in 0..adim.len() {
+            let a = ArrayView2::from_shape([m, k], input_a.slice_at(&[i])).unwrap();
+            let b = ArrayView2::from_shape([k, n], input_b.slice_at(&[i])).unwrap();
+            let mut c = Array2::zeros([m, n]);
+            linalg::general_mat_mul(1., &a, &b, 0., &mut c);
+            output.slice_at_mut(&[i])[..(m * n)].copy_from_slice(c.as_slice().unwrap());
+        }
     } else {
         // TODO: Why don't use gemm library?
         for i in 0..input_a.dims()[0] {

@@ -404,6 +404,8 @@ fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
+    // TODO: We need multidirectional broadcast!
+
     let in_a = input_a.dims();
     let in_b = input_b.dims();
     if in_a.len() == 4
@@ -443,7 +445,26 @@ fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
-    todo!()
+    if in_b.len() == 1 && in_a[in_a.len() - 1] == in_b[0] {
+        let dims = input_a.dims();
+        let len = dims.total_elems();
+        let max = dims.0.last().unwrap();
+        let input_a = input_a.data::<f32>();
+        let input_b = input_b.data::<f32>();
+        let output = output.data_mut::<f32>();
+
+        for i in 0..len {
+            output[i] = input_a[i] * input_b[i % max];
+        }
+
+        return;
+    }
+
+    todo!(
+        "A shape: {:?}, B shape: {:?}",
+        input_a.dims(),
+        input_b.dims()
+    )
 }
 
 fn compute_div(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

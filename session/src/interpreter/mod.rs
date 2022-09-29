@@ -566,17 +566,42 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_b = inputs[Node::MATMUL_IN_B];
     let output = &mut outputs[Node::MATMUL_OUT];
 
-    assert!(input_a.dims().len() == 2);
-    assert!(input_b.dims().len() == 2);
-    assert!(input_a.dims()[1] == input_b.dims()[0]);
+    let adim = input_a.dims();
+    let bdim = input_b.dims();
 
-    for i in 0..input_a.dims()[0] {
-        for j in 0..input_b.dims()[1] {
-            let mut t = 0.0;
-            for k in 0..input_b.dims()[0] {
-                t += input_a.at_2d(i, k) * input_b.at_2d(k, j);
+    assert!(
+        (adim.len() == 2 && bdim.len() == 2 && adim[1] == bdim[0])
+            || (adim.len() == 3 && bdim.len() == 2 && adim[2] == bdim[0])
+            || (adim.len() == 3 && bdim.len() == 3 && adim[0] == bdim[0] && adim[2] == bdim[1]),
+        "A shape: {adim:?}, B shape: {bdim:?}"
+    );
+
+    if adim.len() == 3 && bdim.len() == 2 {
+        // TODO: Don't use ndarray.
+        let input_a = inputs[Node::GEMM_IN_A];
+        let [_, m, _k] = input_a.fixed_dims::<3>();
+        let [k, n] = input_b.fixed_dims::<2>();
+        let output = &mut outputs[Node::GEMM_OUT];
+
+        for i in 0..adim.len() {
+            let a = ArrayView2::from_shape([m, k], input_a.slice_at(&[i])).unwrap();
+            let b = ArrayView2::from_shape([k, n], input_b.data::<f32>()).unwrap();
+            let mut c = Array2::zeros([m, n]);
+            linalg::general_mat_mul(1., &a, &b, 0., &mut c);
+            output.slice_at_mut(&[i])[..(m * n)].copy_from_slice(c.as_slice().unwrap());
+        }
+    } else if adim.len() == 3 && bdim.len() == 3 {
+        todo!()
+    } else {
+        // TODO: Why don't use gemm library?
+        for i in 0..input_a.dims()[0] {
+            for j in 0..input_b.dims()[1] {
+                let mut t = 0.0;
+                for k in 0..input_b.dims()[0] {
+                    t += input_a.at_2d(i, k) * input_b.at_2d(k, j);
+                }
+                *output.at_2d_mut(i, j) = t;
             }
-            *output.at_2d_mut(i, j) = t;
         }
     }
 }

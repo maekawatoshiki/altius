@@ -731,13 +731,15 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let in_starts = inputs[Node::SLICE_IN_STARTS].data::<i64>();
             let in_ends = inputs[Node::SLICE_IN_ENDS].data::<i64>();
             let in_axes = inputs[Node::SLICE_IN_AXES].data::<i64>();
-            let in_steps = inputs[Node::SLICE_IN_STEPS].data::<i64>();
+            let ones = vec![1i64; in_axes.len()];
+            let in_steps = inputs
+                .get(Node::SLICE_IN_STEPS)
+                .map_or(ones.as_slice(), |s| s.data::<i64>());
             assert!(in_starts.iter().all(|&x| x >= 0));
             assert!(in_ends.iter().all(|&x| x >= 0));
-            assert!(in_axes.iter().all(|&x| x >= 0));
             assert!(in_steps.iter().all(|&x| x >= 0));
             let mut dims = in_data_dims.clone();
-            for (((start, end), axis), step) in in_starts
+            for (((start, end), &axis), step) in in_starts
                 .iter()
                 .zip(in_ends.iter())
                 .zip(in_axes.iter())
@@ -745,7 +747,11 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             {
                 let start = *start as usize;
                 let end = *end as usize;
-                let axis = *axis as usize;
+                let axis = if axis < 0 {
+                    (in_data_dims.len() as i64 + axis) as usize
+                } else {
+                    axis as usize
+                };
                 let step = *step as usize;
                 let out_dim = (end - start) / step;
                 assert!(out_dim > 0);

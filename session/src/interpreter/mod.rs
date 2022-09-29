@@ -4,8 +4,9 @@ use super::SessionError;
 use altius_core::{
     model::Model,
     node::{
-        compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gemm, HardSigmoid,
-        LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize, Softmax, Squeeze, Transpose,
+        compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gather, Gemm,
+        HardSigmoid, LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize, Softmax, Squeeze,
+        Transpose,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -175,7 +176,7 @@ impl<'a> Interpreter<'a> {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
             Op::Slice => compute_slice(node, &inputs, &mut outputs),
-            Op::Gather(_) => todo!("Gather"),
+            Op::Gather(ref gather) => compute_gather(gather, &inputs, &mut outputs),
             Op::Shape(_) => todo!("shape"),
             Op::NonMaxSuppression => todo!("nms"),
             Op::Constant(_) => todo!("constant"),
@@ -604,7 +605,6 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let input_a = inputs[Node::GEMM_IN_A];
         let [_, m, _k] = input_a.fixed_dims::<3>();
         let [k, n] = input_b.fixed_dims::<2>();
-        let output = &mut outputs[Node::GEMM_OUT];
 
         for i in 0..adim[0] {
             let a = ArrayView2::from_shape([m, k], input_a.slice_at(&[i])).unwrap();
@@ -618,7 +618,6 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let input_a = inputs[Node::GEMM_IN_A];
         let [_, m, _k] = input_a.fixed_dims::<3>();
         let [_, k, n] = input_b.fixed_dims::<3>();
-        let output = &mut outputs[Node::GEMM_OUT];
 
         for i in 0..adim[0] {
             let a = ArrayView2::from_shape([m, k], input_a.slice_at(&[i])).unwrap();
@@ -628,16 +627,16 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             output.slice_at_mut(&[i])[..(m * n)].copy_from_slice(c.as_slice().unwrap());
         }
     } else {
-        // TODO: Why don't use gemm library?
-        for i in 0..input_a.dims()[0] {
-            for j in 0..input_b.dims()[1] {
-                let mut t = 0.0;
-                for k in 0..input_b.dims()[0] {
-                    t += input_a.at_2d(i, k) * input_b.at_2d(k, j);
-                }
-                *output.at_2d_mut(i, j) = t;
-            }
-        }
+        // TODO: Don't use ndarray.
+        let input_a = inputs[Node::MATMUL_IN_A];
+        let [m, _k] = input_a.fixed_dims::<2>();
+        let [k, n] = input_b.fixed_dims::<2>();
+
+        let a = ArrayView2::from_shape([m, k], input_a.data()).unwrap();
+        let b = ArrayView2::from_shape([k, n], input_b.data()).unwrap();
+        let mut c = Array2::zeros([m, n]);
+        linalg::general_mat_mul(1., &a, &b, 0., &mut c);
+        output.data_mut().copy_from_slice(c.as_slice().unwrap());
     }
 }
 
@@ -1014,6 +1013,23 @@ fn compute_slice(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                 .unwrap(),
         );
     }
+}
+
+fn compute_gather(gather: &Gather, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let data = inputs[0];
+    let indices = inputs[1];
+    let output = &mut outputs[0];
+
+    assert!(gather.axis >= 0);
+    assert!(indices.dims().is_scalar(), "Indices shape: {indices:?}");
+
+    let axis = gather.axis as usize;
+    assert_eq!(axis, 1);
+    assert_eq!(data.dims().len(), 3);
+    assert_eq!(data.dims()[0], 1);
+
+    let gathered = &data.slice_at::<f32>(&[0, indices.data::<i64>()[0] as usize])[..data.dims()[2]];
+    output.data_mut().copy_from_slice(gathered);
 }
 
 fn compute_reshape(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

@@ -5,7 +5,7 @@ use altius_core::{
     model::Model,
     node::{
         compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gemm, HardSigmoid,
-        LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize, Squeeze, Transpose,
+        LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize, Softmax, Squeeze, Transpose,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -157,7 +157,7 @@ impl<'a> Interpreter<'a> {
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Erf => todo!("Erf"),
             Op::Clip => todo!("clip"),
-            Op::Softmax(_) => todo!("Softmax"),
+            Op::Softmax(ref softmax) => compute_softmax(softmax, &inputs, &mut outputs),
             Op::Resize(ref resize) => compute_resize(resize, &inputs, &mut outputs),
             Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
             Op::Transpose(ref trans) => compute_transpose(trans, &inputs, &mut outputs),
@@ -697,6 +697,27 @@ fn compute_sigmoid(inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = 1. / (1. + (-i).exp())
+    }
+}
+
+fn compute_softmax(softmax: &Softmax, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input = inputs[0];
+    let output = &mut outputs[0];
+
+    assert_eq!(input.dims().len(), 3);
+    assert_eq!(softmax.axis, -1);
+
+    for i in 0..input.dims()[0] {
+        for j in 0..input.dims()[1] {
+            let sum: f32 = input.slice_at::<f32>(&[i, j])[..input.dims()[2]]
+                .iter()
+                .copied()
+                .map(f32::exp)
+                .sum();
+            for k in 0..input.dims()[2] {
+                *output.at_3d_mut(i, j, k) = input.at_3d(i, j, k).exp() / sum;
+            }
+        }
     }
 }
 

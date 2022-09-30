@@ -793,16 +793,25 @@ fn compute_softmax(softmax: &Softmax, inputs: &[&Tensor], outputs: &mut [Tensor]
     assert_eq!(input.dims().len(), 3);
     assert_eq!(softmax.axis, -1);
 
-    for i in 0..input.dims()[0] {
-        for j in 0..input.dims()[1] {
-            let sum: f32 = input.slice_at::<f32>(&[i, j])[..input.dims()[2]]
-                .iter()
-                .copied()
-                .map(f32::exp)
-                .sum();
-            for k in 0..input.dims()[2] {
-                *output.at_3d_mut(i, j, k) = input.at_3d(i, j, k).exp() / sum;
+    let imax = input.dims()[0];
+    let jmax = input.dims()[1];
+    let kmax = input.dims()[2];
+    let mut input = input.data::<f32>();
+    let mut output = output.data_mut::<f32>();
+
+    for i in 0..imax {
+        for j in 0..jmax {
+            let mut sum = 0f32;
+            for k in 0..kmax {
+                let s = input[k].exp();
+                output[k] = s;
+                sum += s;
             }
+            for k in 0..kmax {
+                output[k] /= sum;
+            }
+            input = &input[kmax..];
+            output = &mut output[kmax..];
         }
     }
 }

@@ -12,6 +12,8 @@ Small DNN runtime written in Rust
 
 # Run
 
+- To download large models, run `cd models && ./download.sh`
+
 ```sh
 export RUST_LOG=debug
 cargo run --release --example mnist

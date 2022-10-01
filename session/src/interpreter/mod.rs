@@ -290,7 +290,10 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_b = inputs[Node::ADD_IN_B];
     let output = &mut outputs[Node::ADD_OUT];
 
-    if input_a.dims() == input_b.dims() {
+    let adims = input_a.dims();
+    let bdims = input_b.dims();
+
+    if adims == bdims {
         let mut input_a = input_a.data::<f32>();
         let mut input_b = input_b.data::<f32>();
         let mut output = output.data_mut::<f32>();
@@ -315,15 +318,15 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
-    if input_a.dims().len() == 4 && input_b.dims().len() == 3 {
-        assert!(input_a.dims()[1] == input_b.dims()[0]);
-        assert!(input_b.dims()[1] == 1);
-        assert!(input_b.dims()[2] == 1);
+    if adims.len() == 4 && bdims.len() == 3 {
+        assert!(adims[1] == bdims[0]);
+        assert!(bdims[1] == 1);
+        assert!(bdims[2] == 1);
 
-        for n in 0..input_a.dims()[0] {
-            for z in 0..input_a.dims()[1] {
-                for x in 0..input_a.dims()[2] {
-                    for y in 0..input_a.dims()[3] {
+        for n in 0..adims[0] {
+            for z in 0..adims[1] {
+                for x in 0..adims[2] {
+                    for y in 0..adims[3] {
                         *output.at_4d_mut(n, z, x, y) =
                             input_a.at_4d(n, z, x, y) + input_b.at_3d(z, 0, 0);
                     }
@@ -334,9 +337,8 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
-    if input_a.dims().len() == input_b.dims().len() && input_b.dims()[input_b.dims().len() - 1] == 1
-    {
-        let dims = input_a.dims();
+    if adims.len() == bdims.len() && bdims[bdims.len() - 1] == 1 {
+        let dims = adims;
         let max = dims.total_elems();
         let n = dims.0.last().unwrap();
         let input_a = input_a.data::<f32>();
@@ -350,7 +352,7 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
-    if input_b.dims().is_scalar() {
+    if bdims.is_scalar() {
         let b = input_b.data::<f32>()[0];
         let output = output.data_mut::<f32>();
 
@@ -361,44 +363,30 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
-    let adims = input_a.dims();
-    let bdims = input_b.dims();
+    let (adims, bdims, input_a, input_b) = if bdims.len() == 1 && adims[adims.len() - 1] == bdims[0]
+    {
+        (adims, bdims, input_a, input_b)
+    } else if adims.len() == 1 && bdims[bdims.len() - 1] == adims[0] {
+        (bdims, adims, input_b, input_a)
+    } else {
+        todo!("A shape: {:?}, B shape: {:?}", adims, bdims)
+    };
 
-    if bdims.len() == 1 && adims[adims.len() - 1] == bdims[0] {
-        let dims = input_a.dims();
-        let len = dims.total_elems();
-        let max = dims.0.last().unwrap();
-        let input_a = input_a.data::<f32>();
-        let input_b = input_b.data::<f32>();
-        let output = output.data_mut::<f32>();
+    let total = adims.total_elems();
+    let part = bdims[0];
+    let b = input_b.data::<f32>().as_ptr();
+    let mut a = input_a.data::<f32>().as_ptr();
+    let mut output = output.data_mut::<f32>().as_mut_ptr();
 
-        for i in 0..len {
-            output[i] = input_a[i] + input_b[i % max];
+    for _ in 0..total / part {
+        let mut b = b;
+        for _ in 0..part {
+            unsafe { *output = *a + *b };
+            a = unsafe { a.add(1) };
+            b = unsafe { b.add(1) };
+            output = unsafe { output.add(1) };
         }
-
-        return;
     }
-
-    if adims.len() == 1 && bdims[bdims.len() - 1] == adims[0] {
-        let dims = input_b.dims();
-        let len = dims.total_elems();
-        let max = dims.0.last().unwrap();
-        let input_a = input_a.data::<f32>();
-        let input_b = input_b.data::<f32>();
-        let output = output.data_mut::<f32>();
-
-        for i in 0..len {
-            output[i] = input_a[i % max] + input_b[i];
-        }
-
-        return;
-    }
-
-    todo!(
-        "A shape: {:?}, B shape: {:?}",
-        input_a.dims(),
-        input_b.dims()
-    )
 }
 
 fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

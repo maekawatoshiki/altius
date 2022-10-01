@@ -11,6 +11,7 @@ pub type NodeArena = Arena<Node>;
 #[derive(Debug, Clone)]
 pub struct Node {
     pub op: Op,
+    pub name: Option<String>,
     pub inputs: Vec<ValueId>,
     pub outputs: Vec<ValueId>,
 }
@@ -297,9 +298,15 @@ impl Node {
     pub fn new(op: Op) -> Self {
         Self {
             op,
+            name: None,
             inputs: Vec::new(),
             outputs: Vec::new(),
         }
+    }
+
+    pub fn with_name(mut self, name: impl Into<Option<String>>) -> Self {
+        self.name = name.into();
+        self
     }
 
     pub fn with_in(mut self, id: ValueId) -> Self {

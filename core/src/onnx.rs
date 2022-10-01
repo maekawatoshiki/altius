@@ -290,10 +290,12 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             op => todo!("op: {}", op),
         };
 
-        let _ = Node::new(op)
-            .with_ins(inputs)
-            .with_outs(outputs)
-            .alloc(&mut model.nodes);
+        model.add_node(
+            Node::new(op)
+                .with_name(node.name.to_owned())
+                .with_ins(inputs)
+                .with_outs(outputs),
+        );
     }
 
     Ok(model)

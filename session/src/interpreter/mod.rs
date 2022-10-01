@@ -451,7 +451,10 @@ fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_b = inputs[Node::MUL_IN_B];
     let output = &mut outputs[Node::MUL_OUT];
 
-    if input_a.dims() == input_b.dims() {
+    let adims = input_a.dims();
+    let bdims = input_b.dims();
+
+    if adims == bdims {
         let output = output.data_mut::<f32>();
         for (i, (a, b)) in input_a
             .data::<f32>()
@@ -467,8 +470,8 @@ fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     // TODO: We need multidirectional broadcast!
 
-    let in_a = input_a.dims();
-    let in_b = input_b.dims();
+    let in_a = adims;
+    let in_b = bdims;
     if in_a.len() == 4
         && in_b.len() == 4
         && in_a[0] == in_b[0]
@@ -506,22 +509,7 @@ fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
-    if in_b.len() == 1 && in_a[in_a.len() - 1] == in_b[0] {
-        let dims = input_a.dims();
-        let len = dims.total_elems();
-        let max = dims.0.last().unwrap();
-        let input_a = input_a.data::<f32>();
-        let input_b = input_b.data::<f32>();
-        let output = output.data_mut::<f32>();
-
-        for i in 0..len {
-            output[i] = input_a[i] * input_b[i % max];
-        }
-
-        return;
-    }
-
-    if input_b.dims().is_scalar() {
+    if bdims.is_scalar() {
         let b = input_b.data::<f32>()[0];
         let output = output.data_mut::<f32>();
 
@@ -532,11 +520,30 @@ fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
-    todo!(
-        "A shape: {:?}, B shape: {:?}",
-        input_a.dims(),
-        input_b.dims()
-    )
+    let (adims, bdims, input_a, input_b) = if bdims.len() == 1 && adims[adims.len() - 1] == bdims[0]
+    {
+        (adims, bdims, input_a, input_b)
+    } else if adims.len() == 1 && bdims[bdims.len() - 1] == adims[0] {
+        (bdims, adims, input_b, input_a)
+    } else {
+        todo!("A shape: {:?}, B shape: {:?}", adims, bdims)
+    };
+
+    let total = adims.total_elems();
+    let part = bdims[0];
+    let b = input_b.data::<f32>().as_ptr();
+    let mut a = input_a.data::<f32>().as_ptr();
+    let mut output = output.data_mut::<f32>().as_mut_ptr();
+
+    for _ in 0..total / part {
+        let mut b = b;
+        for _ in 0..part {
+            unsafe { *output = *a * *b };
+            a = unsafe { a.add(1) };
+            b = unsafe { b.add(1) };
+            output = unsafe { output.add(1) };
+        }
+    }
 }
 
 fn compute_div(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

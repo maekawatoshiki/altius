@@ -667,7 +667,6 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     );
 
     if adim.len() == 3 && bdim.len() == 2 {
-        // TODO: Don't use ndarray.
         let [_, m, _k] = input_a.fixed_dims::<3>();
         let [k, n] = input_b.fixed_dims::<2>();
 
@@ -678,7 +677,6 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
         }
     } else if adim.len() == 3 && bdim.len() == 3 {
-        // TODO: Don't use ndarray.
         let [_, m, _k] = input_a.fixed_dims::<3>();
         let [_, k, n] = input_b.fixed_dims::<3>();
 
@@ -689,7 +687,6 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
         }
     } else {
-        // TODO: Don't use ndarray.
         let [m, _k] = input_a.fixed_dims::<2>();
         let [k, n] = input_b.fixed_dims::<2>();
 

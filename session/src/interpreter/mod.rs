@@ -799,8 +799,8 @@ fn compute_softmax(softmax: &Softmax, inputs: &[&Tensor], outputs: &mut [Tensor]
     let mut input = input.data::<f32>();
     let mut output = output.data_mut::<f32>();
 
-    for i in 0..imax {
-        for j in 0..jmax {
+    for _i in 0..imax {
+        for _j in 0..jmax {
             let mut sum = 0f32;
             for k in 0..kmax {
                 let s = input[k].exp();

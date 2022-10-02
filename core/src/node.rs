@@ -14,6 +14,7 @@ pub struct Node {
     pub name: Option<String>,
     pub inputs: Vec<ValueId>,
     pub outputs: Vec<ValueId>,
+    pub deleted: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +27,7 @@ pub enum Op {
     Pow,
     Sqrt,
     ReLU,
+    Gelu,
     LeakyReLU(LeakyReLU),
     Sigmoid,
     Erf,
@@ -301,6 +303,7 @@ impl Node {
             name: None,
             inputs: Vec::new(),
             outputs: Vec::new(),
+            deleted: false,
         }
     }
 
@@ -346,6 +349,7 @@ impl Op {
             Op::Sqrt => "Sqrt",
             Op::ReLU => "ReLU",
             Op::LeakyReLU(_) => "LeakyReLU",
+            Op::Gelu => "Gelu",
             Op::Sigmoid => "Sigmoid",
             Op::Erf => "Erf",
             Op::Clip => "Clip",
@@ -769,6 +773,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         Op::Sqrt
         | Op::ReLU
         | Op::LeakyReLU(_)
+        | Op::Gelu
         | Op::Sigmoid
         | Op::Erf
         | Op::Clip

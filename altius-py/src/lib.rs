@@ -3,6 +3,7 @@ extern crate altius_session;
 
 use std::collections::HashMap;
 
+use altius_core::optimize;
 use altius_core::{model::Model, tensor::Tensor};
 use altius_session::interpreter::Interpreter;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
@@ -28,8 +29,10 @@ fn load(path: String) -> PyResult<PyModel> {
 }
 
 #[pyfunction(enable_profiling = false)]
-fn session<'a>(model: &'a PyModel, enable_profiling: bool) -> PyResult<PySession> {
-    let model = unsafe { std::mem::transmute::<&'a Model, &'static Model>(&model.0) };
+fn session<'a>(model: &'a mut PyModel, enable_profiling: bool) -> PyResult<PySession> {
+    let mut model =
+        unsafe { std::mem::transmute::<&'a mut Model, &'static mut Model>(&mut model.0) };
+    optimize::gelu_fusion::fuse_gelu(&mut model);
     Ok(PySession(
         Interpreter::new(model).with_profiling(enable_profiling),
     ))

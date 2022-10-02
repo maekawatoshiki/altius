@@ -16,7 +16,7 @@ matrixmultiply = "0.3.2"
 thiserror = "1.0.31"
 blas-src = { version = "0.8", optional = true }
 cblas-sys = { version = "*", optional = true }
-statrs = "0.16.0"
+fastapprox = "0.3.0"
 
 [features]
 cuda = ["cudnn", "cust"]

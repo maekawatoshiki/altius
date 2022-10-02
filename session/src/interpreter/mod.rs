@@ -19,7 +19,6 @@ use conv2d::Conv2dCtx;
 use cudnn::CudnnContext;
 use ndarray::{linalg, s, Array2, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
-use statrs::function::erf::erf;
 
 use std::simd::Simd;
 use std::time::{Duration, Instant};
@@ -604,7 +603,7 @@ fn compute_div(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_a = inputs[0];
     let input_b = inputs[1];
-    let output = &mut outputs[0];
+    let output = &mut outputs[0].data_mut();
 
     if input_a.dims() == input_b.dims() {
         for (i, (a, b)) in input_a
@@ -613,7 +612,7 @@ fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             .zip(input_b.data::<f32>().iter())
             .enumerate()
         {
-            output.data_mut::<f32>()[i] = a.powf(*b);
+            output[i] = a.powf(*b);
         }
         return;
     }
@@ -622,10 +621,15 @@ fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     if input_b.dims().is_scalar() {
         let b = input_b.data::<f32>()[0];
-        let output = output.data_mut::<f32>();
 
-        for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
-            *o = a.powf(b);
+        if b == 2. {
+            for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
+                *o = a * a;
+            }
+        } else {
+            for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
+                *o = a.powf(b);
+            }
         }
 
         return;

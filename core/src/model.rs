@@ -33,6 +33,10 @@ impl Model {
         let mut value_users: FxHashMap<ValueId, FxHashSet<NodeId>> = FxHashMap::default();
 
         for (node_id, node) in self.nodes.iter() {
+            if node.deleted {
+                continue;
+            }
+
             for &input in node.inputs.iter() {
                 value_users.entry(input).or_default().insert(node_id);
             }
@@ -45,6 +49,10 @@ impl Model {
         let mut value_parents: FxHashMap<ValueId, NodeId> = FxHashMap::default();
 
         for (node_id, node) in self.nodes.iter() {
+            if node.deleted {
+                continue;
+            }
+
             for &output in node.outputs.iter() {
                 value_parents.insert(output, node_id);
             }
@@ -64,6 +72,10 @@ impl Model {
         let consts = &self.inputs.iter().copied().collect::<FxHashSet<_>>()
             | &self.inits.keys().copied().collect::<FxHashSet<_>>();
         for (id, node) in self.nodes.iter() {
+            if node.deleted {
+                continue;
+            }
+
             let mut inputs = &node.inputs.clone().into_iter().collect::<FxHashSet<_>>() - &consts;
             inputs.retain(|i| value_parents.contains_key(i)); // NOTE: Some of node inputs might be
                                                               // optional (so they don't have their

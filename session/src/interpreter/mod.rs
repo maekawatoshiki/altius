@@ -158,6 +158,7 @@ impl<'a> Interpreter<'a> {
             Op::ReLU => compute_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(ref hs) => compute_hard_sigmoid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
+            Op::Gelu => todo!("Gelu"),
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),

@@ -72,25 +72,41 @@ def test_sqrt_2():
 
 def test_softmax_1():
     with tempfile.TemporaryDirectory() as tmpdir:
-        op_elemwise(os.path.join(tmpdir, "model.onnx"), "Softmax", [1, 2, 3])
+        op_elemwise(
+            os.path.join(tmpdir, "model.onnx"),
+            "Softmax",
+            [1, 2, 3],
+            atol=1e-1,
+            rtol=1e-5,
+        )
 
 
 def test_softmax_2():
     with tempfile.TemporaryDirectory() as tmpdir:
-        op_elemwise(os.path.join(tmpdir, "model.onnx"), "Softmax", [3, 28, 28])
+        op_elemwise(
+            os.path.join(tmpdir, "model.onnx"),
+            "Softmax",
+            [3, 28, 28],
+            atol=1e-1,
+            rtol=1e-5,
+        )
 
 
 def test_erf_1():
     with tempfile.TemporaryDirectory() as tmpdir:
-        op_elemwise(os.path.join(tmpdir, "model.onnx"), "Erf", [1, 2, 3])
+        op_elemwise(
+            os.path.join(tmpdir, "model.onnx"), "Erf", [1, 2, 3], atol=1e-1, rtol=1e-5
+        )
 
 
 def test_erf_2():
     with tempfile.TemporaryDirectory() as tmpdir:
-        op_elemwise(os.path.join(tmpdir, "model.onnx"), "Erf", [3, 28, 28])
+        op_elemwise(
+            os.path.join(tmpdir, "model.onnx"), "Erf", [3, 28, 28], atol=1e-1, rtol=1e-5
+        )
 
 
-def op_elemwise(filepath, op_type, shape):
+def op_elemwise(filepath, op_type, shape, **kwargs):
     inputs = [helper.make_tensor_value_info("x", TensorProto.FLOAT, shape)]
     outputs = [helper.make_tensor_value_info("y", TensorProto.FLOAT, shape)]
     nodes = [helper.make_node(op_type, ["x"], ["y"])]
@@ -106,4 +122,4 @@ def op_elemwise(filepath, op_type, shape):
     actual = altius_sess.run(None, {"x": x})
 
     for expected, actual in zip(expected, actual):
-        assert np.allclose(expected, actual)
+        assert np.allclose(expected, actual, **kwargs)

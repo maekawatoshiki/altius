@@ -15,13 +15,21 @@ use altius_core::{
     value::ValueId,
 };
 use conv2d::Conv2dCtx;
+use core_affinity::CoreId;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
 use ndarray::{s, Array2, ArrayView2, ArrayView3, ArrayView4};
+use rayon::{
+    prelude::{IndexedParallelIterator, ParallelIterator},
+    slice::{ParallelSlice, ParallelSliceMut},
+};
 use rustc_hash::FxHashMap;
+use threadpool::ThreadPool;
 
-use std::simd::{Simd, SimdFloat, StdFloat};
-use std::time::{Duration, Instant};
+use std::{
+    simd::{Simd, SimdFloat, StdFloat},
+    time::{Duration, Instant},
+};
 
 #[cfg(feature = "cuda")]
 mod cuda {
@@ -44,13 +52,29 @@ pub struct Interpreter<'a> {
     inferred_shapes: FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     enable_profiling: bool,
     dummy_value: Tensor,
+    tctx: ThreadCtx,
 }
+
+struct ThreadCtx {
+    tp: ThreadPool,
+}
+
+unsafe impl Sync for ThreadCtx {}
 
 impl<'a> Interpreter<'a> {
     pub fn new(model: &'a Model) -> Self {
         let sorted_nodes = model.topo_sort_nodes();
         let mut inferred_shapes = FxHashMap::default();
         infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
+        let workers = num_cpus::get_physical();
+        let tp = ThreadPool::new(workers);
+        assert_eq!(tp.queued_count(), 0);
+        for p in 0..workers {
+            tp.execute(move || {
+                core_affinity::set_for_current(CoreId { id: p });
+            });
+        }
+        tp.join();
 
         Interpreter {
             model,
@@ -60,6 +84,7 @@ impl<'a> Interpreter<'a> {
             inferred_shapes,
             enable_profiling: false,
             dummy_value: Tensor::zeros::<f32>(vec![0].into()),
+            tctx: ThreadCtx { tp },
         }
     }
 
@@ -158,7 +183,7 @@ impl<'a> Interpreter<'a> {
             Op::ReLU => compute_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(ref hs) => compute_hard_sigmoid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
-            Op::Gelu => compute_gelu(&inputs, &mut outputs),
+            Op::Gelu => compute_gelu(&self.tctx, &inputs, &mut outputs),
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
@@ -675,12 +700,16 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let [_, m, _k] = input_a.fixed_dims::<3>();
         let [k, n] = input_b.fixed_dims::<2>();
 
-        for i in 0..adim[0] {
-            let a = input_a.slice_at(&[i]);
-            let b = input_b.data::<f32>();
-            let c = output.slice_at_mut(&[i]);
-            sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
-        }
+        let mn = output.strides()[0];
+        let mk = input_a.strides()[0];
+        let b = input_b.data::<f32>();
+        output
+            .data_mut::<f32>()
+            .par_chunks_mut(mn)
+            .zip(input_a.data::<f32>().par_chunks(mk))
+            .for_each(|(c, a)| {
+                sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
+            });
     } else if adim.len() == 3 && bdim.len() == 3 {
         let [_, m, _k] = input_a.fixed_dims::<3>();
         let [_, k, n] = input_b.fixed_dims::<3>();
@@ -782,22 +811,55 @@ fn compute_leaky_relu(leaky: &LeakyReLU, inputs: &[&Tensor], outputs: &mut [Tens
     }
 }
 
-fn compute_gelu(inputs: &[&Tensor], outputs: &mut [Tensor]) {
+#[derive(Copy, Clone, Debug)]
+struct SendPtr<T: Send>(pub *const T);
+#[derive(Copy, Clone, Debug)]
+struct SendPtrMut<T: Send>(pub *mut T);
+
+unsafe impl<T: Send> Send for SendPtr<T> {}
+unsafe impl<T: Send> Send for SendPtrMut<T> {}
+
+impl<T: Send> SendPtr<T> {
+    pub fn inner(self) -> *const T {
+        self.0
+    }
+}
+
+impl<T: Send> SendPtrMut<T> {
+    pub fn inner(self) -> *mut T {
+        self.0
+    }
+}
+
+fn compute_gelu(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     const B: f32 = 0.7978845608028654f32; // sqrt(2.0 / PI)
     const C: f32 = 0.035677408136300125f32; // 0.044715 * sqrt(2.0 / PI)
 
     let input: &[f32] = inputs[0].data();
     let output: &mut [f32] = outputs[0].data_mut();
+    let n = tctx.tp.max_count();
 
-    for (&i, o) in input.iter().zip(output.iter_mut()) {
-        *o = i * (C * i * i + B);
-    }
+    input
+        .chunks(input.len() / n)
+        .zip(output.chunks_mut(input.len() / n))
+        .for_each(|(input, output)| {
+            let len = input.len();
+            let input_ptr = SendPtr(input.as_ptr());
+            let output_ptr = SendPtrMut(output.as_mut_ptr());
+            tctx.tp.execute(move || {
+                let input = unsafe { std::slice::from_raw_parts(input_ptr.inner(), len) };
+                let output = unsafe { std::slice::from_raw_parts_mut(output_ptr.inner(), len) };
+                for (&i, o) in input.iter().zip(output.iter_mut()) {
+                    *o = i * (C * i * i + B);
+                }
+                tanh(output);
+                for (&i, o) in input.iter().zip(output.iter_mut()) {
+                    *o = (*o + 1.) * (i * 0.5);
+                }
+            })
+        });
 
-    tanh(output);
-
-    for (&i, o) in input.iter().zip(output.iter_mut()) {
-        *o = (*o + 1.) * (i * 0.5);
-    }
+    tctx.tp.join();
 }
 
 fn tanh(mut data: &mut [f32]) {

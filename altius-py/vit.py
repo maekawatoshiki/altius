@@ -32,7 +32,7 @@ def main():
     # opt = ort.SessionOptions()
     # # opt.intra_op_num_threads = 1
     # # opt.inter_op_num_threads = 1
-    # sess = ort.InferenceSession("./vit.onnx", sess_options=opt)
+    # sess = ort.InferenceSession("../models/vit_b_16.onnx", sess_options=opt)
     sess = altius_py.InferenceSession("../models/vit_b_16.onnx", True)
 
     inputs = {"x": input}

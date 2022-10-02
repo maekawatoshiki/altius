@@ -17,7 +17,7 @@ use altius_core::{
 use conv2d::Conv2dCtx;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-use ndarray::{linalg, s, Array2, ArrayView2, ArrayView3, ArrayView4};
+use ndarray::{s, Array2, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
 
 use std::simd::Simd;
@@ -718,14 +718,32 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let a = if gemm.trans_a { a.t() } else { a.view() };
     let b = if gemm.trans_b { b.t() } else { b.view() };
 
-    let mut c = Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
+    let c = Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
         .unwrap()
         .broadcast(output.fixed_dims::<2>())
         .unwrap()
         .into_owned();
-    linalg::general_mat_mul(gemm.alpha, &a, &b, gemm.beta, &mut c);
+    let mut c = c.as_standard_layout();
 
-    output.set_raw_vec(c.into_raw_vec());
+    let m = a.shape()[0];
+    let k = a.shape()[1];
+    let n = b.shape()[1];
+
+    sgemm(
+        m,
+        k,
+        n,
+        gemm.alpha,
+        a.as_standard_layout().as_slice().unwrap(),
+        k,
+        b.as_standard_layout().as_slice().unwrap(),
+        n,
+        gemm.beta,
+        c.as_slice_mut().unwrap(),
+        n,
+    );
+
+    output.set_raw_vec(c.into_owned().into_raw_vec())
 }
 
 fn compute_relu(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

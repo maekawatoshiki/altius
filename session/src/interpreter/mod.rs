@@ -158,7 +158,7 @@ impl<'a> Interpreter<'a> {
             Op::ReLU => compute_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(ref hs) => compute_hard_sigmoid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
-            Op::Gelu => todo!("Gelu"),
+            Op::Gelu => compute_gelu(&inputs, &mut outputs),
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
@@ -779,6 +779,19 @@ fn compute_leaky_relu(leaky: &LeakyReLU, inputs: &[&Tensor], outputs: &mut [Tens
 
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = if *i < 0.0 { leaky.alpha * i } else { *i };
+    }
+}
+
+fn compute_gelu(inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    const B: f32 = 0.7978845608028654f32; // sqrt(2.0 / PI)
+    const C: f32 = 0.035677408136300125f32; // 0.044715 * sqrt(2.0 / PI)
+
+    let input: &[f32] = inputs[0].data();
+    let output: &mut [f32] = outputs[0].data_mut();
+
+    for (&i, o) in input.iter().zip(output.iter_mut()) {
+        let x = i * (C * i * i + B);
+        *o = (fastapprox::faster::tanh(x) + 1.) * (i * 0.5);
     }
 }
 

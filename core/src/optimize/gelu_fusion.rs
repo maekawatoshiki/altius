@@ -1,12 +1,14 @@
+use std::time::Instant;
+
 use crate::{
     model::Model,
     node::{Node, Op},
 };
 
 pub fn fuse_gelu(model: &mut Model) {
+    let start = Instant::now();
     let nodes = model.topo_sort_nodes();
     let value_users = model.get_value_users();
-    let value_parents = model.get_value_parents();
 
     let mut list = vec![];
     let mut delete_list = vec![];
@@ -102,12 +104,7 @@ pub fn fuse_gelu(model: &mut Model) {
         model.nodes[node].deleted = true
     }
 
-    let nodes = model.topo_sort_nodes();
-    for node in nodes {
-        let node = &model.nodes[node];
-        // log::info!("node {} {:?}", node.op.name(), node.name);
-        assert_ne!(node.op.name(), "Erf")
-    }
+    log::info!("fuse_gelu: {:?}", start.elapsed());
 }
 
 fn allclose(x: &[f32], y: &[f32]) -> bool {

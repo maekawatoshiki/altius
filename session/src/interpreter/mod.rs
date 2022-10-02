@@ -777,8 +777,7 @@ fn compute_erf(inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let output: &mut [f32] = outputs[0].data_mut();
 
     for (&i, o) in input.iter().zip(output.iter_mut()) {
-        // TODO: `statrs` crate is used only for this `erf` function...
-        *o = erf(i as f64) as f32;
+        *o = fastapprox::faster::erf(i);
     }
 }
 
@@ -799,12 +798,13 @@ fn compute_softmax(softmax: &Softmax, inputs: &[&Tensor], outputs: &mut [Tensor]
         for _j in 0..jmax {
             let mut sum = 0f32;
             for k in 0..kmax {
-                let s = input[k].exp();
+                let s = fastapprox::faster::exp(input[k]);
                 output[k] = s;
                 sum += s;
             }
+            let rsum = 1. / sum;
             for k in 0..kmax {
-                output[k] /= sum;
+                output[k] *= rsum;
             }
             input = &input[kmax..];
             output = &mut output[kmax..];

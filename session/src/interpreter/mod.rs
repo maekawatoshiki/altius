@@ -20,7 +20,7 @@ use cudnn::CudnnContext;
 use ndarray::{s, Array2, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
 
-use std::simd::{Simd, SimdFloat};
+use std::simd::{Simd, SimdFloat, StdFloat};
 use std::time::{Duration, Instant};
 
 #[cfg(feature = "cuda")]
@@ -841,17 +841,17 @@ fn tanh(mut data: &mut [f32]) {
         let vals_squared = vals * vals;
 
         // TODO: NOTE: For some reason, using simd::StdFloat::mul_add() slows down the following code...
-        let p = vals_squared * alpha_13s + alpha_11s;
-        let p = p * vals_squared + alpha_9s;
-        let p = p * vals_squared + alpha_7s;
-        let p = p * vals_squared + alpha_5s;
-        let p = p * vals_squared + alpha_3s;
-        let p = p * vals_squared + alpha_1s;
+        let p = vals_squared.mul_add(alpha_13s, alpha_11s);
+        let p = p.mul_add(vals_squared, alpha_9s);
+        let p = p.mul_add(vals_squared, alpha_7s);
+        let p = p.mul_add(vals_squared, alpha_5s);
+        let p = p.mul_add(vals_squared, alpha_3s);
+        let p = p.mul_add(vals_squared, alpha_1s);
         let p = p * vals;
 
-        let q = vals_squared * beta_6s + beta_4s;
-        let q = q * vals_squared + beta_2s;
-        let q = q * vals_squared + beta_0s;
+        let q = vals_squared.mul_add(beta_6s, beta_4s);
+        let q = q.mul_add(vals_squared, beta_2s);
+        let q = q.mul_add(vals_squared, beta_0s);
 
         data[0..SIMD_LEN].copy_from_slice((p / q).as_ref());
 
@@ -866,17 +866,17 @@ fn tanh(mut data: &mut [f32]) {
 
         let val_squared = val * val;
 
-        let p = val_squared * alpha_13 + alpha_11;
-        let p = p * val_squared + alpha_9;
-        let p = p * val_squared + alpha_7;
-        let p = p * val_squared + alpha_5;
-        let p = p * val_squared + alpha_3;
-        let p = p * val_squared + alpha_1;
+        let p = val_squared.mul_add(alpha_13, alpha_11);
+        let p = p.mul_add(val_squared, alpha_9);
+        let p = p.mul_add(val_squared, alpha_7);
+        let p = p.mul_add(val_squared, alpha_5);
+        let p = p.mul_add(val_squared, alpha_3);
+        let p = p.mul_add(val_squared, alpha_1);
         let p = p * val;
 
-        let q = val_squared * beta_6 + beta_4;
-        let q = q * val_squared + beta_2;
-        let q = q * val_squared + beta_0;
+        let q = val_squared.mul_add(beta_6, beta_4);
+        let q = q.mul_add(val_squared, beta_2);
+        let q = q.mul_add(val_squared, beta_0);
 
         *x = p / q
     }

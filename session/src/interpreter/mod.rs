@@ -840,7 +840,6 @@ fn tanh(mut data: &mut [f32]) {
 
         let vals_squared = vals * vals;
 
-        // TODO: NOTE: For some reason, using simd::StdFloat::mul_add() slows down the following code...
         let p = vals_squared.mul_add(alpha_13s, alpha_11s);
         let p = p.mul_add(vals_squared, alpha_9s);
         let p = p.mul_add(vals_squared, alpha_7s);

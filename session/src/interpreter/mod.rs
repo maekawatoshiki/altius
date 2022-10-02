@@ -20,7 +20,7 @@ use cudnn::CudnnContext;
 use ndarray::{s, Array2, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
 
-use std::simd::Simd;
+use std::simd::{Simd, SimdFloat};
 use std::time::{Duration, Instant};
 
 #[cfg(feature = "cuda")]
@@ -790,8 +790,95 @@ fn compute_gelu(inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let output: &mut [f32] = outputs[0].data_mut();
 
     for (&i, o) in input.iter().zip(output.iter_mut()) {
-        let x = i * (C * i * i + B);
-        *o = (fastapprox::faster::tanh(x) + 1.) * (i * 0.5);
+        *o = i * (C * i * i + B);
+    }
+
+    tanh(output);
+
+    for (&i, o) in input.iter().zip(output.iter_mut()) {
+        *o = (*o + 1.) * (i * 0.5);
+    }
+}
+
+fn tanh(mut data: &mut [f32]) {
+    let lower_range = -9f32;
+    let upper_range = 9f32;
+    let alpha_13 = -2.76076847742355e-16f32;
+    let alpha_11 = 2.00018790482477e-13f32;
+    let alpha_9 = -8.60467152213735e-11f32;
+    let alpha_7 = 5.12229709037114e-08f32;
+    let alpha_5 = 1.48572235717979e-05f32;
+    let alpha_3 = 6.37261928875436e-04f32;
+    let alpha_1 = 4.89352455891786e-03f32;
+    let beta_6 = 1.19825839466702e-06f32;
+    let beta_4 = 1.18534705686654e-04f32;
+    let beta_2 = 2.26843463243900e-03f32;
+    let beta_0 = 4.89352518554385e-03f32;
+
+    const SIMD_LEN: usize = 4;
+
+    let lower_ranges = Simd::<f32, SIMD_LEN>::from_array([lower_range; SIMD_LEN]);
+    let upper_ranges = Simd::<f32, SIMD_LEN>::from_array([upper_range; SIMD_LEN]);
+    let alpha_13s = Simd::<f32, SIMD_LEN>::from_array([alpha_13; SIMD_LEN]);
+    let alpha_11s = Simd::<f32, SIMD_LEN>::from_array([alpha_11; SIMD_LEN]);
+    let alpha_9s = Simd::<f32, SIMD_LEN>::from_array([alpha_9; SIMD_LEN]);
+    let alpha_7s = Simd::<f32, SIMD_LEN>::from_array([alpha_7; SIMD_LEN]);
+    let alpha_5s = Simd::<f32, SIMD_LEN>::from_array([alpha_5; SIMD_LEN]);
+    let alpha_3s = Simd::<f32, SIMD_LEN>::from_array([alpha_3; SIMD_LEN]);
+    let alpha_1s = Simd::<f32, SIMD_LEN>::from_array([alpha_1; SIMD_LEN]);
+    let beta_6s = Simd::<f32, SIMD_LEN>::from_array([beta_6; SIMD_LEN]);
+    let beta_4s = Simd::<f32, SIMD_LEN>::from_array([beta_4; SIMD_LEN]);
+    let beta_2s = Simd::<f32, SIMD_LEN>::from_array([beta_2; SIMD_LEN]);
+    let beta_0s = Simd::<f32, SIMD_LEN>::from_array([beta_0; SIMD_LEN]);
+
+    let mut len = data.len();
+
+    while len >= SIMD_LEN {
+        let vals = Simd::<f32, SIMD_LEN>::from_slice(&data[0..SIMD_LEN]);
+        let vals = lower_ranges.simd_max(vals);
+        let vals = upper_ranges.simd_min(vals);
+
+        let vals_squared = vals * vals;
+
+        // TODO: NOTE: For some reason, using simd::StdFloat::mul_add() slows down the following code...
+        let p = vals_squared * alpha_13s + alpha_11s;
+        let p = p * vals_squared + alpha_9s;
+        let p = p * vals_squared + alpha_7s;
+        let p = p * vals_squared + alpha_5s;
+        let p = p * vals_squared + alpha_3s;
+        let p = p * vals_squared + alpha_1s;
+        let p = p * vals;
+
+        let q = vals_squared * beta_6s + beta_4s;
+        let q = q * vals_squared + beta_2s;
+        let q = q * vals_squared + beta_0s;
+
+        data[0..SIMD_LEN].copy_from_slice((p / q).as_ref());
+
+        len -= SIMD_LEN;
+        data = &mut data[SIMD_LEN..];
+    }
+
+    for x in data {
+        let val = *x;
+        let val = if val < lower_range { lower_range } else { val };
+        let val = if val > upper_range { upper_range } else { val };
+
+        let val_squared = val * val;
+
+        let p = val_squared * alpha_13 + alpha_11;
+        let p = p * val_squared + alpha_9;
+        let p = p * val_squared + alpha_7;
+        let p = p * val_squared + alpha_5;
+        let p = p * val_squared + alpha_3;
+        let p = p * val_squared + alpha_1;
+        let p = p * val;
+
+        let q = val_squared * beta_6 + beta_4;
+        let q = q * val_squared + beta_2;
+        let q = q * val_squared + beta_0;
+
+        *x = p / q
     }
 }
 

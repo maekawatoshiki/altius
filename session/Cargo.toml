@@ -19,7 +19,6 @@ cblas-sys = { version = "*", optional = true }
 fastapprox = "0.3.0"
 crossbeam = "0.8.2"
 thread-tree = "0.3.3"
-rayon = "1.5.3"
 image = "0.24.2"
 core_affinity = "0.5.10"
 threadpool = "1.8.1"
@@ -36,3 +35,4 @@ cblas = [ "cblas-sys" ]
 env_logger = "0.9.0"
 image = "0.24.2"
 structopt = "0.3.26"
+rayon = "1.5.3"

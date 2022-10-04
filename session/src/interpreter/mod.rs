@@ -19,10 +19,6 @@ use core_affinity::CoreId;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
 use ndarray::{s, Array2, ArrayView2, ArrayView3, ArrayView4};
-use rayon::{
-    prelude::{IndexedParallelIterator, ParallelIterator},
-    slice::{ParallelSlice, ParallelSliceMut},
-};
 use rustc_hash::FxHashMap;
 use threadpool::ThreadPool;
 
@@ -705,8 +701,8 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let b = input_b.data::<f32>();
         output
             .data_mut::<f32>()
-            .par_chunks_mut(mn)
-            .zip(input_a.data::<f32>().par_chunks(mk))
+            .chunks_mut(mn)
+            .zip(input_a.data::<f32>().chunks(mk))
             .for_each(|(c, a)| {
                 sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
             });

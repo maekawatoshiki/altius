@@ -55,6 +55,27 @@ struct ThreadCtx {
     tp: ThreadPool,
 }
 
+#[derive(Copy, Clone, Debug)]
+struct SendPtr<T: Send>(pub *const T);
+
+#[derive(Copy, Clone, Debug)]
+struct SendPtrMut<T: Send>(pub *mut T);
+
+unsafe impl<T: Send> Send for SendPtr<T> {}
+unsafe impl<T: Send> Send for SendPtrMut<T> {}
+
+impl<T: Send> SendPtr<T> {
+    pub fn inner(self) -> *const T {
+        self.0
+    }
+}
+
+impl<T: Send> SendPtrMut<T> {
+    pub fn inner(self) -> *mut T {
+        self.0
+    }
+}
+
 unsafe impl Sync for ThreadCtx {}
 
 impl<'a> Interpreter<'a> {
@@ -804,26 +825,6 @@ fn compute_leaky_relu(leaky: &LeakyReLU, inputs: &[&Tensor], outputs: &mut [Tens
 
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = if *i < 0.0 { leaky.alpha * i } else { *i };
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-struct SendPtr<T: Send>(pub *const T);
-#[derive(Copy, Clone, Debug)]
-struct SendPtrMut<T: Send>(pub *mut T);
-
-unsafe impl<T: Send> Send for SendPtr<T> {}
-unsafe impl<T: Send> Send for SendPtrMut<T> {}
-
-impl<T: Send> SendPtr<T> {
-    pub fn inner(self) -> *const T {
-        self.0
-    }
-}
-
-impl<T: Send> SendPtrMut<T> {
-    pub fn inner(self) -> *mut T {
-        self.0
     }
 }
 

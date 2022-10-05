@@ -21,4 +21,5 @@ cargo-util = "0.2.1"
 [features]
 matrixmultiply-threading = [ "altius-session/matrixmultiply-threading" ]
 openblas = [ "altius-session/openblas" ]
+blis = [ "altius-session/blis" ]
 accelerate = [ "altius-session/accelerate" ]

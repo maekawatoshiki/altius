@@ -195,7 +195,7 @@ impl<'a> Interpreter<'a> {
             Op::GlobalAveragePool => compute_gavg_pool(node, &inputs, &mut outputs),
             Op::Reshape => compute_reshape(node, &inputs, &mut outputs),
             Op::Flatten(ref flatten) => compute_flatten(flatten, &inputs, &mut outputs),
-            Op::MatMul => compute_mat_mul(node, &inputs, &mut outputs),
+            Op::MatMul => compute_mat_mul(&self.tctx, node, &inputs, &mut outputs),
             Op::Gemm(ref gemm) => compute_gemm(gemm, &inputs, &mut outputs),
             Op::ReLU => compute_relu(node, &inputs, &mut outputs),
             Op::HardSigmoid(ref hs) => compute_hard_sigmoid(hs, &inputs, &mut outputs),
@@ -698,7 +698,7 @@ fn compute_sqrt(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     }
 }
 
-fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_mat_mul(tctx: &ThreadCtx, _node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_a = inputs[Node::MATMUL_IN_A];
     let input_b = inputs[Node::MATMUL_IN_B];
     let output = &mut outputs[Node::MATMUL_OUT];
@@ -714,29 +714,64 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     );
 
     if adim.len() == 3 && bdim.len() == 2 {
-        let [_, m, _k] = input_a.fixed_dims::<3>();
+        let [batch, m, _k] = input_a.fixed_dims::<3>();
         let [k, n] = input_b.fixed_dims::<2>();
 
         let mn = output.strides()[0];
         let mk = input_a.strides()[0];
         let b = input_b.data::<f32>();
+
+        if batch == 1 {
+            output
+                .data_mut::<f32>()
+                .chunks_mut(mn)
+                .zip(input_a.data::<f32>().chunks(mk))
+                .for_each(|(c, a)| {
+                    sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
+                });
+        } else {
+            output
+                .data_mut::<f32>()
+                .chunks_mut(mn)
+                .zip(input_a.data::<f32>().chunks(mk))
+                .for_each(|(c, a)| {
+                    let a = SendPtr(a.as_ptr());
+                    let b = SendPtr(b.as_ptr());
+                    let c = SendPtrMut(c.as_mut_ptr());
+                    tctx.tp.execute(move || {
+                        let a = unsafe { std::slice::from_raw_parts(a.inner(), mk) };
+                        let b = unsafe { std::slice::from_raw_parts(b.inner(), k * n) };
+                        let c = unsafe { std::slice::from_raw_parts_mut(c.inner(), mn) };
+                        sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
+                    })
+                });
+            tctx.tp.join();
+        }
+    } else if adim.len() == 3 && bdim.len() == 3 {
+        let [_, m, _k] = input_a.fixed_dims::<3>();
+        let [_, k, n] = input_b.fixed_dims::<3>();
+        let mn = m * n;
+        let mk = m * k;
+        let kn = k * n;
+
         output
             .data_mut::<f32>()
             .chunks_mut(mn)
             .zip(input_a.data::<f32>().chunks(mk))
-            .for_each(|(c, a)| {
-                sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
+            .zip(input_b.data::<f32>().chunks(kn))
+            .for_each(|((c, a), b)| {
+                let a = SendPtr(a.as_ptr());
+                let b = SendPtr(b.as_ptr());
+                let c = SendPtrMut(c.as_mut_ptr());
+                tctx.tp.execute(move || {
+                    let a = unsafe { std::slice::from_raw_parts(a.inner(), mk) };
+                    let b = unsafe { std::slice::from_raw_parts(b.inner(), kn) };
+                    let c = unsafe { std::slice::from_raw_parts_mut(c.inner(), mn) };
+                    sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
+                })
             });
-    } else if adim.len() == 3 && bdim.len() == 3 {
-        let [_, m, _k] = input_a.fixed_dims::<3>();
-        let [_, k, n] = input_b.fixed_dims::<3>();
 
-        for i in 0..adim[0] {
-            let a = input_a.slice_at(&[i]);
-            let b = input_b.slice_at(&[i]);
-            let c = output.slice_at_mut(&[i]);
-            sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
-        }
+        tctx.tp.join();
     } else {
         let [m, _k] = input_a.fixed_dims::<2>();
         let [k, n] = input_b.fixed_dims::<2>();

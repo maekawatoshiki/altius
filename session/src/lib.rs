@@ -2,9 +2,12 @@
 
 pub mod interpreter;
 
-#[cfg(feature = "cblas")]
+#[cfg(all(feature = "cblas", not(feature = "blis")))]
 #[allow(unused)]
 use blas_src;
+#[cfg(all(feature = "cblas", feature = "blis"))]
+#[allow(unused)]
+use blis_src;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]

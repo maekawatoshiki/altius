@@ -14,6 +14,8 @@ import onnxruntime as ort
 
 def main():
     logging.basicConfig(level=logging.INFO)
+    os.environ["OMP_PROC_BIND"] = "TRUE"
+    os.environ["BLIS_NUM_THREADS"] = "1" # Increase this number
 
     labels = open("../models/imagenet_classes.txt").readlines()
     image = Image.open("../models/cat.png")

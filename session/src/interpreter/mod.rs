@@ -1,7 +1,7 @@
 mod conv2d;
 mod gemm;
 
-use crate::interpreter::gemm::sgemm;
+use crate::interpreter::gemm::{sgemm, sgemm2};
 
 use super::SessionError;
 use altius_core::{
@@ -18,7 +18,7 @@ use conv2d::Conv2dCtx;
 use core_affinity::CoreId;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-use ndarray::{s, Array2, ArrayView2, ArrayView3, ArrayView4};
+use ndarray::{s, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 use threadpool::ThreadPool;
@@ -790,39 +790,79 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     assert!(input_b.dims().len() == 2);
     assert!(input_c.dims().len() == 1);
 
-    let a =
-        Array2::from_shape_vec(input_a.fixed_dims::<2>(), input_a.data::<f32>().to_vec()).unwrap();
-    let b =
-        Array2::from_shape_vec(input_b.fixed_dims::<2>(), input_b.data::<f32>().to_vec()).unwrap();
-    let a = if gemm.trans_a { a.t() } else { a.view() };
-    let b = if gemm.trans_b { b.t() } else { b.view() };
+    #[cfg(feature = "cblas")]
+    {
+        let m = input_a.dims()[gemm.trans_a as usize];
+        let k = input_a.dims()[1 - gemm.trans_a as usize];
+        let n = input_b.dims()[1 - gemm.trans_b as usize];
 
-    let c = Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
-        .unwrap()
-        .broadcast(output.fixed_dims::<2>())
-        .unwrap()
-        .into_owned();
-    let mut c = c.as_standard_layout();
+        let a = input_a.data();
+        let b = input_b.data();
+        let c = output.data_mut::<f32>();
 
-    let m = a.shape()[0];
-    let k = a.shape()[1];
-    let n = b.shape()[1];
+        c.chunks_mut(input_c.dims()[0])
+            .for_each(|o| o.copy_from_slice(input_c.data::<f32>()));
 
-    sgemm(
-        m,
-        k,
-        n,
-        gemm.alpha,
-        a.as_standard_layout().as_slice().unwrap(),
-        k,
-        b.as_standard_layout().as_slice().unwrap(),
-        n,
-        gemm.beta,
-        c.as_slice_mut().unwrap(),
-        n,
-    );
+        sgemm2(
+            gemm.trans_a,
+            gemm.trans_b,
+            m,
+            k,
+            n,
+            gemm.alpha,
+            a,
+            if gemm.trans_a { m } else { k },
+            b,
+            if gemm.trans_b { k } else { n },
+            gemm.beta,
+            c,
+            n,
+        );
+    }
 
-    output.set_raw_vec(c.into_owned().into_raw_vec())
+    #[cfg(not(feature = "cblas"))]
+    {
+        use ndarray::Array2;
+
+        let a = Array2::from_shape_vec(input_a.fixed_dims::<2>(), input_a.data::<f32>().to_vec())
+            .unwrap();
+        let b = Array2::from_shape_vec(input_b.fixed_dims::<2>(), input_b.data::<f32>().to_vec())
+            .unwrap();
+        let a = if gemm.trans_a { a.t() } else { a.view() };
+        let b = if gemm.trans_b { b.t() } else { b.view() };
+
+        let c = Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
+            .unwrap()
+            .broadcast(output.fixed_dims::<2>())
+            .unwrap()
+            .into_owned();
+        let mut c = c.as_standard_layout();
+
+        let m = a.shape()[0];
+        let k = a.shape()[1];
+        let n = b.shape()[1];
+
+        let a = a.as_standard_layout();
+        let a = a.as_slice().unwrap();
+        let b = b.as_standard_layout();
+        let b = b.as_slice().unwrap();
+
+        sgemm(
+            m,
+            k,
+            n,
+            gemm.alpha,
+            a,
+            k,
+            b,
+            n,
+            gemm.beta,
+            c.as_slice_mut().unwrap(),
+            n,
+        );
+
+        output.set_raw_vec(c.into_owned().into_raw_vec())
+    }
 }
 
 fn compute_relu(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

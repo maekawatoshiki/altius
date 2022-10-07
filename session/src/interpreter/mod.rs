@@ -115,6 +115,8 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
+        let start = Instant::now();
+
         if self.model.outputs.len() > 1 {
             log::debug!("Number of outputs: {}", self.model.outputs.len());
         }
@@ -133,9 +135,10 @@ impl<'a> Interpreter<'a> {
 
         if self.enable_profiling {
             log::info!(
-                "Total execution time: {:#?}",
+                "Kernel execution time: {:#?}",
                 profile.values().sum::<Duration>()
             );
+            log::info!("Total execution time: {:#?}", start.elapsed());
             log::info!("Profile: {:#?}", profile);
         }
 

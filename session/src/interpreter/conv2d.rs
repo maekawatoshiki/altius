@@ -73,6 +73,8 @@ pub fn compute(ctx: &mut Conv2dCtx) {
                 }
             }
         }
+    } else {
+        output.data_mut::<f32>().fill(0.);
     }
 
     let mut col = Tensor::zeros::<f32>(

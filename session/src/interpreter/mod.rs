@@ -174,7 +174,7 @@ impl<'a> Interpreter<'a> {
                 });
         let mut outputs = output_shapes
             .into_iter()
-            .map(|TypedShape { elem_ty, dims }| Tensor::zeros_of_type(elem_ty, dims))
+            .map(|TypedShape { elem_ty, dims }| Tensor::uninit_of_type(elem_ty, dims))
             .collect::<Vec<_>>();
 
         let start = Instant::now();

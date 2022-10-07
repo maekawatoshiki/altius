@@ -80,6 +80,22 @@ impl Tensor {
         }
     }
 
+    pub fn uninit_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
+        fn uninit_of<T: TensorElemTypeExt>(total_elems: usize) -> Vec<T> {
+            let mut vec: Vec<T> = Vec::with_capacity(total_elems);
+            unsafe { vec.set_len(total_elems) };
+            vec
+        }
+
+        let total_elems = dims.total_elems();
+        match ty {
+            TensorElemType::Bool => Self::new(dims, uninit_of::<u8>(total_elems)),
+            TensorElemType::F32 => Self::new(dims, uninit_of::<f32>(total_elems)),
+            TensorElemType::I32 => Self::new(dims, uninit_of::<i32>(total_elems)),
+            TensorElemType::I64 => Self::new(dims, uninit_of::<i64>(total_elems)),
+        }
+    }
+
     pub fn rand<T>(dims: Dimensions) -> Self
     where
         T: TensorElemTypeExt,

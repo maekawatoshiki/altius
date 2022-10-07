@@ -1,7 +1,6 @@
 use altius_core::onnx::load_onnx;
 use altius_core::tensor::*;
 use altius_session::interpreter::Interpreter;
-use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
@@ -32,41 +31,33 @@ fn main() {
         inputs.push((expected, pixels));
     }
 
-    let mut correct: i32 = 0;
-    let validation_count = 10000;
-    let repeat = 1;
-
     let start = Instant::now();
 
+    let validation_count = 10000;
     let input_value = mnist.lookup_named_value("Input3").unwrap();
-    let i = Interpreter::new(&mnist);
+    let sess = Interpreter::new(&mnist);
 
-    for _ in 0..repeat {
-        correct = inputs
-            .par_iter()
-            .take(validation_count)
-            .map(|(expected, input)| {
-                let v = i
-                    .run(vec![(input_value, input.clone())])
-                    .expect("Inference failed");
-                let inferred = v[0]
-                    .data::<f32>()
-                    .iter()
-                    .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-                    .map(|(index, _)| index)
-                    .unwrap();
-                (*expected == inferred as i32) as i32
-            })
-            .sum();
-    }
+    let correct: i32 = inputs
+        .iter()
+        .take(validation_count)
+        .map(|(expected, input)| {
+            let v = sess
+                .run(vec![(input_value, input.clone())])
+                .expect("Inference failed");
+            let inferred = v[0]
+                .data::<f32>()
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+                .map(|(index, _)| index)
+                .unwrap();
+            (*expected == inferred as i32) as i32
+        })
+        .sum();
 
     let end = start.elapsed();
     println!("elapsed: {:?}", end);
-    println!(
-        "fps: {:?}",
-        (validation_count as f64 * repeat as f64) / end.as_secs_f64()
-    );
+    println!("fps: {:?}", (validation_count as f64) / end.as_secs_f64());
 
     // for (_expected, input) in &inputs {
     //     for x in 0..28 {

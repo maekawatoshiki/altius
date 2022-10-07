@@ -20,9 +20,11 @@ use core_affinity::CoreId;
 use cudnn::CudnnContext;
 use ndarray::{s, Array2, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
+use thread_local::ThreadLocal;
 use threadpool::ThreadPool;
 
 use std::{
+    cell::RefCell,
     simd::{Simd, SimdFloat, StdFloat},
     time::{Duration, Instant},
 };
@@ -47,6 +49,7 @@ pub struct Interpreter<'a> {
     sorted_nodes: Vec<NodeId>,
     inferred_shapes: FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     enable_profiling: bool,
+    values: ThreadLocal<RefCell<FxHashMap<ValueId, Tensor>>>,
     dummy_value: Tensor,
     tctx: ThreadCtx,
 }
@@ -100,6 +103,7 @@ impl<'a> Interpreter<'a> {
             sorted_nodes,
             inferred_shapes,
             enable_profiling: false,
+            values: ThreadLocal::new(),
             dummy_value: Tensor::zeros::<f32>(vec![0].into()),
             tctx: ThreadCtx { tp },
         }
@@ -122,7 +126,10 @@ impl<'a> Interpreter<'a> {
         }
 
         let mut profile = FxHashMap::default();
-        let mut values = self.model.inits.clone();
+        let values = &mut *self
+            .values
+            .get_or(|| RefCell::new(self.model.inits.clone()))
+            .borrow_mut();
 
         // Set inputs.
         for (id, tensor) in inputs {
@@ -130,7 +137,7 @@ impl<'a> Interpreter<'a> {
         }
 
         for &node in &self.sorted_nodes {
-            self.run_node(&mut profile, &mut values, node);
+            self.run_node(&mut profile, values, node);
         }
 
         if self.enable_profiling {

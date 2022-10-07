@@ -25,6 +25,7 @@ core_affinity = "0.5.10"
 threadpool = "1.8.1"
 num_cpus = "1.13.1"
 rayon = "1.5.3"
+thread_local = "1.1"
 
 [features]
 cuda = ["cudnn", "cust"]

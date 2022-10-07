@@ -195,7 +195,7 @@ impl<'a> Interpreter<'a> {
                 inputs: &inputs,
                 outputs: &mut outputs,
             }),
-            Op::Add => compute_add(node, &inputs, &mut outputs),
+            Op::Add => compute_add(&self.tctx, &inputs, &mut outputs),
             Op::Sub => compute_sub(node, &inputs, &mut outputs),
             Op::Mul => compute_mul(node, &inputs, &mut outputs),
             Op::Div => compute_div(&self.tctx, &inputs, &mut outputs),
@@ -337,7 +337,7 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
     }
 }
 
-fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_a = inputs[Node::ADD_IN_A];
     let input_b = inputs[Node::ADD_IN_B];
     let output = &mut outputs[Node::ADD_OUT];
@@ -346,26 +346,48 @@ fn compute_add(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let bdims = input_b.dims();
 
     if adims == bdims {
-        let mut input_a = input_a.data::<f32>();
-        let mut input_b = input_b.data::<f32>();
-        let mut output = output.data_mut::<f32>();
-        let mut len = output.len();
+        let input_a = input_a.data::<f32>();
+        let input_b = input_b.data::<f32>();
+        let output = output.data_mut::<f32>();
+        let len = output.len();
+        let n = tctx.tp.max_count();
         const SIMD_LEN: usize = 4;
 
-        while len >= SIMD_LEN {
-            let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
-            let b = Simd::<f32, SIMD_LEN>::from_slice(&input_b[0..SIMD_LEN]);
-            let c = a + b;
-            output[0..SIMD_LEN].copy_from_slice(c.as_array());
-            input_a = &input_a[SIMD_LEN..];
-            input_b = &input_b[SIMD_LEN..];
-            output = &mut output[SIMD_LEN..];
-            len -= SIMD_LEN
-        }
+        input_a
+            .chunks(len / n)
+            .zip(input_b.chunks(len / n))
+            .zip(output.chunks_mut(len / n))
+            .for_each(|((a, b), o)| {
+                let mut len = a.len();
+                let a = SendPtr(a.as_ptr());
+                let b = SendPtr(b.as_ptr());
+                let o = SendPtrMut(o.as_mut_ptr());
 
-        for (i, (a, b)) in input_a.iter().zip(input_b.iter()).enumerate() {
-            output[i] = a + b;
-        }
+                tctx.tp.execute(move || {
+                    let mut a = unsafe { std::slice::from_raw_parts(a.inner(), len) };
+                    let mut b = unsafe { std::slice::from_raw_parts(b.inner(), len) };
+                    let mut o = unsafe { std::slice::from_raw_parts_mut(o.inner(), len) };
+
+                    while len >= SIMD_LEN {
+                        {
+                            let a = Simd::<f32, SIMD_LEN>::from_slice(&a[0..SIMD_LEN]);
+                            let b = Simd::<f32, SIMD_LEN>::from_slice(&b[0..SIMD_LEN]);
+                            let c = a + b;
+                            o[0..SIMD_LEN].copy_from_slice(c.as_array());
+                        }
+                        a = &a[SIMD_LEN..];
+                        b = &b[SIMD_LEN..];
+                        o = &mut o[SIMD_LEN..];
+                        len -= SIMD_LEN
+                    }
+
+                    for ((a, b), o) in a.iter().zip(b.iter()).zip(o.iter_mut()) {
+                        *o = a + b;
+                    }
+                });
+            });
+
+        tctx.tp.join();
 
         return;
     }
@@ -644,6 +666,8 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                         }
                     });
                 });
+
+            tctx.tp.join();
         }
 
         return;

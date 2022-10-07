@@ -198,7 +198,7 @@ impl<'a> Interpreter<'a> {
             Op::Add => compute_add(node, &inputs, &mut outputs),
             Op::Sub => compute_sub(node, &inputs, &mut outputs),
             Op::Mul => compute_mul(node, &inputs, &mut outputs),
-            Op::Div => compute_div(node, &inputs, &mut outputs),
+            Op::Div => compute_div(&self.tctx, &inputs, &mut outputs),
             Op::Pow => compute_pow(node, &inputs, &mut outputs),
             Op::Sqrt => compute_sqrt(node, &inputs, &mut outputs),
             Op::MaxPool(ref maxpool) => compute_max_pool(maxpool, &inputs, &mut outputs),
@@ -598,7 +598,7 @@ fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     }
 }
 
-fn compute_div(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_a = inputs[Node::MUL_IN_A];
     let input_b = inputs[Node::MUL_IN_B];
     let output = &mut outputs[Node::MUL_OUT];
@@ -621,15 +621,29 @@ fn compute_div(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         && input_b.dims().len() == 3
         && input_b.dims()[input_b.dims().len() - 1] == 1
     {
-        let dims = input_a.dims();
-        let max = dims.total_elems();
-        let n = dims.0.last().unwrap();
-        let input_a = input_a.data::<f32>();
-        let input_b = input_b.data::<f32>();
-        let output = output.data_mut::<f32>();
+        {
+            let dims = input_a.dims();
+            let n = dims.0.last().unwrap();
+            let input_a = input_a.data::<f32>();
+            let input_b = input_b.data::<f32>();
+            let output = output.data_mut::<f32>();
 
-        for i in 0..max {
-            output[i] = input_a[i] / input_b[i / n];
+            input_a
+                .chunks(*n)
+                .zip(input_b.iter())
+                .zip(output.chunks_mut(*n))
+                .for_each(|((a, &b), o)| {
+                    let len = a.len();
+                    let a = SendPtr(a.as_ptr());
+                    let o = SendPtrMut(o.as_mut_ptr());
+                    tctx.tp.execute(move || {
+                        let a = unsafe { std::slice::from_raw_parts(a.inner(), len) };
+                        let o = unsafe { std::slice::from_raw_parts_mut(o.inner(), len) };
+                        for (&a, o) in a.iter().zip(o.iter_mut()) {
+                            *o = a / b;
+                        }
+                    });
+                });
         }
 
         return;

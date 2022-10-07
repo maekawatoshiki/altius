@@ -79,8 +79,6 @@ impl<T: Send> SendPtrMut<T> {
     }
 }
 
-unsafe impl Sync for ThreadCtx {}
-
 impl<'a> Interpreter<'a> {
     pub fn new(model: &'a Model) -> Self {
         let sorted_nodes = model.topo_sort_nodes();
@@ -349,8 +347,8 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let input_a = input_a.data::<f32>();
         let input_b = input_b.data::<f32>();
         let output = output.data_mut::<f32>();
-        let len = output.len();
         let n = tctx.tp.max_count();
+        let len = output.len().max(n);
         const SIMD_LEN: usize = 4;
 
         input_a

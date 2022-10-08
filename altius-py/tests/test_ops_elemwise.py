@@ -76,8 +76,6 @@ def test_softmax_1():
             os.path.join(tmpdir, "model.onnx"),
             "Softmax",
             [1, 2, 3],
-            atol=1e-1,
-            rtol=1e-5,
         )
 
 
@@ -87,8 +85,15 @@ def test_softmax_2():
             os.path.join(tmpdir, "model.onnx"),
             "Softmax",
             [3, 28, 28],
-            atol=1e-1,
-            rtol=1e-5,
+        )
+
+
+def test_softmax_3():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_elemwise(
+            os.path.join(tmpdir, "model.onnx"),
+            "Softmax",
+            [128, 512, 512],
         )
 
 

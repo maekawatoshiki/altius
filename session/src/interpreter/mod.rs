@@ -25,7 +25,7 @@ use threadpool::ThreadPool;
 
 use std::{
     cell::RefCell,
-    simd::{Simd, SimdFloat, StdFloat},
+    simd::{Simd, SimdFloat, SimdOrd, StdFloat},
     time::{Duration, Instant},
 };
 
@@ -212,7 +212,7 @@ impl<'a> Interpreter<'a> {
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
-            Op::Softmax(ref softmax) => compute_softmax(softmax, &inputs, &mut outputs),
+            Op::Softmax(ref softmax) => compute_softmax(&self.tctx, softmax, &inputs, &mut outputs),
             Op::Resize(ref resize) => compute_resize(resize, &inputs, &mut outputs),
             Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
             Op::Transpose(ref trans) => compute_transpose(trans, &inputs, &mut outputs),
@@ -354,7 +354,7 @@ fn compute_add(inputs: &[&Tensor], outputs: &mut [Tensor]) {
             let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
             let b = Simd::<f32, SIMD_LEN>::from_slice(&input_b[0..SIMD_LEN]);
             let c = a + b;
-            output[0..SIMD_LEN].copy_from_slice(c.as_array());
+            output[0..SIMD_LEN].copy_from_slice(c.as_ref());
             input_a = &input_a[SIMD_LEN..];
             input_b = &input_b[SIMD_LEN..];
             output = &mut output[SIMD_LEN..];
@@ -437,7 +437,7 @@ fn compute_add(inputs: &[&Tensor], outputs: &mut [Tensor]) {
                 {
                     let a = Simd::<f32, SIMD_LEN>::from_slice(&a[0..SIMD_LEN]);
                     let b = Simd::<f32, SIMD_LEN>::from_slice(&b[0..SIMD_LEN]);
-                    o[0..SIMD_LEN].copy_from_slice((a + b).as_array());
+                    o[0..SIMD_LEN].copy_from_slice((a + b).as_ref());
                 }
                 a = &a[SIMD_LEN..];
                 b = &b[SIMD_LEN..];
@@ -1012,6 +1012,119 @@ fn tanh(mut data: &mut [f32]) {
     }
 }
 
+fn exp(mut output: &mut [f32], mut input: &[f32]) {
+    let lower_range = -103.9720840454f32;
+    let upper_range = 88.7762626647950f32;
+    // let lower_range_sum_exp = -88.3762626647949f32;
+    // let upper_range_sum_exp = 88.3762626647949f32;
+    let rounding_bias = 12582912.0f32;
+    let log2reciprocal = 1.44269504088896341f32;
+    let log2high = -6.93145752e-1f32;
+    let log2low = -1.42860677e-6f32;
+    let poly_0 = 0.0013780593872f32;
+    let poly_1 = 0.0083731245250f32;
+    let poly_2 = 0.0416695363820f32;
+    let poly_3 = 0.1666647195816f32;
+    let poly_4 = 0.4999998509884f32;
+    let poly_56 = 1.0000000000000f32;
+    let minimum_exponent = -1056964608i32;
+    let maximum_exponent = 0x3F800000i32;
+
+    const SIMD_LEN: usize = 4;
+
+    let lower_ranges = Simd::<f32, SIMD_LEN>::from_array([lower_range; SIMD_LEN]);
+    let upper_ranges = Simd::<f32, SIMD_LEN>::from_array([upper_range; SIMD_LEN]);
+    // let lower_range_sum_exp = Simd::<f32, SIMD_LEN>::from_array([lower_range_sum_exp; SIMD_LEN]);
+    // let upper_range_sum_exp = Simd::<f32, SIMD_LEN>::from_array([upper_range_sum_exp; SIMD_LEN]);
+    let rounding_biases = Simd::<f32, SIMD_LEN>::from_array([rounding_bias; SIMD_LEN]);
+    let log2reciprocals = Simd::<f32, SIMD_LEN>::from_array([log2reciprocal; SIMD_LEN]);
+    let log2highs = Simd::<f32, SIMD_LEN>::from_array([log2high; SIMD_LEN]);
+    let log2lows = Simd::<f32, SIMD_LEN>::from_array([log2low; SIMD_LEN]);
+    let poly_0s = Simd::<f32, SIMD_LEN>::from_array([poly_0; SIMD_LEN]);
+    let poly_1s = Simd::<f32, SIMD_LEN>::from_array([poly_1; SIMD_LEN]);
+    let poly_2s = Simd::<f32, SIMD_LEN>::from_array([poly_2; SIMD_LEN]);
+    let poly_3s = Simd::<f32, SIMD_LEN>::from_array([poly_3; SIMD_LEN]);
+    let poly_4s = Simd::<f32, SIMD_LEN>::from_array([poly_4; SIMD_LEN]);
+    let poly_56s = Simd::<f32, SIMD_LEN>::from_array([poly_56; SIMD_LEN]);
+    let shl23 = Simd::<i32, SIMD_LEN>::from_array([23; SIMD_LEN]);
+    let maximum_exponents = Simd::<i32, SIMD_LEN>::from_array([maximum_exponent; SIMD_LEN]);
+    let minimum_exponents = Simd::<i32, SIMD_LEN>::from_array([minimum_exponent; SIMD_LEN]);
+
+    let mut len = input.len();
+
+    while len >= SIMD_LEN {
+        let vals = Simd::<f32, SIMD_LEN>::from_slice(&input[0..SIMD_LEN]);
+        let vals = lower_ranges.simd_max(vals);
+        let vals = upper_ranges.simd_min(vals);
+
+        let biased = vals.mul_add(log2reciprocals, rounding_biases);
+        let m = biased - rounding_biases;
+
+        let vals = m.mul_add(log2highs, vals);
+        let vals = m.mul_add(log2lows, vals);
+
+        let overflow: Simd<i32, SIMD_LEN> =
+            unsafe { std::mem::transmute::<_, Simd<i32, SIMD_LEN>>(biased) } << shl23;
+        let normal = overflow.simd_min(maximum_exponents);
+        let normal = normal.simd_max(minimum_exponents);
+        let overflow = overflow - normal;
+        let overflow = overflow + maximum_exponents;
+        let normal = normal + maximum_exponents;
+
+        let p = poly_0s;
+        let p = p.mul_add(vals, poly_1s);
+        let p = p.mul_add(vals, poly_2s);
+        let p = p.mul_add(vals, poly_3s);
+        let p = p.mul_add(vals, poly_4s);
+        let p = p.mul_add(vals, poly_56s);
+
+        let vals = vals * unsafe { std::mem::transmute::<_, Simd<f32, SIMD_LEN>>(overflow) };
+        let p = p.mul_add(vals, unsafe {
+            std::mem::transmute::<_, Simd<f32, SIMD_LEN>>(overflow)
+        });
+        let p = p * unsafe { std::mem::transmute::<_, Simd<f32, SIMD_LEN>>(normal) };
+
+        output[0..SIMD_LEN].copy_from_slice(p.as_ref());
+
+        len -= SIMD_LEN;
+        input = &input[SIMD_LEN..];
+        output = &mut output[SIMD_LEN..];
+    }
+
+    for (i, o) in input.iter().zip(output.iter_mut()) {
+        let val = *i;
+        let val = lower_range.max(val);
+        let val = upper_range.min(val);
+
+        let biased = val * log2reciprocal + rounding_bias;
+        let m = biased - rounding_bias;
+
+        let val = m * log2high + val;
+        let val = m * log2low + val;
+
+        // overflow
+        let overflow = unsafe { std::mem::transmute::<_, i32>(biased) } << 23i32;
+        let normal = overflow.min(maximum_exponent);
+        let normal = normal.max(minimum_exponent);
+        let overflow = overflow - normal;
+        let overflow = overflow + maximum_exponent;
+        let normal = normal + maximum_exponent;
+
+        let p = poly_0;
+        let p = p * val + poly_1;
+        let p = p * val + poly_2;
+        let p = p * val + poly_3;
+        let p = p * val + poly_4;
+        let p = p * val + poly_56;
+
+        let val = val * unsafe { std::mem::transmute::<_, f32>(overflow) };
+        let p = p * val + unsafe { std::mem::transmute::<_, f32>(overflow) };
+        let p = p * unsafe { std::mem::transmute::<_, f32>(normal) };
+
+        *o = p;
+    }
+}
+
 fn compute_sigmoid(inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input: &[f32] = inputs[Node::SIGMOID_IN].data();
     let output: &mut [f32] = outputs[Node::SIGMOID_OUT].data_mut();
@@ -1030,35 +1143,66 @@ fn compute_erf(inputs: &[&Tensor], outputs: &mut [Tensor]) {
     }
 }
 
-fn compute_softmax(softmax: &Softmax, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_softmax(
+    tctx: &ThreadCtx,
+    softmax: &Softmax,
+    inputs: &[&Tensor],
+    outputs: &mut [Tensor],
+) {
     let input = inputs[0];
     let output = &mut outputs[0];
 
     assert_eq!(input.dims().len(), 3);
     assert_eq!(softmax.axis, -1);
 
-    let imax = input.dims()[0];
-    let jmax = input.dims()[1];
-    let kmax = input.dims()[2];
-    let mut input = input.data::<f32>();
-    let mut output = output.data_mut::<f32>();
+    let axis_len = input.dims()[2];
+    let input = input.data::<f32>();
+    let output = output.data_mut::<f32>();
 
-    for _i in 0..imax {
-        for _j in 0..jmax {
-            let mut sum = 0f32;
-            for k in 0..kmax {
-                let s = fastapprox::faster::exp(input[k]);
-                output[k] = s;
-                sum += s;
+    let n = tctx.tp.max_count();
+    let chunk = if input.len() < n {
+        input.len()
+    } else {
+        input.len() / n
+    };
+
+    input
+        .chunks(chunk)
+        .zip(output.chunks_mut(chunk))
+        .for_each(|(input, output)| {
+            let len = input.len();
+            let input_ptr = SendPtr(input.as_ptr());
+            let output_ptr = SendPtrMut(output.as_mut_ptr());
+            tctx.tp.execute(move || {
+                let input = unsafe { std::slice::from_raw_parts(input_ptr.inner(), len) };
+                let output = unsafe { std::slice::from_raw_parts_mut(output_ptr.inner(), len) };
+                exp(output, input)
+            })
+        });
+
+    tctx.tp.join();
+
+    let batch = (output.len() / 100000).max(1); // 100000 is magic number :(
+                                                // I think processing more than 100000 elements for
+                                                // each core is just right.
+
+    output.chunks_mut(axis_len * batch).for_each(|output| {
+        let output_ptr = SendPtrMut(output.as_mut_ptr());
+        tctx.tp.execute(move || {
+            for i in 0..batch {
+                let output = unsafe {
+                    std::slice::from_raw_parts_mut(output_ptr.inner().add(i * axis_len), axis_len)
+                };
+                let sum: f32 = output.iter().sum();
+                let rsum = 1. / sum;
+                for o in output.iter_mut() {
+                    *o *= rsum;
+                }
             }
-            let rsum = 1. / sum;
-            for k in 0..kmax {
-                output[k] *= rsum;
-            }
-            input = &input[kmax..];
-            output = &mut output[kmax..];
-        }
-    }
+        })
+    });
+
+    tctx.tp.join();
 }
 
 fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {

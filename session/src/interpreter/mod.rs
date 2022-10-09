@@ -653,14 +653,27 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_b = inputs[Node::MUL_IN_B];
     let output = &mut outputs[Node::MUL_OUT];
 
+    const SIMD_LEN: usize = 4;
+
     if input_a.dims() == input_b.dims() {
-        for (i, (a, b)) in input_a
-            .data::<f32>()
-            .iter()
-            .zip(input_b.data::<f32>().iter())
-            .enumerate()
-        {
-            output.data_mut::<f32>()[i] = a / b;
+        let mut input_a = input_a.data::<f32>();
+        let mut input_b = input_b.data::<f32>();
+        let mut output = output.data_mut::<f32>();
+
+        let mut len = input_a.len();
+
+        while len >= SIMD_LEN {
+            let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
+            let b = Simd::<f32, SIMD_LEN>::from_slice(&input_b[0..SIMD_LEN]).recip();
+            output[0..SIMD_LEN].copy_from_slice((a * b).as_ref());
+            input_a = &input_a[SIMD_LEN..];
+            input_b = &input_b[SIMD_LEN..];
+            output = &mut output[SIMD_LEN..];
+            len -= SIMD_LEN
+        }
+
+        for ((a, b), o) in input_a.iter().zip(input_b.iter()).zip(output.iter_mut()) {
+            *o = a / b;
         }
         return;
     }
@@ -671,17 +684,38 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         && input_b.dims().len() == 3
         && input_b.dims()[input_b.dims().len() - 1] == 1
     {
-        {
-            let dims = input_a.dims();
-            let n = dims.0.last().unwrap();
-            let input_a = input_a.data::<f32>();
-            let input_b = input_b.data::<f32>();
-            let output = output.data_mut::<f32>();
+        let dims = input_a.dims();
+        let n = *dims.0.last().unwrap();
+        let input_a = input_a.data::<f32>();
+        let input_b = input_b.data::<f32>();
+        let output = output.data_mut::<f32>();
 
+        if n < 100000 {
             input_a
-                .chunks(*n)
+                .chunks(n)
                 .zip(input_b.iter())
-                .zip(output.chunks_mut(*n))
+                .zip(output.chunks_mut(n))
+                .for_each(|((mut a, &b), mut o)| {
+                    let mut len = a.len();
+                    let b_ = Simd::<f32, SIMD_LEN>::splat(b).recip();
+
+                    while len >= SIMD_LEN {
+                        let a_ = Simd::<f32, SIMD_LEN>::from_slice(&a[0..SIMD_LEN]);
+                        o[0..SIMD_LEN].copy_from_slice((a_ * b_).as_ref());
+                        a = &a[SIMD_LEN..];
+                        o = &mut o[SIMD_LEN..];
+                        len -= SIMD_LEN
+                    }
+
+                    for (a, o) in a.iter().zip(o.iter_mut()) {
+                        *o = a / b;
+                    }
+                });
+        } else {
+            input_a
+                .chunks(n)
+                .zip(input_b.iter())
+                .zip(output.chunks_mut(n))
                 .for_each(|((a, &b), o)| {
                     let len = a.len();
                     let a = SendPtr(a.as_ptr());
@@ -702,13 +736,23 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     }
 
     if input_b.dims().is_scalar() {
+        let mut input_a = input_a.data::<f32>();
         let b = input_b.data::<f32>()[0];
-        let output = output.data_mut::<f32>();
+        let simd_b = Simd::<f32, SIMD_LEN>::splat(b).recip();
+        let mut output = output.data_mut::<f32>();
+        let mut len = input_a.len();
 
-        for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
-            *o = a / b;
+        while len >= SIMD_LEN {
+            let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
+            output[0..SIMD_LEN].copy_from_slice((a * simd_b).as_ref());
+            input_a = &input_a[SIMD_LEN..];
+            output = &mut output[SIMD_LEN..];
+            len -= SIMD_LEN
         }
 
+        for (a, o) in input_a.iter().zip(output.iter_mut()) {
+            *o = a * b;
+        }
         return;
     }
 

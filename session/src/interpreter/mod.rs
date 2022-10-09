@@ -15,7 +15,6 @@ use altius_core::{
     value::ValueId,
 };
 use conv2d::Conv2dCtx;
-use core_affinity::CoreId;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
 use ndarray::{s, ArrayView2, ArrayView3, ArrayView4};
@@ -88,12 +87,6 @@ impl<'a> Interpreter<'a> {
         let workers = num_cpus::get_physical();
         let tp = ThreadPool::new(workers);
         assert_eq!(tp.queued_count(), 0);
-        for p in 0..workers {
-            tp.execute(move || {
-                core_affinity::set_for_current(CoreId { id: p });
-            });
-        }
-        tp.join();
 
         Interpreter {
             model,

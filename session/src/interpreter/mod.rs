@@ -1238,7 +1238,7 @@ fn compute_softmax(
                 let output = unsafe {
                     slice::from_raw_parts_mut(output_ptr.inner().add(i * axis_len), axis_len)
                 };
-                let sum: f32 = output.iter().sum();
+                let sum = fast_sum(output);
                 let rsum = 1. / sum;
                 for o in output.iter_mut() {
                     *o *= rsum;
@@ -1248,6 +1248,20 @@ fn compute_softmax(
     });
 
     tctx.tp.join();
+}
+
+fn fast_sum(mut slice: &[f32]) -> f32 {
+    const SIMD_LEN: usize = 4;
+    let mut sum = Simd::<f32, SIMD_LEN>::splat(0f32);
+    let mut len = slice.len();
+
+    while len >= SIMD_LEN {
+        sum += Simd::<f32, SIMD_LEN>::from_slice(&slice);
+        slice = &slice[SIMD_LEN..];
+        len -= SIMD_LEN
+    }
+
+    sum.reduce_sum() + slice.iter().sum::<f32>()
 }
 
 fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {
@@ -1394,16 +1408,8 @@ fn compute_reduce_mean(rmean: &ReduceMean, inputs: &[&Tensor], outputs: &mut [Te
     input
         .chunks(axis_len)
         .zip(output.iter_mut())
-        .for_each(|(mut input, output)| {
-            let mut sum = Simd::<f32, 4>::splat(0.0);
-            let mut len = input.len();
-            while len >= SIMD_LEN {
-                sum += Simd::<f32, SIMD_LEN>::from_slice(&input);
-                input = &input[SIMD_LEN..];
-                len -= SIMD_LEN
-            }
-            let mut sum = sum.reduce_sum();
-            sum += input.iter().sum::<f32>();
+        .for_each(|(input, output)| {
+            let sum = fast_sum(input);
             *output = sum * r_axis_len;
         });
 }

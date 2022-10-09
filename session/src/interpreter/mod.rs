@@ -769,13 +769,13 @@ fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let output = &mut outputs[0].data_mut();
 
     if input_a.dims() == input_b.dims() {
-        for (i, (a, b)) in input_a
+        for ((a, b), o) in input_a
             .data::<f32>()
             .iter()
             .zip(input_b.data::<f32>().iter())
-            .enumerate()
+            .zip(output.iter_mut())
         {
-            output[i] = a.powf(*b);
+            *o = a.powf(*b);
         }
         return;
     }

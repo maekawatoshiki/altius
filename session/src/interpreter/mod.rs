@@ -1379,19 +1379,24 @@ fn compute_reduce_mean(rmean: &ReduceMean, inputs: &[&Tensor], outputs: &mut [Te
         })
         .collect::<Vec<_>>();
     assert_eq!(axes.len(), 1);
+
     let axis = axes[0];
     assert_eq!(input.dims().len(), 3);
     assert_eq!(axis, 2);
     assert!(rmean.keep_dims);
-    for i in 0..input.dims()[0] {
-        for j in 0..input.dims()[1] {
-            let mut sum = 0f32;
-            for k in 0..input.dims()[2] {
-                sum += input.at_3d(i, j, k);
-            }
-            *output.at_3d_mut(i, j, 0) = sum / input.dims()[2] as f32;
-        }
-    }
+
+    let axis_len = input.dims()[2];
+    let input = input.data::<f32>();
+    let output = output.data_mut::<f32>();
+    let r_axis_len = 1.0 / axis_len as f32;
+
+    input
+        .chunks(axis_len)
+        .zip(output.iter_mut())
+        .for_each(|(i, o)| {
+            let sum: f32 = i.iter().sum();
+            *o = sum * r_axis_len;
+        });
 }
 
 fn compute_loop(_node: &Node, _inputs: &[&Tensor], _outputs: &mut [Tensor]) {

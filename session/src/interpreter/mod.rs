@@ -531,14 +531,20 @@ fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     {
         let dims = input_a.dims();
         let max = dims.total_elems();
-        let n = dims.0.last().unwrap();
+        let n = *dims.0.last().unwrap();
         let input_a = input_a.data::<f32>();
         let input_b = input_b.data::<f32>();
         let output = output.data_mut::<f32>();
 
-        for i in 0..max {
-            output[i] = input_a[i] - input_b[i / n];
-        }
+        input_a
+            .chunks(n)
+            .zip(input_b.iter())
+            .zip(output.chunks_mut(n))
+            .for_each(|((a, b), o)| {
+                for (a, o) in a.iter().zip(o.iter_mut()) {
+                    *o = a - b;
+                }
+            });
 
         return;
     }

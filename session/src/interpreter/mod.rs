@@ -1389,13 +1389,22 @@ fn compute_reduce_mean(rmean: &ReduceMean, inputs: &[&Tensor], outputs: &mut [Te
     let input = input.data::<f32>();
     let output = output.data_mut::<f32>();
     let r_axis_len = 1.0 / axis_len as f32;
+    const SIMD_LEN: usize = 4;
 
     input
         .chunks(axis_len)
         .zip(output.iter_mut())
-        .for_each(|(i, o)| {
-            let sum: f32 = i.iter().sum();
-            *o = sum * r_axis_len;
+        .for_each(|(mut input, output)| {
+            let mut sum = Simd::<f32, 4>::splat(0.0);
+            let mut len = input.len();
+            while len >= SIMD_LEN {
+                sum += Simd::<f32, SIMD_LEN>::from_slice(&input);
+                input = &input[SIMD_LEN..];
+                len -= SIMD_LEN
+            }
+            let mut sum = sum.reduce_sum();
+            sum += input.iter().sum::<f32>();
+            *output = sum * r_axis_len;
         });
 }
 

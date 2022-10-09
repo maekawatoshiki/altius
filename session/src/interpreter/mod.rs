@@ -530,7 +530,6 @@ fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         && input_b.dims()[input_b.dims().len() - 1] == 1
     {
         let dims = input_a.dims();
-        let max = dims.total_elems();
         let n = *dims.0.last().unwrap();
         let input_a = input_a.data::<f32>();
         let input_b = input_b.data::<f32>();
@@ -1230,6 +1229,7 @@ fn compute_softmax(
 
     tctx.tp.join();
 
+    let out_len = output.len();
     let batch = (output.len() / 100000).max(1); // 100000 is magic number :(
                                                 // I think processing more than 100000 elements for
                                                 // each core is just right.
@@ -1238,6 +1238,10 @@ fn compute_softmax(
         let output_ptr = SendPtrMut(output.as_mut_ptr());
         tctx.tp.execute(move || {
             for i in 0..batch {
+                if i * axis_len >= out_len {
+                    break;
+                }
+
                 let output = unsafe {
                     slice::from_raw_parts_mut(output_ptr.inner().add(i * axis_len), axis_len)
                 };

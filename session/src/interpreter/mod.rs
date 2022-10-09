@@ -1403,7 +1403,6 @@ fn compute_reduce_mean(rmean: &ReduceMean, inputs: &[&Tensor], outputs: &mut [Te
     let input = input.data::<f32>();
     let output = output.data_mut::<f32>();
     let r_axis_len = 1.0 / axis_len as f32;
-    const SIMD_LEN: usize = 4;
 
     input
         .chunks(axis_len)

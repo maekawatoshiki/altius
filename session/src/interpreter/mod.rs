@@ -1097,56 +1097,45 @@ fn tanh(mut data: &mut [f32]) {
 }
 
 fn exp(mut output: &mut [f32], mut input: &[f32]) {
-    let lower_range = -103.9720840454f32;
-    let upper_range = 88.7762626647950f32;
-    // let lower_range_sum_exp = -88.3762626647949f32;
-    // let upper_range_sum_exp = 88.3762626647949f32;
-    let rounding_bias = 12582912.0f32;
-    let log2reciprocal = 1.44269504088896341f32;
-    let log2high = -6.93145752e-1f32;
-    let log2low = -1.42860677e-6f32;
-    let poly_0 = 0.0013780593872f32;
-    let poly_1 = 0.0083731245250f32;
-    let poly_2 = 0.0416695363820f32;
-    let poly_3 = 0.1666647195816f32;
-    let poly_4 = 0.4999998509884f32;
-    let poly_56 = 1.0000000000000f32;
-    let minimum_exponent = -1056964608i32;
-    let maximum_exponent = 0x3F800000i32;
+    const LOWER_RANGE: f32 = -103.9720840454f32;
+    const UPPER_RANGE: f32 = 88.7762626647950f32;
+    const ROUNDING_BIAS: f32 = 12582912.0f32;
+    const LOG2RECIPROCAL: f32 = 1.44269504088896341f32;
+    const LOG2HIGH: f32 = -6.93145752e-1f32;
+    const LOG2LOW: f32 = -1.42860677e-6f32;
+    const POLY_0: f32 = 0.0013780593872f32;
+    const POLY_1: f32 = 0.0083731245250f32;
+    const POLY_2: f32 = 0.0416695363820f32;
+    const POLY_3: f32 = 0.1666647195816f32;
+    const POLY_4: f32 = 0.4999998509884f32;
+    const POLY_56: f32 = 1.0000000000000f32;
+    const MINIMUM_EXPONENT: i32 = -1056964608i32;
+    const MAXIMUM_EXPONENT: i32 = 0x3F800000i32;
 
     const SIMD_LEN: usize = 4;
-
-    let lower_ranges = Simd::<f32, SIMD_LEN>::from_array([lower_range; SIMD_LEN]);
-    let upper_ranges = Simd::<f32, SIMD_LEN>::from_array([upper_range; SIMD_LEN]);
-    // let lower_range_sum_exp = Simd::<f32, SIMD_LEN>::from_array([lower_range_sum_exp; SIMD_LEN]);
-    // let upper_range_sum_exp = Simd::<f32, SIMD_LEN>::from_array([upper_range_sum_exp; SIMD_LEN]);
-    let rounding_biases = Simd::<f32, SIMD_LEN>::from_array([rounding_bias; SIMD_LEN]);
-    let log2reciprocals = Simd::<f32, SIMD_LEN>::from_array([log2reciprocal; SIMD_LEN]);
-    let log2highs = Simd::<f32, SIMD_LEN>::from_array([log2high; SIMD_LEN]);
-    let log2lows = Simd::<f32, SIMD_LEN>::from_array([log2low; SIMD_LEN]);
-    let poly_0s = Simd::<f32, SIMD_LEN>::from_array([poly_0; SIMD_LEN]);
-    let poly_1s = Simd::<f32, SIMD_LEN>::from_array([poly_1; SIMD_LEN]);
-    let poly_2s = Simd::<f32, SIMD_LEN>::from_array([poly_2; SIMD_LEN]);
-    let poly_3s = Simd::<f32, SIMD_LEN>::from_array([poly_3; SIMD_LEN]);
-    let poly_4s = Simd::<f32, SIMD_LEN>::from_array([poly_4; SIMD_LEN]);
-    let poly_56s = Simd::<f32, SIMD_LEN>::from_array([poly_56; SIMD_LEN]);
-    let shl23 = Simd::<i32, SIMD_LEN>::from_array([23; SIMD_LEN]);
-    let maximum_exponents = Simd::<i32, SIMD_LEN>::from_array([maximum_exponent; SIMD_LEN]);
-    let minimum_exponents = Simd::<i32, SIMD_LEN>::from_array([minimum_exponent; SIMD_LEN]);
 
     let mut len = input.len();
 
     while len >= SIMD_LEN {
         let vals = Simd::<f32, SIMD_LEN>::from_slice(&input[0..SIMD_LEN]);
+        let lower_ranges = Simd::<f32, SIMD_LEN>::from_array([LOWER_RANGE; SIMD_LEN]);
+        let upper_ranges = Simd::<f32, SIMD_LEN>::from_array([UPPER_RANGE; SIMD_LEN]);
         let vals = lower_ranges.simd_max(vals);
         let vals = upper_ranges.simd_min(vals);
 
+        let rounding_biases = Simd::<f32, SIMD_LEN>::from_array([ROUNDING_BIAS; SIMD_LEN]);
+        let log2reciprocals = Simd::<f32, SIMD_LEN>::from_array([LOG2RECIPROCAL; SIMD_LEN]);
         let biased = vals.mul_add(log2reciprocals, rounding_biases);
         let m = biased - rounding_biases;
 
+        let log2highs = Simd::<f32, SIMD_LEN>::from_array([LOG2HIGH; SIMD_LEN]);
+        let log2lows = Simd::<f32, SIMD_LEN>::from_array([LOG2LOW; SIMD_LEN]);
         let vals = m.mul_add(log2highs, vals);
         let vals = m.mul_add(log2lows, vals);
 
+        let shl23 = Simd::<i32, SIMD_LEN>::from_array([23; SIMD_LEN]);
+        let maximum_exponents = Simd::<i32, SIMD_LEN>::from_array([MAXIMUM_EXPONENT; SIMD_LEN]);
+        let minimum_exponents = Simd::<i32, SIMD_LEN>::from_array([MINIMUM_EXPONENT; SIMD_LEN]);
         let overflow: Simd<i32, SIMD_LEN> =
             unsafe { std::mem::transmute::<_, Simd<i32, SIMD_LEN>>(biased) } << shl23;
         let normal = overflow.simd_min(maximum_exponents);
@@ -1155,6 +1144,12 @@ fn exp(mut output: &mut [f32], mut input: &[f32]) {
         let overflow = overflow + maximum_exponents;
         let normal = normal + maximum_exponents;
 
+        let poly_0s = Simd::<f32, SIMD_LEN>::from_array([POLY_0; SIMD_LEN]);
+        let poly_1s = Simd::<f32, SIMD_LEN>::from_array([POLY_1; SIMD_LEN]);
+        let poly_2s = Simd::<f32, SIMD_LEN>::from_array([POLY_2; SIMD_LEN]);
+        let poly_3s = Simd::<f32, SIMD_LEN>::from_array([POLY_3; SIMD_LEN]);
+        let poly_4s = Simd::<f32, SIMD_LEN>::from_array([POLY_4; SIMD_LEN]);
+        let poly_56s = Simd::<f32, SIMD_LEN>::from_array([POLY_56; SIMD_LEN]);
         let p = poly_0s;
         let p = p.mul_add(vals, poly_1s);
         let p = p.mul_add(vals, poly_2s);
@@ -1177,32 +1172,32 @@ fn exp(mut output: &mut [f32], mut input: &[f32]) {
 
     for (i, o) in input.iter().zip(output.iter_mut()) {
         let val = *i;
-        let val = lower_range.max(val);
-        let val = upper_range.min(val);
+        let val = LOWER_RANGE.max(val);
+        let val = UPPER_RANGE.min(val);
 
-        let biased = val * log2reciprocal + rounding_bias;
-        let m = biased - rounding_bias;
+        let biased = val.mul_add(LOG2RECIPROCAL, ROUNDING_BIAS);
+        let m = biased - ROUNDING_BIAS;
 
-        let val = m * log2high + val;
-        let val = m * log2low + val;
+        let val = m.mul_add(LOG2HIGH, val);
+        let val = m.mul_add(LOG2LOW, val);
 
         // overflow
         let overflow = unsafe { std::mem::transmute::<_, i32>(biased) } << 23i32;
-        let normal = overflow.min(maximum_exponent);
-        let normal = normal.max(minimum_exponent);
+        let normal = overflow.min(MAXIMUM_EXPONENT);
+        let normal = normal.max(MINIMUM_EXPONENT);
         let overflow = overflow - normal;
-        let overflow = overflow + maximum_exponent;
-        let normal = normal + maximum_exponent;
+        let overflow = overflow + MAXIMUM_EXPONENT;
+        let normal = normal + MAXIMUM_EXPONENT;
 
-        let p = poly_0;
-        let p = p * val + poly_1;
-        let p = p * val + poly_2;
-        let p = p * val + poly_3;
-        let p = p * val + poly_4;
-        let p = p * val + poly_56;
+        let p = POLY_0;
+        let p = p.mul_add(val, POLY_1);
+        let p = p.mul_add(val, POLY_2);
+        let p = p.mul_add(val, POLY_3);
+        let p = p.mul_add(val, POLY_4);
+        let p = p.mul_add(val, POLY_56);
 
         let val = val * unsafe { std::mem::transmute::<_, f32>(overflow) };
-        let p = p * val + unsafe { std::mem::transmute::<_, f32>(overflow) };
+        let p = p.mul_add(val, unsafe { std::mem::transmute::<_, f32>(overflow) });
         let p = p * unsafe { std::mem::transmute::<_, f32>(normal) };
 
         *o = p;

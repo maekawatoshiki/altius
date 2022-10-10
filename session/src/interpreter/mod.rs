@@ -1174,10 +1174,7 @@ fn compute_softmax(
                     slice::from_raw_parts_mut(output_ptr.inner().add(i * axis_len), axis_len)
                 };
                 let sum = fast_sum(output);
-                let rsum = 1. / sum;
-                for o in output.iter_mut() {
-                    *o *= rsum;
-                }
+                output.iter_mut().for_each(|o| *o /= sum);
             }
         })
     });

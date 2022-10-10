@@ -24,10 +24,10 @@ pub fn fast_exp(output: &mut [f32], input: &[f32]) {
 
     assert_eq!(input.len(), output.len());
 
-    let (input0, input1, input2) = input.as_simd();
-    let (output0, output1, output2) = output.as_simd_mut();
+    let (input0, input1, input2) = input.as_simd::<SIMD_LEN>();
+    let (output0, output1, output2) = output.as_simd_mut::<SIMD_LEN>();
 
-    for (vals, out) in input1.iter().zip(output1.iter_mut()) {
+    for (&vals, out) in input1.iter().zip(output1.iter_mut()) {
         let vals = vals.simd_clamp(Simd::splat(LOWER_RANGE), Simd::splat(UPPER_RANGE));
 
         let biased = vals.mul_add(Simd::splat(LOG2RECIPROCAL), Simd::splat(ROUNDING_BIAS));
@@ -36,8 +36,7 @@ pub fn fast_exp(output: &mut [f32], input: &[f32]) {
         let vals = m.mul_add(Simd::splat(LOG2HIGH), vals);
         let vals = m.mul_add(Simd::splat(LOG2LOW), vals);
 
-        let overflow: Simd<i32, SIMD_LEN> =
-            unsafe { transmute::<_, Simd<i32, SIMD_LEN>>(biased) } << Simd::splat(23);
+        let overflow = unsafe { transmute::<_, Simd<i32, SIMD_LEN>>(biased) } << Simd::splat(23);
         let normal = overflow.simd_min(Simd::splat(MAXIMUM_EXPONENT));
         let normal = normal.simd_max(Simd::splat(MINIMUM_EXPONENT));
         let overflow = overflow - normal;

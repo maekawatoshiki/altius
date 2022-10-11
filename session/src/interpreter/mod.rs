@@ -19,6 +19,7 @@ use altius_core::{
     value::ValueId,
 };
 use conv2d::Conv2dCtx;
+use core_affinity;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
 use ndarray::{s, ArrayView2, ArrayView3, ArrayView4};
@@ -91,6 +92,10 @@ impl<'a> Interpreter<'a> {
         let workers = num_cpus::get_physical();
         let tp = ThreadPool::new(workers);
         assert_eq!(tp.queued_count(), 0);
+        for i in 0..workers {
+            tp.execute(move || core_affinity::set_for_current(core_affinity::CoreId { id: i }))
+        }
+        tp.join();
 
         Interpreter {
             model,
@@ -438,52 +443,41 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             todo!("A shape: {:?}, B shape: {:?}", adims, bdims)
         };
 
-    let input_a = input_a.data::<f32>();
-    let output = output.data_mut::<f32>();
+    let input_a = unsafe { std::mem::transmute::<_, &'static [f32]>(input_a.data::<f32>()) };
+    let input_b = unsafe { std::mem::transmute::<_, &'static [f32]>(input_b.data::<f32>()) };
+    let output = unsafe { std::mem::transmute::<_, &'static mut [f32]>(output.data_mut::<f32>()) };
     let blen = bdims[0];
-    const SIMD_LEN: usize = 4;
-
-    let input_b_ptr = SendPtr(input_b.data::<f32>().as_ptr());
     let batch = (100000 / blen).max(1);
+    const SIMD_LEN: usize = 4;
 
     input_a
         .chunks(blen * batch)
         .zip(output.chunks_mut(blen * batch))
         .for_each(|(input_a, output)| {
-            let out_len = output.len();
-            let input_a_ptr = SendPtr(input_a.as_ptr());
-            let output_ptr = SendPtrMut(output.as_mut_ptr());
-
             tctx.tp.execute(move || {
-                let input_b = unsafe { slice::from_raw_parts(input_b_ptr.inner(), blen) };
+                input_a
+                    .chunks(blen)
+                    .zip(output.chunks_mut(blen))
+                    .for_each(|(input_a, output)| {
+                        let (input_a0, input_a1, input_a2) = input_a.as_simd::<SIMD_LEN>();
+                        let (input_b0, input_b1, input_b2) = input_b.as_simd::<SIMD_LEN>();
+                        let (output0, output1, output2) = output.as_simd_mut::<SIMD_LEN>();
 
-                for i in 0..batch {
-                    if i * blen >= out_len {
-                        break;
-                    }
+                        for ((a, b), o) in
+                            input_a1.iter().zip(input_b1.iter()).zip(output1.iter_mut())
+                        {
+                            *o = a + b;
+                        }
 
-                    let mut len = blen;
-                    let mut input_b = input_b;
-                    let mut output = unsafe {
-                        slice::from_raw_parts_mut(output_ptr.inner().add(i * blen), blen)
-                    };
-                    let mut input_a =
-                        unsafe { slice::from_raw_parts(input_a_ptr.inner().add(i * blen), blen) };
-
-                    while len >= SIMD_LEN {
-                        let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
-                        let b = Simd::<f32, SIMD_LEN>::from_slice(&input_b[0..SIMD_LEN]);
-                        output[0..SIMD_LEN].copy_from_slice((a + b).as_ref());
-                        input_a = &input_a[SIMD_LEN..];
-                        input_b = &input_b[SIMD_LEN..];
-                        output = &mut output[SIMD_LEN..];
-                        len -= SIMD_LEN
-                    }
-
-                    for ((a, b), o) in input_a.iter().zip(input_b.iter()).zip(output.iter_mut()) {
-                        *o = a + b;
-                    }
-                }
+                        for ((a, b), o) in input_a0
+                            .iter()
+                            .chain(input_a2.iter())
+                            .zip(input_b0.iter().chain(input_b2.iter()))
+                            .zip(output0.iter_mut().chain(output2.iter_mut()))
+                        {
+                            *o = a + b;
+                        }
+                    });
             })
         });
 

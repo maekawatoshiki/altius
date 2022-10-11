@@ -3,7 +3,7 @@ use std::{
     simd::{Simd, SimdFloat, SimdOrd, StdFloat},
 };
 
-#[inline]
+// #[inline]
 pub fn fast_exp(output: &mut [f32], input: &[f32]) {
     const LOWER_RANGE: f32 = -103.9720840454f32;
     const UPPER_RANGE: f32 = 88.7762626647950f32;

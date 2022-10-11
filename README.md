@@ -23,6 +23,8 @@ NO_AFFINITY=1 OPENBLAS_NUM_THREADS=8 cargo run --release --example mobilenet --f
 cargo run --release --example mobilenet --features accelerate # for macOS
 ```
 
+- Use `blis` feature and set `GOMP_CPU_AFFINITY='0-31' BLIS_NUM_THREADS=32` (adjust the number of cores for your machine) for better performance
+
 # Run from Python
 
 ```sh

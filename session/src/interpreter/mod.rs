@@ -51,7 +51,7 @@ pub struct Interpreter<'a> {
     model: &'a Model,
     #[cfg(feature = "cuda")]
     cudnn_ctx: SafeCudnnContext,
-    sorted_nodes: Vec<NodeId>,
+    sorted_nodes: Vec<NodeOrFree>,
     inferred_shapes: FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     enable_profiling: bool,
     values: ThreadLocal<RefCell<FxHashMap<ValueId, Tensor>>>,
@@ -84,9 +84,50 @@ impl<T: Send> SendPtrMut<T> {
     }
 }
 
+#[derive(Debug)]
+enum NodeOrFree {
+    Node(NodeId),
+    Free(ValueId),
+}
+
 impl<'a> Interpreter<'a> {
     pub fn new(model: &'a Model) -> Self {
         let sorted_nodes = model.topo_sort_nodes();
+        let value_users = model.get_value_users();
+
+        let node_orders: FxHashMap<NodeId, usize> = sorted_nodes
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (*id, i))
+            .collect();
+
+        let mut new_sorted_nodes = vec![];
+        let mut vals_to_free = FxHashMap::default();
+
+        for (idx, &node_id) in sorted_nodes.iter().enumerate() {
+            let node = &model.nodes[node_id];
+            new_sorted_nodes.push(NodeOrFree::Node(node_id));
+
+            for &output_id in &node.outputs {
+                if !value_users.contains_key(&output_id) {
+                    continue;
+                }
+
+                let users = &value_users[&output_id];
+                let last_user = users.iter().map(|id| node_orders[id]).max().unwrap();
+                vals_to_free
+                    .entry(last_user)
+                    .or_insert_with(|| vec![])
+                    .push(output_id)
+            }
+
+            if let Some(vals) = vals_to_free.remove(&idx) {
+                for val in vals {
+                    new_sorted_nodes.push(NodeOrFree::Free(val))
+                }
+            }
+        }
+
         let mut inferred_shapes = FxHashMap::default();
         infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
         let workers = num_cpus::get_physical();
@@ -101,7 +142,7 @@ impl<'a> Interpreter<'a> {
             model,
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
-            sorted_nodes,
+            sorted_nodes: new_sorted_nodes,
             inferred_shapes,
             enable_profiling: false,
             values: ThreadLocal::new(),
@@ -137,8 +178,11 @@ impl<'a> Interpreter<'a> {
             values.insert(id, tensor);
         }
 
-        for &node in &self.sorted_nodes {
-            self.run_node(&mut profile, values, node);
+        for node in &self.sorted_nodes {
+            match node {
+                NodeOrFree::Node(node) => self.run_node(&mut profile, values, *node),
+                NodeOrFree::Free(val) => values.get_mut(val).unwrap().set_raw_vec::<u8>(Vec::new()),
+            }
         }
 
         if self.enable_profiling {

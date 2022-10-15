@@ -1593,7 +1593,7 @@ fn infer_shape(
     let output_shapes = compute_output_shapes(&mut op, &inputs);
     let mut outputs = vec![];
     for shape in &output_shapes {
-        outputs.push(Tensor::zeros_of_type(shape.elem_ty, shape.dims.clone()));
+        outputs.push(Tensor::empty_of_type(shape.elem_ty, shape.dims.clone()));
     }
     for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
         values.insert(val, output);

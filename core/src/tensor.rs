@@ -70,6 +70,17 @@ impl Tensor {
         Self::new(dims, vec![T::zero(); total_elems])
     }
 
+    /// Returns `Tensor` of given type and shape but allocates no elements.
+    /// This is used in shape inference.
+    pub fn empty_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
+        match ty {
+            TensorElemType::Bool => Self::new::<bool>(dims, vec![]),
+            TensorElemType::F32 => Self::new::<f32>(dims, vec![]),
+            TensorElemType::I32 => Self::new::<i32>(dims, vec![]),
+            TensorElemType::I64 => Self::new::<i64>(dims, vec![]),
+        }
+    }
+
     pub fn zeros_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
         let total_elems = dims.total_elems();
         match ty {

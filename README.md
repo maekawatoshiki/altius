@@ -12,7 +12,9 @@ Small DNN runtime written in Rust
 
 # Run
 
-- To download large models, run `cd models && ./download.sh`
+- First of all, to download large models, run `cd models && ./download.sh`.
+- Use `./run.sh` to run examples (e.g. `./run.sh {mnist, mobilenet, vit}`)
+  - You can manually run examples by the following commands.
 
 ```sh
 export RUST_LOG=debug
@@ -20,10 +22,11 @@ cargo run --release --example mnist
 cargo run --release --example mobilenet
 cargo run --release --example mobilenet --features cuda # -- --profile
 NO_AFFINITY=1 OPENBLAS_NUM_THREADS=8 cargo run --release --example mobilenet --features openblas # -- --profile
+BLIS_NUM_THREADS=8 cargo run --release --example vit --features blis
 cargo run --release --example mobilenet --features accelerate # for macOS
 ```
 
-- Use `blis` feature and set `GOMP_CPU_AFFINITY='0-31' BLIS_NUM_THREADS=32` (adjust the number of cores for your machine) for better performance
+- Recommend to use `blis` feature and set `GOMP_CPU_AFFINITY='0-31' BLIS_NUM_THREADS=32` (adjust the number of cores for your machine) for better performance
 
 # Run from Python
 

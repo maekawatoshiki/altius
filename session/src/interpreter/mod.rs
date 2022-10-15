@@ -51,7 +51,7 @@ pub struct Interpreter<'a> {
     model: &'a Model,
     #[cfg(feature = "cuda")]
     cudnn_ctx: SafeCudnnContext,
-    sorted_nodes: Vec<NodeOrFree>,
+    execution_plans: Vec<NodeExecutionPlan>,
     inferred_shapes: FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     enable_profiling: bool,
     values: ThreadLocal<RefCell<FxHashMap<ValueId, Tensor>>>,
@@ -84,55 +84,24 @@ impl<T: Send> SendPtrMut<T> {
     }
 }
 
+/// Represents a node to execute and values to be freed after the execution of the node.
 #[derive(Debug)]
-enum NodeOrFree {
-    Node(NodeId),
-    Free(ValueId),
+struct NodeExecutionPlan {
+    /// The node to execute.
+    node_id: NodeId,
+
+    /// Values to be freed after the execution of the node.
+    free_vals: Vec<ValueId>,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new(model: &'a Model) -> Self {
         let sorted_nodes = model.topo_sort_nodes();
-        let value_users = model.get_value_users();
-
-        let node_orders: FxHashMap<NodeId, usize> = sorted_nodes
-            .iter()
-            .enumerate()
-            .map(|(i, id)| (*id, i))
-            .collect();
-
-        let mut new_sorted_nodes = vec![];
-        let mut vals_to_free = FxHashMap::default();
-
-        for (idx, &node_id) in sorted_nodes.iter().enumerate() {
-            let node = &model.nodes[node_id];
-            new_sorted_nodes.push(NodeOrFree::Node(node_id));
-
-            for &output_id in &node.outputs {
-                if !value_users.contains_key(&output_id) {
-                    continue;
-                }
-
-                let users = &value_users[&output_id];
-                let last_user = users.iter().map(|id| node_orders[id]).max().unwrap();
-                vals_to_free
-                    .entry(last_user)
-                    .or_insert_with(|| vec![])
-                    .push(output_id)
-            }
-
-            if let Some(vals) = vals_to_free.remove(&idx) {
-                for val in vals {
-                    new_sorted_nodes.push(NodeOrFree::Free(val))
-                }
-            }
-        }
-
         let mut inferred_shapes = FxHashMap::default();
         infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
+
         let workers = num_cpus::get_physical();
         let tp = ThreadPool::new(workers);
-        assert_eq!(tp.queued_count(), 0);
         for i in 0..workers {
             tp.execute(move || core_affinity::set_for_current(core_affinity::CoreId { id: i }))
         }
@@ -142,7 +111,7 @@ impl<'a> Interpreter<'a> {
             model,
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
-            sorted_nodes: new_sorted_nodes,
+            execution_plans: create_execution_plan(model, &sorted_nodes),
             inferred_shapes,
             enable_profiling: false,
             values: ThreadLocal::new(),
@@ -178,10 +147,11 @@ impl<'a> Interpreter<'a> {
             values.insert(id, tensor);
         }
 
-        for node in &self.sorted_nodes {
-            match node {
-                NodeOrFree::Node(node) => self.run_node(&mut profile, values, *node),
-                NodeOrFree::Free(val) => values.get_mut(val).unwrap().set_raw_vec::<u8>(Vec::new()),
+        for node in &self.execution_plans {
+            self.run_node(&mut profile, values, node.node_id);
+
+            for val in &node.free_vals {
+                values.get_mut(val).unwrap().set_raw_vec::<u8>(Vec::new())
             }
         }
 
@@ -1599,4 +1569,51 @@ fn infer_shape(
         values.insert(val, output);
     }
     shapes.insert(node_id, (op, output_shapes));
+}
+
+fn create_execution_plan(model: &Model, sorted_nodes: &[NodeId]) -> Vec<NodeExecutionPlan> {
+    let node_order: FxHashMap<NodeId, usize> = sorted_nodes
+        .iter()
+        .enumerate()
+        .map(|(i, id)| (*id, i))
+        .collect();
+    let mut new_sorted_nodes = vec![];
+    let mut node_to_free_vals = FxHashMap::default();
+    let value_users = model.get_value_users();
+
+    for &node_id in sorted_nodes {
+        let node = &model.nodes[node_id];
+        new_sorted_nodes.push(NodeExecutionPlan {
+            node_id,
+            free_vals: vec![],
+        });
+
+        for &output_id in &node.outputs {
+            if !value_users.contains_key(&output_id) {
+                continue;
+            }
+
+            let users = &value_users[&output_id];
+            let last_user = users
+                .iter()
+                .map(|id| (node_order[id], id))
+                .max_by(|x, y| x.0.cmp(&y.0))
+                .unwrap()
+                .1;
+            node_to_free_vals
+                .entry(last_user)
+                .or_insert_with(|| vec![])
+                .push(output_id)
+        }
+
+        if let Some(mut vals) = node_to_free_vals.remove(&node_id) {
+            new_sorted_nodes
+                .last_mut()
+                .unwrap()
+                .free_vals
+                .append(&mut vals);
+        }
+    }
+
+    new_sorted_nodes
 }

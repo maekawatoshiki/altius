@@ -29,7 +29,6 @@ use threadpool::ThreadPool;
 
 use std::{
     cell::RefCell,
-    env,
     simd::{Simd, SimdFloat, StdFloat},
     slice,
     time::{Duration, Instant},
@@ -101,13 +100,8 @@ impl<'a> Interpreter<'a> {
         let mut inferred_shapes = FxHashMap::default();
         infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
 
-        let workers = num_cpus::get_physical();
-        env::set_var("BLIS_NUM_THREADS", format!("{}", workers));
-        env::set_var("GOMP_CPU_AFFINITY", format!("0-{}", workers - 1));
-        let tp = ThreadPool::new(workers);
-        for i in 0..workers {
-            tp.execute(move || core_affinity::set_for_current(core_affinity::CoreId { id: i }))
-        }
+        let tp = ThreadPool::new(1);
+        tp.execute(move || core_affinity::set_for_current(core_affinity::CoreId { id: 0 }));
         tp.join();
 
         Interpreter {
@@ -125,6 +119,25 @@ impl<'a> Interpreter<'a> {
 
     pub fn with_profiling(mut self, enable: bool) -> Self {
         self.enable_profiling = enable;
+        self
+    }
+
+    pub fn with_intra_op_num_threads(mut self, num_threads: usize) -> Self {
+        #[cfg(feature = "blis")]
+        {
+            extern "C" {
+                fn bli_thread_set_num_threads(n_threads: usize);
+            }
+            unsafe { bli_thread_set_num_threads(num_threads) };
+        }
+
+        let tp = ThreadPool::new(num_threads);
+        for i in 0..num_threads {
+            tp.execute(move || core_affinity::set_for_current(core_affinity::CoreId { id: i }))
+        }
+        tp.join();
+        self.tctx = ThreadCtx { tp };
+
         self
     }
 

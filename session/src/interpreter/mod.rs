@@ -29,6 +29,7 @@ use threadpool::ThreadPool;
 
 use std::{
     cell::RefCell,
+    env,
     simd::{Simd, SimdFloat, StdFloat},
     slice,
     time::{Duration, Instant},
@@ -101,6 +102,8 @@ impl<'a> Interpreter<'a> {
         infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
 
         let workers = num_cpus::get_physical();
+        env::set_var("BLIS_NUM_THREADS", format!("{}", workers));
+        env::set_var("GOMP_CPU_AFFINITY", format!("0-{}", workers - 1));
         let tp = ThreadPool::new(workers);
         for i in 0..workers {
             tp.execute(move || core_affinity::set_for_current(core_affinity::CoreId { id: i }))

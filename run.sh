@@ -11,9 +11,6 @@ if [ $EXAMPLE = "vit" ]; then
   sleep 3
 fi
 
-# export OMP_PROC_BIND=TRUE
-export GOMP_CPU_AFFINITY="0-$(expr $NPROC - 1)"
-export BLIS_NUM_THREADS=$NPROC
 export RUST_LOG=debug
 export RUSTFLAGS="-C target-cpu=native"
 

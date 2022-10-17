@@ -31,7 +31,9 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 384, 384].into(), image.into_raw_vec());
 
-    let i = Interpreter::new(&model).with_profiling(opt.profile);
+    let i = Interpreter::new(&model)
+        .with_profiling(opt.profile)
+        .with_intra_op_num_threads(num_cpus::get_physical());
     #[cfg(feature = "cuda")]
     Interpreter::new(&model)
         .run(vec![(input_value, input.clone())])

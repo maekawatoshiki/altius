@@ -33,7 +33,7 @@ fn main() {
 
     let i = Interpreter::new(&model)
         .with_profiling(opt.profile)
-        .with_intra_op_num_threads(num_cpus::get_physical());
+        .with_intra_op_num_threads(8);
     #[cfg(feature = "cuda")]
     Interpreter::new(&model)
         .run(vec![(input_value, input.clone())])

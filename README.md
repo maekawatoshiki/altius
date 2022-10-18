@@ -14,6 +14,7 @@ Small DNN runtime written in Rust
 
 - First of all, to download large models, run `cd models && ./download.sh`.
 - Use `./run.sh` to run examples (e.g. `./run.sh {mnist, mobilenet, vit}`)
+  - For `vit` (vision transformer) example, you can specify the number of threads for computation in `./session/examples/vit.rs`.
   - You can manually run examples by the following commands.
 
 ```sh

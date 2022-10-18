@@ -254,6 +254,10 @@ impl Tensor {
         }
     }
 
+    pub fn copy_data_from(&mut self, other: &Self) {
+        self.data.copy_from_slice(&other.data)
+    }
+
     pub fn elem_ty(&self) -> TensorElemType {
         self.elem_ty
     }

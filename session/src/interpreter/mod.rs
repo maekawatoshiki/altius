@@ -1460,30 +1460,14 @@ fn compute_gather(gather: &Gather, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
 fn compute_reshape(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input = inputs[Node::RESHAPE_IN];
-    let shape = inputs[Node::RESHAPE_SHAPE]
-        .data::<i64>()
-        .iter()
-        .map(|&x| {
-            if x == -1 {
-                let other_dims_sz: i64 = inputs[Node::RESHAPE_SHAPE]
-                    .data::<i64>()
-                    .iter()
-                    .filter(|x| **x != -1)
-                    .product();
-                input.dims().total_elems() / other_dims_sz as usize
-            } else {
-                x as usize
-            }
-        })
-        .collect::<Vec<_>>();
     let output = &mut outputs[Node::RESHAPE_OUT];
-    *output = input.clone().reshape_into(shape.into())
+    output.copy_data_from(input)
 }
 
 fn compute_flatten(_flatten: &Flatten, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input = inputs[Node::FLATTEN_IN];
     let output = &mut outputs[Node::FLATTEN_OUT];
-    *output = input.clone().reshape_into(output.dims().clone());
+    output.copy_data_from(input);
 }
 
 // TODO: Better move to another file.

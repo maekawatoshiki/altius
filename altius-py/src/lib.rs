@@ -28,13 +28,19 @@ fn load(path: String) -> PyResult<PyModel> {
     )
 }
 
-#[pyfunction(enable_profiling = false)]
-fn session<'a>(model: &'a mut PyModel, enable_profiling: bool) -> PyResult<PySession> {
+#[pyfunction(enable_profiling = false, intra_op_num_threads = 1)]
+fn session<'a>(
+    model: &'a mut PyModel,
+    enable_profiling: bool,
+    intra_op_num_threads: usize,
+) -> PyResult<PySession> {
     let mut model =
         unsafe { std::mem::transmute::<&'a mut Model, &'static mut Model>(&mut model.0) };
     optimize::gelu_fusion::fuse_gelu(&mut model);
     Ok(PySession(
-        Interpreter::new(model).with_profiling(enable_profiling),
+        Interpreter::new(model)
+            .with_profiling(enable_profiling)
+            .with_intra_op_num_threads(intra_op_num_threads),
     ))
 }
 

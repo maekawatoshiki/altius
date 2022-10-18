@@ -13,7 +13,7 @@ fi
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 if [ ${1:-nobuild} = "build" ]; then
-  maturin develop -r --target-dir ./target
+  maturin develop -r --target-dir ./target --features blis
 fi
 
 python -m pytest . -n 8

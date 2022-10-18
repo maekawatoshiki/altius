@@ -1,11 +1,11 @@
 mod conv2d;
 mod exp;
 mod gemm;
+mod thread;
 
-use crate::interpreter::{
-    exp::fast_exp,
-    gemm::{sgemm, sgemm2},
-};
+use exp::fast_exp;
+use gemm::{sgemm, sgemm2};
+use thread::ThreadCtx;
 
 use super::SessionError;
 use altius_core::{
@@ -57,10 +57,6 @@ pub struct Interpreter<'a> {
     values: ThreadLocal<RefCell<FxHashMap<ValueId, Tensor>>>,
     dummy_value: Tensor,
     tctx: ThreadCtx,
-}
-
-struct ThreadCtx {
-    tp: ThreadPool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -383,38 +379,34 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         const SIMD_LEN: usize = 4;
         let chunk = 100000;
 
-        input_a
-            .chunks(chunk)
-            .zip(input_b.chunks(chunk))
-            .zip(output.chunks_mut(chunk))
-            .for_each(|((a, b), o)| {
-                let mut len = a.len();
-                let a = SendPtr(a.as_ptr());
-                let b = SendPtr(b.as_ptr());
-                let o = SendPtrMut(o.as_mut_ptr());
+        tctx.scope(|scope| {
+            input_a
+                .chunks(chunk)
+                .zip(input_b.chunks(chunk))
+                .zip(output.chunks_mut(chunk))
+                .for_each(|((input_a, input_b), output)| {
+                    scope.spawn(move || {
+                        let (input_a0, input_a1, input_a2) = input_a.as_simd::<SIMD_LEN>();
+                        let (input_b0, input_b1, input_b2) = input_b.as_simd::<SIMD_LEN>();
+                        let (output0, output1, output2) = output.as_simd_mut::<SIMD_LEN>();
 
-                tctx.tp.execute(move || {
-                    let mut input_a = unsafe { slice::from_raw_parts(a.inner(), len) };
-                    let mut input_b = unsafe { slice::from_raw_parts(b.inner(), len) };
-                    let mut output = unsafe { slice::from_raw_parts_mut(o.inner(), len) };
+                        for ((a, b), o) in
+                            input_a1.iter().zip(input_b1.iter()).zip(output1.iter_mut())
+                        {
+                            *o = a + b;
+                        }
 
-                    while len >= SIMD_LEN {
-                        let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
-                        let b = Simd::<f32, SIMD_LEN>::from_slice(&input_b[0..SIMD_LEN]);
-                        output[0..SIMD_LEN].copy_from_slice((a + b).as_ref());
-                        input_a = &input_a[SIMD_LEN..];
-                        input_b = &input_b[SIMD_LEN..];
-                        output = &mut output[SIMD_LEN..];
-                        len -= SIMD_LEN
-                    }
-
-                    for ((a, b), o) in input_a.iter().zip(input_b.iter()).zip(output.iter_mut()) {
-                        *o = a + b;
-                    }
+                        for ((a, b), o) in input_a0
+                            .iter()
+                            .chain(input_a2.iter())
+                            .zip(input_b0.iter().chain(input_b2.iter()))
+                            .zip(output0.iter_mut().chain(output2.iter_mut()))
+                        {
+                            *o = a + b;
+                        }
+                    });
                 });
-            });
-
-        tctx.tp.join();
+        });
 
         return;
     }
@@ -740,24 +732,19 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                     }
                 });
         } else {
-            input_a
-                .chunks(n)
-                .zip(input_b.iter())
-                .zip(output.chunks_mut(n))
-                .for_each(|((a, &b), o)| {
-                    let len = a.len();
-                    let a = SendPtr(a.as_ptr());
-                    let o = SendPtrMut(o.as_mut_ptr());
-                    tctx.tp.execute(move || {
-                        let a = unsafe { slice::from_raw_parts(a.inner(), len) };
-                        let o = unsafe { slice::from_raw_parts_mut(o.inner(), len) };
-                        for (&a, o) in a.iter().zip(o.iter_mut()) {
-                            *o = a / b;
-                        }
+            tctx.scope(|scope| {
+                input_a
+                    .chunks(n)
+                    .zip(input_b.iter())
+                    .zip(output.chunks_mut(n))
+                    .for_each(|((a, &b), o)| {
+                        scope.spawn(move || {
+                            for (&a, o) in a.iter().zip(o.iter_mut()) {
+                                *o = a / b;
+                            }
+                        });
                     });
-                });
-
-            tctx.tp.join();
+            });
         }
 
         return;

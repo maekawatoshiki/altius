@@ -455,7 +455,7 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             .chunks(blen * batch)
             .zip(output.chunks_mut(blen * batch))
             .for_each(|(input_a, output)| {
-                scope.spawn(move || {
+                let mut f = move || {
                     input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
                         |(input_a, output)| {
                             let (input_a0, input_a1, input_a2) = input_a.as_simd::<SIMD_LEN>();
@@ -478,7 +478,12 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                             }
                         },
                     );
-                })
+                };
+                if blen < 1000 {
+                    f()
+                } else {
+                    scope.spawn(f)
+                }
             });
     });
 }

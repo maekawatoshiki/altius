@@ -513,6 +513,28 @@ fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         return;
     }
 
+    if input_a.dims().is_scalar() {
+        let a = input_a.data::<f32>()[0];
+        let a_ = Simd::splat(a);
+        let (b0, b1, b2) = input_b.data::<f32>().as_simd::<SIMD_LEN>();
+        let (o0, o1, o2) = output.data_mut::<f32>().as_simd_mut::<SIMD_LEN>();
+        const SIMD_LEN: usize = 4;
+
+        for (b, o) in b1.iter().zip(o1.iter_mut()) {
+            *o = a_ - b;
+        }
+
+        for (b, o) in b0
+            .iter()
+            .chain(b2.iter())
+            .zip(o0.iter_mut().chain(o2.iter_mut()))
+        {
+            *o = a - b;
+        }
+
+        return;
+    }
+
     // TODO: We need multidirectional broadcast!
 
     if input_a.dims().len() == 3

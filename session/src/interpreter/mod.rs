@@ -1159,10 +1159,9 @@ fn compute_softmax(
     let input = inputs[0];
     let output = &mut outputs[0];
 
-    assert_eq!(input.dims().len(), 3);
-    assert_eq!(softmax.axis, -1);
+    assert!(softmax.axis == -1 || softmax.axis == (input.dims().len() - 1) as i64);
 
-    let axis_len = input.dims()[2];
+    let axis_len = *input.dims().as_slice().last().unwrap();
     let input = input.data::<f32>();
     let output = output.data_mut::<f32>();
 

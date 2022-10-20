@@ -821,11 +821,28 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     assert!(
         (adim.len() == 2 && bdim.len() == 2 && adim[1] == bdim[0])
             || (adim.len() == 3 && bdim.len() == 2 && adim[2] == bdim[0])
-            || (adim.len() == 3 && bdim.len() == 3 && adim[0] == bdim[0] && adim[2] == bdim[1]),
+            || (adim.len() == 3 && bdim.len() == 3 && adim[0] == bdim[0] && adim[2] == bdim[1])
+            || (adim.len() == 4
+                && bdim.len() == 4
+                && adim[0] == 1
+                && bdim[0] == 1
+                && adim[1] == bdim[1]),
         "A shape: {adim:?}, B shape: {bdim:?}"
     );
 
-    if adim.len() == 3 && bdim.len() == 2 {
+    if adim.len() == 4 && bdim.len() == 4 {
+        let [_one, _batch, m, _k] = input_a.fixed_dims::<4>();
+        let [_one, _batch, k, n] = input_b.fixed_dims::<4>();
+        // TODO: Are there a better way?
+        output
+            .data_mut::<f32>()
+            .chunks_mut(m * n)
+            .zip(input_a.data::<f32>().chunks(m * k))
+            .zip(input_b.data::<f32>().chunks(k * n))
+            .for_each(|((c, a), b)| {
+                sgemm(m, k, n, 1., a, k, b, n, 0., c, n);
+            });
+    } else if adim.len() == 3 && bdim.len() == 2 {
         let [batch, m, _k] = input_a.fixed_dims::<3>();
         let [k, n] = input_b.fixed_dims::<2>();
         let a = input_a.data::<f32>();

@@ -737,10 +737,20 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                     || (in_a.len() == 3
                         && in_b.len() == 3
                         && in_a[0] == in_b[0]
-                        && in_a[2] == in_b[1]),
+                        && in_a[2] == in_b[1])
+                    || (in_a.len() == 4
+                        && in_b.len() == 4
+                        && in_a[0] == 1
+                        && in_b[0] == 1
+                        && in_a[1] == in_b[1]),
                 "A shape: {in_a:?}, B shape: {in_b:?}"
             );
-            if in_a.len() == 3 && in_b.len() == 2 {
+            if in_a.len() == 4 && in_b.len() == 4 {
+                shapes.push(TypedShape::new(
+                    vec![in_a[0], in_a[1], in_a[2], in_b[3]].into(),
+                    inputs[Node::MATMUL_IN_A].elem_ty(),
+                ));
+            } else if in_a.len() == 3 && in_b.len() == 2 {
                 shapes.push(TypedShape::new(
                     vec![in_a[0], in_a[1], in_b[1]].into(),
                     inputs[Node::MATMUL_IN_A].elem_ty(),

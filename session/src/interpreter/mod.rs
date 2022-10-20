@@ -1271,9 +1271,8 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
 
 fn compute_squeeze(_squeeze: &Squeeze, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input = inputs[Node::SQUEEZE_IN];
-    assert!(input.elem_ty().is_f32());
     let output = &mut outputs[Node::SQUEEZE_OUT];
-    output.set_raw_vec(input.data::<f32>().to_vec());
+    output.copy_data_from(&input);
 }
 
 fn compute_reduce_mean(rmean: &ReduceMean, inputs: &[&Tensor], outputs: &mut [Tensor]) {

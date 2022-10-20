@@ -9,7 +9,7 @@ use crate::{
     node::{
         BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gather, Gemm, HardSigmoid,
         LeakyReLU, MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape, Softmax, Squeeze,
-        Transpose,
+        Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
 };
@@ -205,7 +205,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
             "Squeeze" => Op::Squeeze(Squeeze {
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
             }),
-            "Unsqueeze" => Op::Squeeze(Squeeze {
+            "Unsqueeze" => Op::Unsqueeze(Unsqueeze {
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
             }),
             "ReduceMin" => Op::ReduceMin(ReduceMin {

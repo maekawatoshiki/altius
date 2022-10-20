@@ -13,7 +13,7 @@ use altius_core::{
     node::{
         compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gather, Gemm,
         HardSigmoid, LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize, Softmax, Squeeze,
-        Transpose,
+        Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -224,7 +224,7 @@ impl<'a> Interpreter<'a> {
             Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
             Op::Transpose(ref trans) => compute_transpose(trans, &inputs, &mut outputs),
             Op::Squeeze(ref squeeze) => compute_squeeze(squeeze, &inputs, &mut outputs),
-            Op::Unsqueeze(_) => todo!("unsqueeze"),
+            Op::Unsqueeze(ref unsqueeze) => compute_unsqueeze(unsqueeze, &inputs, &mut outputs),
             Op::ReduceMin(_) => todo!("reduce min"),
             Op::ReduceMean(ref rmean) => compute_reduce_mean(rmean, &inputs, &mut outputs),
             Op::Round => todo!("round"),
@@ -1272,6 +1272,12 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
 fn compute_squeeze(_squeeze: &Squeeze, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input = inputs[Node::SQUEEZE_IN];
     let output = &mut outputs[Node::SQUEEZE_OUT];
+    output.copy_data_from(&input);
+}
+
+fn compute_unsqueeze(_: &Unsqueeze, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input = inputs[0];
+    let output = &mut outputs[0];
     output.copy_data_from(&input);
 }
 

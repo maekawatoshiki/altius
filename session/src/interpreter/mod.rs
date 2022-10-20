@@ -1447,15 +1447,34 @@ fn compute_gather(gather: &Gather, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let output = &mut outputs[0];
 
     assert!(gather.axis >= 0);
-    assert!(indices.dims().is_scalar(), "Indices shape: {indices:?}");
+    assert!(
+        indices.dims().is_scalar() || (indices.dims().len() == 2 && indices.dims()[0] == 1),
+        "Unsupported indices shape: {:?}",
+        indices.dims()
+    );
 
-    let axis = gather.axis as usize;
-    assert_eq!(axis, 1);
-    assert_eq!(data.dims().len(), 3);
-    assert_eq!(data.dims()[0], 1);
+    if indices.dims().is_scalar() {
+        let axis = gather.axis as usize;
+        assert_eq!(axis, 1);
+        assert_eq!(data.dims().len(), 3);
+        assert_eq!(data.dims()[0], 1);
 
-    let gathered = &data.slice_at::<f32>(&[0, indices.data::<i64>()[0] as usize])[..data.dims()[2]];
-    output.data_mut().copy_from_slice(gathered);
+        let gathered =
+            &data.slice_at::<f32>(&[0, indices.data::<i64>()[0] as usize])[..data.dims()[2]];
+        output.data_mut().copy_from_slice(gathered);
+    } else {
+        let axis = gather.axis as usize;
+        assert_eq!(axis, 0);
+
+        let indices = indices.data::<i64>();
+        for (&i, o) in indices
+            .iter()
+            .zip(output.data_mut::<f32>().chunks_mut(data.dims()[1]))
+        {
+            assert!(i >= 0);
+            o.copy_from_slice(&data.slice_at::<f32>(&[i as usize])[..data.dims()[1]]);
+        }
+    }
 }
 
 fn compute_reshape(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

@@ -439,6 +439,13 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             (adims, bdims, input_a, input_b)
         } else if adims.len() == 1 && bdims[bdims.len() - 1] == adims[0] {
             (bdims, adims, input_b, input_a)
+        } else if bdims.as_slice()[0..bdims.len() - 1].iter().all(|&d| d == 1)
+            && adims.as_slice().last().unwrap() == bdims.as_slice().last().unwrap()
+        {
+            // e.g.
+            //   a: [1, 12, 9, 9]
+            //   b: [1,  1, 1, 9]
+            (adims, bdims, input_a, input_b)
         } else {
             todo!("A shape: {:?}, B shape: {:?}", adims, bdims)
         };
@@ -446,7 +453,7 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_a = input_a.data::<f32>();
     let input_b = input_b.data::<f32>();
     let output = output.data_mut::<f32>();
-    let blen = bdims[0];
+    let blen = *bdims.as_slice().last().unwrap();
     let batch = (100000 / blen).max(1);
     const SIMD_LEN: usize = 4;
 
@@ -458,21 +465,24 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                 scope.spawn(move || {
                     input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
                         |(input_a, output)| {
-                            let (input_a0, input_a1, input_a2) = input_a.as_simd::<SIMD_LEN>();
-                            let (input_b0, input_b1, input_b2) = input_b.as_simd::<SIMD_LEN>();
-                            let (output0, output1, output2) = output.as_simd_mut::<SIMD_LEN>();
+                            let mut input_a = input_a;
+                            let mut input_b = input_b;
+                            let mut output = output;
+                            let mut len = output.len();
 
-                            for ((a, b), o) in
-                                input_a1.iter().zip(input_b1.iter()).zip(output1.iter_mut())
-                            {
-                                *o = a + b;
+                            while len >= SIMD_LEN {
+                                let a = Simd::<_, SIMD_LEN>::from_slice(&input_a);
+                                let b = Simd::<_, SIMD_LEN>::from_slice(&input_b);
+                                let c = a + b;
+                                output[0..SIMD_LEN].copy_from_slice(c.as_ref());
+                                input_a = &input_a[SIMD_LEN..];
+                                input_b = &input_b[SIMD_LEN..];
+                                output = &mut output[SIMD_LEN..];
+                                len -= SIMD_LEN
                             }
 
-                            for ((a, b), o) in input_a0
-                                .iter()
-                                .chain(input_a2.iter())
-                                .zip(input_b0.iter().chain(input_b2.iter()))
-                                .zip(output0.iter_mut().chain(output2.iter_mut()))
+                            for ((a, b), o) in
+                                input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
                             {
                                 *o = a + b;
                             }

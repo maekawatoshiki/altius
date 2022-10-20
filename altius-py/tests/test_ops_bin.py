@@ -34,6 +34,11 @@ def test_add_5():
         op_add(os.path.join(tmpdir, "model.onnx"), "Add", [1, 3, 28, 28], [3, 1, 2])
 
 
+def test_add_6():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(os.path.join(tmpdir, "model.onnx"), "Add", [1, 12, 9, 9], [1, 1, 1, 9])
+
+
 def test_sub_1():
     with tempfile.TemporaryDirectory() as tmpdir:
         op_bin(os.path.join(tmpdir, "model.onnx"), "Sub", [1, 2])

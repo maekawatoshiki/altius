@@ -1,15 +1,15 @@
 extern crate altius_core;
 extern crate altius_session;
 
-use std::collections::HashMap;
-
 use altius_core::optimize;
+use altius_core::tensor::TensorElemTypeExt;
+use altius_core::value::ValueId;
 use altius_core::{model::Model, tensor::Tensor};
 use altius_session::interpreter::Interpreter;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 
 use numpy::ndarray::ArrayD;
-use numpy::{PyArrayDyn, PyReadonlyArrayDyn};
+use numpy::{Element, PyArrayDyn, PyReadonlyArrayDyn};
 
 #[pyclass]
 #[repr(transparent)]
@@ -51,16 +51,15 @@ impl PySession {
         py: Python<'a>,
         inputs: &PyDict,
     ) -> PyResult<Vec<&'a PyArrayDyn<f32>>> {
-        let map: HashMap<String, PyReadonlyArrayDyn<f32>> = inputs
-            .extract()
-            .map_err(|_| PyRuntimeError::new_err("Failed to extract inputs"))?;
-        let mut inputs = vec![];
-        for (name, val) in map {
-            let val_id =
-                self.0.model().lookup_named_value(&name).ok_or_else(|| {
-                    PyRuntimeError::new_err(format!("Input '{}' not found", name))
-                })?;
-            inputs.push((
+        fn create_input<T: Element + TensorElemTypeExt>(
+            model: &Model,
+            name: String,
+            val: PyReadonlyArrayDyn<T>,
+        ) -> PyResult<(ValueId, Tensor)> {
+            let val_id = model
+                .lookup_named_value(&name)
+                .ok_or_else(|| PyRuntimeError::new_err(format!("Input '{}' not found", name)))?;
+            Ok((
                 val_id,
                 Tensor::new(
                     val.shape().to_vec().into(),
@@ -68,12 +67,39 @@ impl PySession {
                         .map_err(|_| PyRuntimeError::new_err("Array not contiguous"))?
                         .to_vec(),
                 ),
-            ));
+            ))
+        }
+
+        let mut new_inputs = vec![];
+        for (i, item) in inputs.items().iter().enumerate() {
+            if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<f32>)>() {
+                new_inputs.push(create_input(self.0.model(), name, val)?);
+                continue;
+            }
+
+            if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<i64>)>() {
+                new_inputs.push(create_input(self.0.model(), name, val)?);
+                continue;
+            }
+
+            if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<i32>)>() {
+                new_inputs.push(create_input(self.0.model(), name, val)?);
+                continue;
+            }
+
+            if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<bool>)>() {
+                new_inputs.push(create_input(self.0.model(), name, val)?);
+                continue;
+            }
+
+            return Err(PyRuntimeError::new_err(format!(
+                "Input {i} unsupported type"
+            )));
         }
         let mut outputs = vec![];
         for out in self
             .0
-            .run(inputs)
+            .run(new_inputs)
             .map_err(|_| PyRuntimeError::new_err("Inference failed".to_string()))?
         {
             let arr =

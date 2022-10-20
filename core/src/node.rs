@@ -716,6 +716,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 data.remove(gather.axis as usize);
                 shapes.push(TypedShape::new(data.into(), inputs[0].elem_ty()))
             } else {
+                assert_eq!(gather.axis, 0);
                 data.remove(gather.axis as usize);
                 data.insert(0, 1);
                 data.insert(1, indices[1]);

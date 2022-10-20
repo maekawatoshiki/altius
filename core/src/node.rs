@@ -708,9 +708,19 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let mut data = inputs[0].dims().0.to_owned();
             let indices = inputs[1].dims();
             assert!(gather.axis >= 0);
-            assert!(indices.is_scalar(), "Indices shape: {indices:?}");
-            data.remove(gather.axis as usize);
-            shapes.push(TypedShape::new(data.into(), inputs[0].elem_ty()))
+            assert!(
+                indices.is_scalar() || (indices.len() == 2 && indices[0] == 1),
+                "Unsupported indices shape: {indices:?}"
+            );
+            if indices.is_scalar() {
+                data.remove(gather.axis as usize);
+                shapes.push(TypedShape::new(data.into(), inputs[0].elem_ty()))
+            } else {
+                data.remove(gather.axis as usize);
+                data.insert(0, 1);
+                data.insert(1, indices[1]);
+                shapes.push(TypedShape::new(data.into(), inputs[0].elem_ty()))
+            }
         }
         Op::Shape(_) => {
             todo!()

@@ -7,3 +7,4 @@ pytest
 pytest-xdist
 onnxruntime
 onnx
+transformers[onnx]

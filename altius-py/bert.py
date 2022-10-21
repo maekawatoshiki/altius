@@ -1,16 +1,24 @@
 # python -m transformers.onnx --model=bert-base-cased --feature=masked-lm ./a
 
 import time
+import logging
+import os
+import sys
+
 from transformers import AutoTokenizer, BertTokenizer
 import onnxruntime as ort
 import numpy as np
 import altius_py
-import logging
 
 logging.basicConfig(level=logging.INFO)
 
 tokenizer = BertTokenizer.from_pretrained("bert-base-cased", mask_token="[MASK]")
-session = ort.InferenceSession("./a/simple.onnx")
+
+if not os.path.exists("../models/bert.onnx"):
+    print("Run ../models/download.sh to download ../models/bert.onnx")
+    sys.exit(0)
+
+# session = ort.InferenceSession("../models/bert.onnx")
 session = altius_py.InferenceSession(
     "../models/bert.onnx", intra_op_num_threads=8, enable_profile=True
 )

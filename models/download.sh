@@ -1,18 +1,23 @@
 #!/bin/bash -eux
 
 download() {
-  S1=${1?}
-  S2=${2?}
+  ID=${1?}
+  OUT=${2?}
+
+  if [ -e $OUT ]; then
+    return
+  fi
+
   CONFIRM=$( \
     wget \
       --quiet \
       --save-cookies /tmp/cookies.txt \
       --keep-session-cookies \
       --no-check-certificate \
-      "https://drive.google.com/uc?export=download&id=$S1" \
+      "https://drive.google.com/uc?export=download&id=$ID" \
       -O- | \
     sed -En 's/.*confirm=([0-9A-Za-z_]+).*/\1/p')
-  wget --load-cookies /tmp/cookies.txt "https://drive.google.com/uc?export=download&confirm=$CONFIRM&id=$S1" -O $S2
+  wget --load-cookies /tmp/cookies.txt "https://drive.google.com/uc?export=download&confirm=$CONFIRM&id=$ID" -O $OUT
   rm -f /tmp/cookies.txt
 }
 

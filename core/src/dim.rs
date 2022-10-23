@@ -44,6 +44,12 @@ impl Dimensions {
     pub fn broadcast(&self, other: impl AsRef<Self>) -> Option<Self> {
         broadcast(&[self, other.as_ref()])
     }
+
+    pub fn to_fixed_dims<const N: usize>(&self) -> [Dimension; N] {
+        let mut dims: [Dimension; N] = [0; N];
+        dims.copy_from_slice(&self.0);
+        dims
+    }
 }
 
 pub fn broadcast(shapes: &[impl AsRef<Dimensions>]) -> Option<Dimensions> {

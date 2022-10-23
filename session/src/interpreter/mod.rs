@@ -447,7 +447,8 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             //   b: [1,  1, 1, 9]
             (adims, bdims, input_a, input_b)
         } else {
-            todo!("A shape: {:?}, B shape: {:?}", adims, bdims)
+            compute_general_add(input_a, input_b, output);
+            return;
         };
 
     let input_a = input_a.data::<f32>();
@@ -491,6 +492,104 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                 })
             });
     });
+}
+
+fn compute_general_add(input_a: &Tensor, input_b: &Tensor, output: &mut Tensor) {
+    if output.dims().len() == 4 {
+        let [odim0, odim1, odim2, odim3] = output.fixed_dims::<4>();
+        let out_shape = output.dims().as_slice().to_vec();
+        let [astr0, astr1, astr2, astr3] = input_a
+            .strides_for_broadcasting(&out_shape)
+            .unwrap()
+            .to_fixed_dims::<4>();
+        let [bstr0, bstr1, bstr2, bstr3] = input_b
+            .strides_for_broadcasting(&out_shape)
+            .unwrap()
+            .to_fixed_dims::<4>();
+
+        let mut input_a0 = input_a.data::<f32>().as_ptr();
+        let mut input_b0 = input_b.data::<f32>().as_ptr();
+        let mut output = output.data_mut::<f32>().as_mut_ptr();
+
+        for _ in 0..odim0 {
+            let (mut input_a1, mut input_b1) = (input_a0, input_b0);
+            for _ in 0..odim1 {
+                let (mut input_a2, mut input_b2) = (input_a1, input_b1);
+                for _ in 0..odim2 {
+                    let (mut input_a3, mut input_b3) = (input_a2, input_b2);
+                    for _ in 0..odim3 {
+                        unsafe { *output = *input_a3 + *input_b3 };
+                        (output, input_a3, input_b3) =
+                            unsafe { (output.add(1), input_a3.add(astr3), input_b3.add(bstr3)) };
+                    }
+                    (input_a2, input_b2) = unsafe { (input_a2.add(astr2), input_b2.add(bstr2)) };
+                }
+                (input_a1, input_b1) = unsafe { (input_a1.add(astr1), input_b1.add(bstr1)) };
+            }
+            (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
+        }
+        return;
+    }
+
+    if output.dims().len() == 3 {
+        let [odim0, odim1, odim2] = output.fixed_dims::<3>();
+        let out_shape = output.dims().as_slice().to_vec();
+        let [astr0, astr1, astr2] = input_a
+            .strides_for_broadcasting(&out_shape)
+            .unwrap()
+            .to_fixed_dims::<3>();
+        let [bstr0, bstr1, bstr2] = input_b
+            .strides_for_broadcasting(&out_shape)
+            .unwrap()
+            .to_fixed_dims::<3>();
+
+        let mut input_a0 = input_a.data::<f32>().as_ptr();
+        let mut input_b0 = input_b.data::<f32>().as_ptr();
+        let mut output = output.data_mut::<f32>().as_mut_ptr();
+
+        for _ in 0..odim0 {
+            let (mut input_a1, mut input_b1) = (input_a0, input_b0);
+            for _ in 0..odim1 {
+                let (mut input_a2, mut input_b2) = (input_a1, input_b1);
+                for _ in 0..odim2 {
+                    unsafe { *output = *input_a2 + *input_b2 };
+                    (output, input_a2, input_b2) =
+                        unsafe { (output.add(1), input_a2.add(astr2), input_b2.add(bstr2)) };
+                }
+                (input_a1, input_b1) = unsafe { (input_a1.add(astr1), input_b1.add(bstr1)) };
+            }
+            (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
+        }
+        return;
+    }
+
+    if output.dims().len() == 2 {
+        let [odim0, odim1] = output.fixed_dims::<2>();
+        let out_shape = output.dims().as_slice().to_vec();
+        let [astr0, astr1] = input_a
+            .strides_for_broadcasting(&out_shape)
+            .unwrap()
+            .to_fixed_dims::<2>();
+        let [bstr0, bstr1] = input_b
+            .strides_for_broadcasting(&out_shape)
+            .unwrap()
+            .to_fixed_dims::<2>();
+
+        let mut input_a0 = input_a.data::<f32>().as_ptr();
+        let mut input_b0 = input_b.data::<f32>().as_ptr();
+        let mut output = output.data_mut::<f32>().as_mut_ptr();
+
+        for _ in 0..odim0 {
+            let (mut input_a1, mut input_b1) = (input_a0, input_b0);
+            for _ in 0..odim1 {
+                unsafe { *output = *input_a1 + *input_b1 };
+                (output, input_a1, input_b1) =
+                    unsafe { (output.add(1), input_a1.add(astr1), input_b1.add(bstr1)) };
+            }
+            (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
+        }
+        return;
+    }
 }
 
 fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

@@ -19,13 +19,11 @@ use altius_core::{
     value::ValueId,
 };
 use conv2d::Conv2dCtx;
-use core_affinity;
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
 use ndarray::{s, ArrayView2, ArrayView3, ArrayView4};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
-use threadpool::ThreadPool;
 
 use std::{
     cell::RefCell,
@@ -74,10 +72,6 @@ impl<'a> Interpreter<'a> {
         let mut inferred_shapes = FxHashMap::default();
         infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
 
-        let tp = ThreadPool::new(1);
-        tp.execute(move || core_affinity::set_for_current(core_affinity::CoreId { id: 0 }));
-        tp.join();
-
         Interpreter {
             model,
             #[cfg(feature = "cuda")]
@@ -87,7 +81,7 @@ impl<'a> Interpreter<'a> {
             enable_profiling: false,
             values: ThreadLocal::new(),
             dummy_value: Tensor::zeros::<f32>(vec![0].into()),
-            tctx: ThreadCtx { tp },
+            tctx: ThreadCtx::new(),
         }
     }
 
@@ -105,12 +99,7 @@ impl<'a> Interpreter<'a> {
             unsafe { bli_thread_set_num_threads(num_threads) };
         }
 
-        let tp = ThreadPool::new(num_threads);
-        for i in 0..num_threads {
-            tp.execute(move || core_affinity::set_for_current(core_affinity::CoreId { id: i }))
-        }
-        tp.join();
-        self.tctx = ThreadCtx { tp };
+        self.tctx = ThreadCtx::new_with_num_threads(num_threads);
 
         self
     }
@@ -1130,7 +1119,7 @@ fn compute_gelu(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     let input: &[f32] = inputs[0].data();
     let output: &mut [f32] = outputs[0].data_mut();
-    let n = tctx.tp.max_count();
+    let n = tctx.num_threads();
 
     tctx.scope(|scope| {
         input
@@ -1264,7 +1253,7 @@ fn compute_softmax(
     let input = input.data::<f32>();
     let output = output.data_mut::<f32>();
 
-    let n = tctx.tp.max_count();
+    let n = tctx.num_threads();
     let chunk = if input.len() < n {
         input.len()
     } else {

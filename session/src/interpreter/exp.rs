@@ -24,10 +24,12 @@ pub fn fast_exp(output: &mut [f32], input: &[f32]) {
 
     assert_eq!(input.len(), output.len());
 
-    let (input0, input1, input2) = input.as_simd::<SIMD_LEN>();
-    let (output0, output1, output2) = output.as_simd_mut::<SIMD_LEN>();
+    let mut input = input;
+    let mut output = output;
+    let mut len = output.len();
 
-    for (&vals, out) in input1.iter().zip(output1.iter_mut()) {
+    while len >= SIMD_LEN {
+        let vals = Simd::<_, SIMD_LEN>::from_slice(input);
         let vals = vals.simd_clamp(Simd::splat(LOWER_RANGE), Simd::splat(UPPER_RANGE));
 
         let biased = vals.mul_add(Simd::splat(LOG2RECIPROCAL), Simd::splat(ROUNDING_BIAS));
@@ -55,16 +57,13 @@ pub fn fast_exp(output: &mut [f32], input: &[f32]) {
             transmute::<_, Simd<f32, SIMD_LEN>>(overflow)
         });
         let p = p * unsafe { transmute::<_, Simd<f32, SIMD_LEN>>(normal) };
+        output[0..SIMD_LEN].copy_from_slice(p.as_ref());
 
-        *out = p;
+        (input, output) = (&input[SIMD_LEN..], &mut output[SIMD_LEN..]);
+        len -= SIMD_LEN
     }
 
-    for (i, o) in input0
-        .iter()
-        .chain(input2.iter())
-        .zip(output0.iter_mut().chain(output2.iter_mut()))
-    {
-        let val = *i;
+    for (&val, out) in input.iter().zip(output.iter_mut()) {
         let val = LOWER_RANGE.max(val);
         let val = UPPER_RANGE.min(val);
 
@@ -92,6 +91,6 @@ pub fn fast_exp(output: &mut [f32], input: &[f32]) {
         let p = p.mul_add(val, unsafe { transmute::<_, f32>(overflow) });
         let p = p * unsafe { transmute::<_, f32>(normal) };
 
-        *o = p;
+        *out = p;
     }
 }

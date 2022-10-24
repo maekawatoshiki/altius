@@ -352,22 +352,25 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                 .zip(input_b.chunks(chunk))
                 .zip(output.chunks_mut(chunk))
                 .for_each(|((input_a, input_b), output)| {
-                    scope.spawn(|| {
-                        let (input_a0, input_a1, input_a2) = input_a.as_simd::<SIMD_LEN>();
-                        let (input_b0, input_b1, input_b2) = input_b.as_simd::<SIMD_LEN>();
-                        let (output0, output1, output2) = output.as_simd_mut::<SIMD_LEN>();
+                    scope.spawn(move || {
+                        let mut input_a = input_a;
+                        let mut input_b = input_b;
+                        let mut output = output;
+                        let mut len = output.len();
 
-                        for ((a, b), o) in
-                            input_a1.iter().zip(input_b1.iter()).zip(output1.iter_mut())
-                        {
-                            *o = a + b;
+                        while len >= SIMD_LEN {
+                            let a = Simd::<_, SIMD_LEN>::from_slice(input_a);
+                            let b = Simd::<_, SIMD_LEN>::from_slice(input_b);
+                            output[0..SIMD_LEN].copy_from_slice((a + b).as_ref());
+                            (input_a, input_b, output) = (
+                                &input_a[SIMD_LEN..],
+                                &input_b[SIMD_LEN..],
+                                &mut output[SIMD_LEN..],
+                            );
+                            len -= SIMD_LEN;
                         }
 
-                        for ((a, b), o) in input_a0
-                            .iter()
-                            .chain(input_a2.iter())
-                            .zip(input_b0.iter().chain(input_b2.iter()))
-                            .zip(output0.iter_mut().chain(output2.iter_mut()))
+                        for ((a, b), o) in input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
                         {
                             *o = a + b;
                         }
@@ -612,22 +615,24 @@ fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     }
 
     if input_a.dims().is_scalar() {
-        let a = input_a.data::<f32>()[0];
-        let a_ = Simd::splat(a);
-        let (b0, b1, b2) = input_b.data::<f32>().as_simd::<SIMD_LEN>();
-        let (o0, o1, o2) = output.data_mut::<f32>().as_simd_mut::<SIMD_LEN>();
         const SIMD_LEN: usize = 4;
 
-        for (b, o) in b1.iter().zip(o1.iter_mut()) {
-            *o = a_ - b;
+        let input_a = input_a.data::<f32>()[0];
+        let mut input_b = input_b.data::<f32>();
+        let mut output = output.data_mut::<f32>();
+
+        let mut len = output.len();
+
+        while len >= SIMD_LEN {
+            let a = Simd::splat(input_a);
+            let b = Simd::<_, SIMD_LEN>::from_slice(input_b);
+            output[0..SIMD_LEN].copy_from_slice((a - b).as_ref());
+            (input_b, output) = (&input_b[SIMD_LEN..], &mut output[SIMD_LEN..]);
+            len -= SIMD_LEN;
         }
 
-        for (b, o) in b0
-            .iter()
-            .chain(b2.iter())
-            .zip(o0.iter_mut().chain(o2.iter_mut()))
-        {
-            *o = a - b;
+        for (b, o) in input_b.iter().zip(output.iter_mut()) {
+            *o = input_a - b;
         }
 
         return;

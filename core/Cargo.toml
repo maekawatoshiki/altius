@@ -11,8 +11,10 @@ rustc-hash = "1.1.0"
 prost = "^0.10"
 thiserror = "1.0.31"
 log = "0.4.17"
-mimalloc = { version = "0.1.29", default-features = false, features = ["local_dynamic_tls"] }
 rand = "0.8.5"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+mimalloc = { version = "0.1.29", default-features = false, features = ["local_dynamic_tls"] }
 
 [build-dependencies]
 prost-build = "^0.10"

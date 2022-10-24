@@ -29,6 +29,17 @@ cargo run --release --example mobilenet --features accelerate # for macOS
 
 - Recommend to use `blis` feature and set `GOMP_CPU_AFFINITY='0-31' BLIS_NUM_THREADS=32` (adjust the number of cores for your machine) for better performance
 
+## wasm
+
+- Currently, mobilenet v3 can run on web browsers.
+
+```sh
+cd wasm
+cargo install wasm-pack
+wasm-pack build --target web
+python -m http.server 8080 
+```
+
 # Run from Python
 
 ```sh

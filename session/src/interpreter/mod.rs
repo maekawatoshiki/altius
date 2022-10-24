@@ -109,6 +109,7 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
+        #[cfg(not(target_arch = "wasm32"))]
         let start = Instant::now();
 
         if self.model.outputs.len() > 1 {
@@ -134,6 +135,7 @@ impl<'a> Interpreter<'a> {
             }
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         if self.enable_profiling {
             log::info!(
                 "Kernel execution time: {:#?}",
@@ -178,6 +180,7 @@ impl<'a> Interpreter<'a> {
             .map(|TypedShape { elem_ty, dims }| Tensor::uninit_of_type(elem_ty, dims))
             .collect::<Vec<_>>();
 
+        #[cfg(not(target_arch = "wasm32"))]
         let start = Instant::now();
 
         // Actual kernel runs here.
@@ -231,6 +234,7 @@ impl<'a> Interpreter<'a> {
             Op::Constant(_) => todo!("constant"),
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         if self.enable_profiling {
             let elapsed = start.elapsed();
             *profile.entry(op.name()).or_insert(Duration::ZERO) += elapsed;

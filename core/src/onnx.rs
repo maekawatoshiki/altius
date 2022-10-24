@@ -27,6 +27,15 @@ pub enum ModelLoadError {
 
 pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
     let model_proto = load_onnx_model_proto(path)?;
+    load_onnx_from_model_proto(model_proto)
+}
+
+pub fn load_onnx_from_buffer(buf: &[u8]) -> Result<Model, ModelLoadError> {
+    let model = ModelProto::decode(buf).unwrap();
+    load_onnx_from_model_proto(model)
+}
+
+pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, ModelLoadError> {
     let graph = model_proto.graph.ok_or(ModelLoadError::NoGraph)?;
     let mut model = Model::default();
 

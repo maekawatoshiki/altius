@@ -2,7 +2,8 @@
 members = [
   "core",
   "session",
-  "altius-py"
+  "altius-py",
+  "wasm"
 ]
 
 [profile.release]

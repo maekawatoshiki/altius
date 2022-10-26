@@ -21,7 +21,7 @@ jobs:
         toolchain: nightly
     - name: Install dependencies
       run: |
-        sudo apt install -y git-lfs
+        sudo apt install -y git-lfs mesa-common-dev
     - name: Download large files
       run: |
         git lfs install && \

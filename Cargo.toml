@@ -5,6 +5,7 @@ members = [
   "altius-py",
   "wasm"
 ]
+resolver = "2"
 
 [profile.release]
 opt-level = 3

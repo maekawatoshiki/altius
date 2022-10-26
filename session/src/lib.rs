@@ -1,6 +1,7 @@
 #![feature(portable_simd)]
 
 pub mod interpreter;
+pub mod wgpu;
 
 #[cfg(all(feature = "cblas", not(feature = "blis")))]
 #[allow(unused)]

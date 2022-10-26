@@ -53,17 +53,16 @@ impl<'a> WgpuSession<'a> {
 
         let _info = adapter.get_info();
 
-        // skip this on LavaPipe temporarily
-        // if info.vendor == 0x10005 {
-        //     return None;
-        // }
-
-        let input_a = vec![1f32];
-        let input_b = vec![2f32];
-        let mut output = vec![0f32];
+        let input_a = Tensor::rand::<f32>(vec![1, 3, 28, 28].into());
+        let input_b = Tensor::rand::<f32>(vec![1, 3, 28, 28].into());
+        let mut output = Tensor::zeros::<f32>(vec![1, 3, 28, 28].into());
         compute_add(&device, &queue, &input_a, &input_b, &mut output).await;
-        assert_eq!(output[0], 3f32);
-        // println!("result {:?}", result);
+        assert!(input_a
+            .data::<f32>()
+            .iter()
+            .zip(input_b.data::<f32>().iter())
+            .zip(output.data::<f32>())
+            .all(|((a, b), &o)| a + b == o));
 
         Ok(vec![])
     }
@@ -72,9 +71,9 @@ impl<'a> WgpuSession<'a> {
 async fn compute_add(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    input_a: &[f32],
-    input_b: &[f32],
-    output: &mut [f32],
+    input_a: &Tensor,
+    input_b: &Tensor,
+    output: &mut Tensor,
 ) {
     let wgsl = r#"
 @group(0) @binding(0)
@@ -98,6 +97,10 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         label: None,
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(wgsl)),
     });
+
+    let input_a = input_a.data::<f32>();
+    let input_b = input_b.data::<f32>();
+    let output = output.data_mut::<f32>();
 
     assert_eq!(input_a.len(), input_b.len());
     assert_eq!(input_a.len(), output.len());

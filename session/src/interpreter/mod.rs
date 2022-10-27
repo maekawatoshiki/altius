@@ -834,7 +834,7 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                     }
 
                     for (a, o) in a.iter().zip(o.iter_mut()) {
-                        *o = a / b;
+                        *o = a * b.recip();
                     }
                 });
         } else {
@@ -846,7 +846,7 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                     .for_each(|((a, &b), o)| {
                         scope.spawn(move || {
                             for (&a, o) in a.iter().zip(o.iter_mut()) {
-                                *o = a / b;
+                                *o = a * b.recip();
                             }
                         });
                     });
@@ -858,8 +858,8 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     if input_b.dims().is_scalar() {
         let mut input_a = input_a.data::<f32>();
-        let b = input_b.data::<f32>()[0];
-        let simd_b = Simd::<f32, SIMD_LEN>::splat(b).recip();
+        let b = input_b.data::<f32>()[0].recip();
+        let simd_b = Simd::<f32, SIMD_LEN>::splat(b);
         let mut output = output.data_mut::<f32>();
         let mut len = input_a.len();
 

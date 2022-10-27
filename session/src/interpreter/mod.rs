@@ -887,7 +887,7 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_a = inputs[0];
     let input_b = inputs[1];
-    let output = &mut outputs[0].data_mut();
+    let output = outputs[0].data_mut();
 
     if input_a.dims() == input_b.dims() {
         for ((a, b), o) in input_a

@@ -23,3 +23,4 @@ download() {
 
 download 1K6m7WxoE3noMTbNPyhyxLLNlXsdN1Sq6 ./vit_b_16.onnx
 download 1E2RxWfxufLNB_cXm30RdjXt4YVbFzQrs ./bert.onnx
+download 1YP8wJyOhR0vSaeasn-z1WbkXBX8TzUER ./realesrgan_256x256.onnx

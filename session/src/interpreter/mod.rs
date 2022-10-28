@@ -1193,8 +1193,7 @@ fn tanh(mut data: &mut [f32]) {
 
     for x in data {
         let val = *x;
-        let val = if val < LOWER_RANGE { LOWER_RANGE } else { val };
-        let val = if val > UPPER_RANGE { UPPER_RANGE } else { val };
+        let val = val.clamp(LOWER_RANGE, UPPER_RANGE);
 
         let val_squared = val * val;
 

@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, sync::Arc};
 
 use crate::dim::{Dimension, Dimensions};
 use rand::{
@@ -12,7 +12,7 @@ thread_local!(static RNG: RefCell<StdRng> =
 pub struct Tensor {
     dims: Dimensions,
     stride: Dimensions,
-    data: Vec<u8>,
+    data: Arc<Vec<u8>>,
     elem_ty: TensorElemType,
 }
 
@@ -42,13 +42,13 @@ impl Tensor {
         Self {
             stride: compute_strides(&dims),
             elem_ty: T::get_type(),
-            data: unsafe {
+            data: Arc::new(unsafe {
                 Vec::from_raw_parts(
                     data.as_ptr() as *mut u8,
                     data.len() * std::mem::size_of::<T>(),
                     data.capacity() * std::mem::size_of::<T>(),
                 )
-            },
+            }),
             dims,
         }
     }
@@ -58,9 +58,9 @@ impl Tensor {
         Self {
             stride: compute_strides(&dims),
             elem_ty,
-            data: unsafe {
+            data: Arc::new(unsafe {
                 Vec::from_raw_parts(data.as_ptr() as *mut u8, data.len(), data.capacity())
-            },
+            }),
             dims,
         }
     }
@@ -130,13 +130,13 @@ impl Tensor {
 
     pub fn set_raw_vec<T>(&mut self, data: Vec<T>) {
         let data = std::mem::ManuallyDrop::new(data);
-        self.data = unsafe {
+        self.data = Arc::new(unsafe {
             Vec::from_raw_parts(
                 data.as_ptr() as *mut u8,
                 data.len() * std::mem::size_of::<T>(),
                 data.capacity() * std::mem::size_of::<T>(),
             )
-        };
+        });
     }
 
     pub fn reshape_into(mut self, dims: Dimensions) -> Self {
@@ -255,7 +255,7 @@ impl Tensor {
     }
 
     pub fn copy_data_from(&mut self, other: &Self) {
-        self.data.copy_from_slice(&other.data)
+        self.data = other.data.clone()
     }
 
     pub fn elem_ty(&self) -> TensorElemType {

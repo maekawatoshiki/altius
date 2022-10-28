@@ -1260,7 +1260,6 @@ fn compute_softmax(
             .for_each(|(input, output)| scope.spawn(|| fast_exp(output, input)));
     });
 
-    let output = unsafe { std::mem::transmute::<_, &'static mut [f32]>(output) };
     let batch = (output.len() / 100000).max(1); // 100000 is magic number :(
                                                 // I think processing more than 100000 elements for
                                                 // each core is just right.

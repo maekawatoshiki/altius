@@ -64,8 +64,7 @@ pub fn fast_exp(output: &mut [f32], input: &[f32]) {
     }
 
     for (&val, out) in input.iter().zip(output.iter_mut()) {
-        let val = LOWER_RANGE.max(val);
-        let val = UPPER_RANGE.min(val);
+        let val = val.clamp(LOWER_RANGE, UPPER_RANGE);
 
         let biased = val.mul_add(LOG2RECIPROCAL, ROUNDING_BIAS);
         let m = biased - ROUNDING_BIAS;

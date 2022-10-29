@@ -213,7 +213,7 @@ impl<'a> Interpreter<'a> {
             Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
             Op::Softmax(ref softmax) => compute_softmax(&self.tctx, softmax, &inputs, &mut outputs),
-            Op::Resize(ref resize) => compute_resize(resize, &inputs, &mut outputs),
+            Op::Resize(ref resize) => compute_resize(&self.tctx, resize, &inputs, &mut outputs),
             Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
             Op::Transpose(ref trans) => compute_transpose(trans, &inputs, &mut outputs),
             Op::Squeeze(ref squeeze) => compute_squeeze(squeeze, &inputs, &mut outputs),
@@ -1291,10 +1291,10 @@ fn fast_sum(mut slice: &[f32]) -> f32 {
     sum.reduce_sum() + slice.iter().sum::<f32>()
 }
 
-fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_resize(tctx: &ThreadCtx, _resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     log::info!("Resize: Current implementation uses bilinear interpolation!");
 
-    assert_eq!(inputs.len(), 4);
+    assert!(matches!(inputs.len(), 3 | 4));
 
     let input = inputs[Node::RESIZE_IN_X];
     // let sizes = inputs[Node::RESIZE_IN_SIZES];
@@ -1315,32 +1315,36 @@ fn compute_resize(_resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) 
     let mut output = output.data_mut::<f32>();
 
     for _ in 0..outer {
-        for h in 0..output_h {
-            let ihf = (h as f32 / scale - 0.5).max(0.);
-            let ih = ihf as usize;
-            let ih0 = ih.min(input_h - 1);
-            let ih1 = (ih + 1).min(input_h - 1);
-            let ih0w = input_w * ih0;
-            let ih1w = input_w * ih1;
-            for w in 0..output_w {
-                let iwf = (w as f32 / scale - 0.5).max(0.);
-                let iw = iwf as usize;
-                let iw0 = iw.min(input_w - 1);
-                let iw1 = (iw + 1).min(input_w - 1);
+        tctx.scope(|scope| {
+            for (h, o) in (0..output_h).zip(output.chunks_mut(output_w)) {
+                let ihf = (h as f32 / scale - 0.5).max(0.);
+                let ih = ihf as usize;
+                let ih0 = ih.min(input_h - 1);
+                let ih1 = (ih + 1).min(input_h - 1);
+                let ih0w = input_w * ih0;
+                let ih1w = input_w * ih1;
+                scope.spawn(move || {
+                    for (w, o) in (0..output_w).zip(o.iter_mut()) {
+                        let iwf = (w as f32 / scale - 0.5).max(0.);
+                        let iw = iwf as usize;
+                        let iw0 = iw.min(input_w - 1);
+                        let iw1 = (iw + 1).min(input_w - 1);
 
-                let v00 = input[ih0w + iw0];
-                let v01 = input[ih0w + iw1];
-                let v10 = input[ih1w + iw0];
-                let v11 = input[ih1w + iw1];
+                        let v00 = input[ih0w + iw0];
+                        let v01 = input[ih0w + iw1];
+                        let v10 = input[ih1w + iw0];
+                        let v11 = input[ih1w + iw1];
 
-                let hd = v00 + (v10 - v00) * (ihf - ih as f32);
-                let hw = v01 + (v11 - v01) * (ihf - ih as f32);
-                let r = hd + (hw - hd) * (iwf - iw as f32);
+                        let hd = v00 + (v10 - v00) * (ihf - ih as f32);
+                        let hw = v01 + (v11 - v01) * (ihf - ih as f32);
+                        let r = hd + (hw - hd) * (iwf - iw as f32);
 
-                output[0] = r;
-                output = &mut output[1..];
+                        *o = r
+                    }
+                });
             }
-        }
+        });
+        output = &mut output[output_h * output_w..];
         input = &input[input_hw..];
     }
 }

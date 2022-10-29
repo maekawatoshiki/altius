@@ -3,6 +3,7 @@ use altius_core::{
     tensor::Tensor,
 };
 
+use super::thread::ThreadCtx;
 #[cfg(feature = "cuda")]
 use super::SafeCudnnContext;
 #[cfg(feature = "cuda")]
@@ -19,6 +20,7 @@ pub struct Conv2dCtx<'a> {
     pub op: &'a Conv2d,
     pub inputs: &'a [&'a Tensor],
     pub outputs: &'a mut [Tensor],
+    pub tctx: &'a ThreadCtx,
 }
 
 #[cfg(not(feature = "cuda"))]
@@ -77,15 +79,13 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         output.data_mut::<f32>().fill(0.);
     }
 
-    let mut col = Tensor::zeros::<f32>(
+    let mut col = Tensor::uninit::<f32>(
         vec![
             batch_size, input_c, kernel[0], kernel[1], output_h, output_w,
         ]
         .into(),
     );
 
-    let mut col_ptr = col.data_mut::<f32>().as_mut_ptr();
-    let mut input_ptr = input.data::<f32>().as_ptr();
     assert!(input.dims().len() == 4);
 
     if pad_t == 0
@@ -95,6 +95,9 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         && dilation_h == 1
         && dilation_w == 1
     {
+        let mut col_ptr = col.data_mut::<f32>().as_mut_ptr();
+        let mut input_ptr = input.data::<f32>().as_ptr();
+
         let mut outer = batch_size * input_c;
         let inner = kernel_h * kernel_w;
         // Simple case
@@ -109,61 +112,98 @@ pub fn compute(ctx: &mut Conv2dCtx) {
             outer -= 1
         }
     } else if dilation_h == 1 && dilation_w == 1 {
-        let outer = batch_size * input_c;
-        for _ in 0..outer {
-            for fy in 0..kernel_h {
-                let ih = fy as isize - pad_t as isize;
-                for fx in 0..kernel_w {
-                    let iw = fx as isize - pad_l as isize;
-                    let mut ih = ih;
-                    let mut owh = 0;
-                    for _oh in 0..output_h {
-                        if 0 <= ih && ih < input_h as isize {
-                            let jh = ih as usize * input_w;
-                            let mut iw = iw;
-                            for ow in 0..output_w {
-                                if 0 <= iw && iw < input_w as isize {
-                                    let jw = jh + iw as usize;
-                                    unsafe { *col_ptr.add(owh + ow) = *input_ptr.add(jw) };
+        let col = col.data_mut::<f32>();
+        let input = input.data::<f32>();
+        let _outer = batch_size * input_c;
+
+        ctx.tctx.scope(|scope| {
+            for (col, input) in col
+                .chunks_mut(output_hw * kernel_h * kernel_w)
+                .zip(input.chunks(input_hw))
+            {
+                scope.spawn(move || {
+                    let input = input;
+                    let mut col = col;
+
+                    for fy in 0..kernel_h {
+                        let ih = fy as isize - pad_t as isize;
+                        for fx in 0..kernel_w {
+                            let iw = fx as isize - pad_l as isize;
+                            let mut ih = ih;
+                            let mut owh = 0;
+                            for _oh in 0..output_h {
+                                if 0 <= ih && ih < input_h as isize {
+                                    let jh = ih as usize * input_w;
+                                    let mut iw = iw;
+                                    for ow in 0..output_w {
+                                        unsafe { *col.get_unchecked_mut(owh + ow) = 0. };
+                                        if 0 <= iw && iw < input_w as isize {
+                                            let jw = jh + iw as usize;
+                                            unsafe {
+                                                *col.get_unchecked_mut(owh + ow) =
+                                                    *input.get_unchecked(jw)
+                                            };
+                                        }
+                                        iw += stride_w as isize;
+                                    }
+                                } else {
+                                    unsafe { col.get_unchecked_mut(owh..owh + output_w).fill(0.) };
                                 }
-                                iw += stride_w as isize;
+                                owh += output_w;
+                                ih += stride_h as isize;
                             }
+                            col = unsafe { col.get_unchecked_mut(output_hw..) };
                         }
-                        owh += output_w;
-                        ih += stride_h as isize;
                     }
-                    col_ptr = unsafe { col_ptr.add(output_hw) };
-                }
+                });
             }
-            input_ptr = unsafe { input_ptr.add(input_hw) };
-        }
+        })
     } else {
-        // TODO: ndarray is a bit faster than this implementation.
-        for _ in 0..batch_size * input_c {
-            for fy in 0..kernel_h {
-                for fx in 0..kernel_w {
-                    let mut ih = fy * dilation_h;
-                    for _oh in 0..output_h {
-                        if pad_t <= ih && ih < input_h + pad_t {
-                            let jh = (ih - pad_t) * input_w;
-                            let mut iw = fx * dilation_w;
-                            for _ow in 0..output_w {
-                                if pad_l <= iw && iw < input_w + pad_l {
-                                    let jw = jh + (iw - pad_l);
-                                    unsafe { *col_ptr = *input_ptr.add(jw) };
+        let col = col.data_mut::<f32>();
+        let input = input.data::<f32>();
+
+        ctx.tctx.scope(|scope| {
+            for (col, input) in col
+                .chunks_mut(output_hw * kernel_h * kernel_w)
+                .zip(input.chunks(input_hw))
+            {
+                scope.spawn(move || {
+                    let input = input;
+                    let mut col = col;
+
+                    for fy in 0..kernel_h {
+                        let ih = (fy * dilation_h) as isize - pad_t as isize;
+                        for fx in 0..kernel_w {
+                            let iw = (fx * dilation_w) as isize - pad_l as isize;
+                            let mut ih = ih;
+                            let mut owh = 0;
+                            for _oh in 0..output_h {
+                                if 0 <= ih && ih < input_h as isize {
+                                    let jh = ih as usize * input_w;
+                                    let mut iw = iw;
+                                    for ow in 0..output_w {
+                                        unsafe { *col.get_unchecked_mut(owh + ow) = 0. };
+                                        if 0 <= iw && iw < input_w as isize {
+                                            let jw = jh + iw as usize;
+                                            unsafe {
+                                                *col.get_unchecked_mut(owh + ow) =
+                                                    *input.get_unchecked(jw)
+                                            };
+                                        }
+                                        iw += stride_w as isize;
+                                    }
+                                } else {
+                                    unsafe { col.get_unchecked_mut(owh..owh + output_w).fill(0.) };
                                 }
-                                iw += stride_w;
-                                col_ptr = unsafe { col_ptr.add(1) };
+                                owh += output_w;
+                                ih += stride_h as isize;
                             }
-                        } else {
-                            col_ptr = unsafe { col_ptr.add(output_w) };
+                            col = unsafe { col.get_unchecked_mut(output_hw..) };
                         }
-                        ih += stride_h;
                     }
-                }
+                });
             }
-            input_ptr = unsafe { input_ptr.add(input_hw) };
-        }
+        });
     }
 
     let mut col_ptr = col.data::<f32>().as_ptr();
@@ -243,7 +283,8 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let input_cuda = DeviceBuffer::from_slice(input.data::<f32>()).unwrap();
     let weight_cuda = DeviceBuffer::from_slice(weight.data::<f32>()).unwrap();
     let bias_cuda = DeviceBuffer::from_slice(bias.data::<f32>()).unwrap();
-    let mut output_cuda = DeviceBuffer::from_slice(output.data::<f32>()).unwrap();
+    let mut output_cuda =
+        unsafe { DeviceBuffer::uninitialized(output.dims().total_elems()).unwrap() };
     let input_desc =
         TensorDescriptor::<f32>::new_format(&input.dims().to_i32_vec(), ScalarC::Nchw).unwrap();
     let weight_desc =

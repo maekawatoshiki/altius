@@ -1115,8 +1115,8 @@ fn compute_hard_sigmoid(hs: &HardSigmoid, inputs: &[&Tensor], outputs: &mut [Ten
 }
 
 fn compute_leaky_relu(leaky: &LeakyReLU, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input: &[f32] = inputs[Node::HARDSIGMOID_IN].data();
-    let output: &mut [f32] = outputs[Node::HARDSIGMOID_OUT].data_mut();
+    let input: &[f32] = inputs[0].data();
+    let output: &mut [f32] = outputs[0].data_mut();
 
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = if *i < 0.0 { leaky.alpha * i } else { *i };

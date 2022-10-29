@@ -34,6 +34,7 @@ openblas = [ "blas-src/openblas", "cblas" ]
 blis = [ "blis-src", "cblas" ]
 accelerate = [ "blas-src/accelerate", "cblas" ]
 cblas = [ "cblas-sys" ]
+heavy-log = []
 
 [dev-dependencies]
 env_logger = "0.9.0"

@@ -526,7 +526,7 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                     Dimensions::from_i64(sizes.data::<i64>()),
                     inputs[Node::RESIZE_IN_X].elem_ty(),
                 ))
-            } else {
+            } else if inputs.len() == 3 {
                 // TODO: Support other cases.
                 assert!(resize.coordinate_transformation_mode == "asymmetric");
                 assert!(resize.mode == "nearest");
@@ -534,18 +534,33 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 assert!(inputs.len() == 3);
                 let x = &inputs[Node::RESIZE_IN_X];
                 assert!(x.dims().len() == 4);
-                let roi = &inputs[Node::RESIZE_IN_ROI].data::<f32>();
+                let _roi = &inputs[Node::RESIZE_IN_ROI].data::<f32>(); // TODO: According to https://github.com/onnx/onnx/blob/main/docs/Operators.md#Resize,
+                                                                       // it only takes effect when coordinate_transformation_mode is "tf_crop_and_resize".
+                                                                       // Since we assume coordinate_transformation_mode is "asymmetric" for now, just ignore roi.
                 let scales = &inputs[Node::RESIZE_IN_SCALES].data::<f32>();
                 shapes.push(TypedShape::new(
                     vec![
-                        (x.dims()[0] as f32 * (roi[4] - roi[0]) * scales[0]).floor() as usize,
-                        (x.dims()[1] as f32 * (roi[5] - roi[1]) * scales[1]).floor() as usize,
-                        (x.dims()[2] as f32 * (roi[6] - roi[2]) * scales[2]).floor() as usize,
-                        (x.dims()[3] as f32 * (roi[7] - roi[3]) * scales[3]).floor() as usize,
+                        (x.dims()[0] as f32 * scales[0]).floor() as usize,
+                        (x.dims()[1] as f32 * scales[1]).floor() as usize,
+                        (x.dims()[2] as f32 * scales[2]).floor() as usize,
+                        (x.dims()[3] as f32 * scales[3]).floor() as usize,
                     ]
                     .into(),
                     inputs[Node::RESIZE_IN_X].elem_ty(),
                 ))
+                // NOTE: Use the following code when roi takes effect ... right?
+                // shapes.push(TypedShape::new(
+                //     vec![
+                //         (x.dims()[0] as f32 * (roi[4] - roi[0]) * scales[0]).floor() as usize,
+                //         (x.dims()[1] as f32 * (roi[5] - roi[1]) * scales[1]).floor() as usize,
+                //         (x.dims()[2] as f32 * (roi[6] - roi[2]) * scales[2]).floor() as usize,
+                //         (x.dims()[3] as f32 * (roi[7] - roi[3]) * scales[3]).floor() as usize,
+                //     ]
+                //     .into(),
+                //     inputs[Node::RESIZE_IN_X].elem_ty(),
+                // ))
+            } else {
+                todo!()
             }
         }
         Op::Concat(concat) => {

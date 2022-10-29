@@ -191,6 +191,7 @@ impl<'a> Interpreter<'a> {
                 op: conv,
                 inputs: &inputs,
                 outputs: &mut outputs,
+                tctx: &self.tctx,
             }),
             Op::Add => compute_add(&self.tctx, &inputs, &mut outputs),
             Op::Sub => compute_sub(node, &inputs, &mut outputs),

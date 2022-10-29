@@ -107,6 +107,17 @@ impl Tensor {
         }
     }
 
+    pub fn uninit<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
+        fn uninit_of<T: TensorElemTypeExt>(total_elems: usize) -> Vec<T> {
+            let mut vec: Vec<T> = Vec::with_capacity(total_elems);
+            unsafe { vec.set_len(total_elems) };
+            vec
+        }
+
+        let total_elems = dims.total_elems();
+        Self::new(dims, uninit_of::<T>(total_elems))
+    }
+
     pub fn rand<T>(dims: Dimensions) -> Self
     where
         T: TensorElemTypeExt,

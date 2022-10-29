@@ -127,8 +127,32 @@ impl<'a> Interpreter<'a> {
             values.insert(id, tensor);
         }
 
+        #[cfg(not(feature = "heavy-log"))]
         for node in &self.execution_plans {
             self.run_node(&mut profile, values, node.node_id);
+
+            for val in &node.free_vals {
+                values.get_mut(val).unwrap().set_raw_vec::<u8>(Vec::new())
+            }
+        }
+
+        #[cfg(feature = "heavy-log")]
+        for (i, node) in self.execution_plans.iter().enumerate() {
+            let start = Instant::now();
+
+            self.run_node(&mut profile, values, node.node_id);
+
+            log::info!(
+                "{}/{} {}({}) {:?}",
+                i,
+                self.execution_plans.len(),
+                self.model.nodes[node.node_id].op.name(),
+                self.model.nodes[node.node_id]
+                    .name
+                    .as_ref()
+                    .unwrap_or(&"".to_string()),
+                start.elapsed()
+            );
 
             for val in &node.free_vals {
                 values.get_mut(val).unwrap().set_raw_vec::<u8>(Vec::new())

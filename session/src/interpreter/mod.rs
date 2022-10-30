@@ -235,6 +235,7 @@ impl<'a> Interpreter<'a> {
             Op::Gelu => compute_gelu(&self.tctx, &inputs, &mut outputs),
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Erf => compute_erf(&inputs, &mut outputs),
+            Op::Tanh => compute_tanh(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
             Op::Where => todo!("Where"),
             Op::Softmax(ref softmax) => compute_softmax(&self.tctx, softmax, &inputs, &mut outputs),
@@ -1256,6 +1257,13 @@ fn compute_erf(inputs: &[&Tensor], outputs: &mut [Tensor]) {
     for (&i, o) in input.iter().zip(output.iter_mut()) {
         *o = fastapprox::faster::erf(i);
     }
+}
+
+fn compute_tanh(inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input = inputs[0].data::<f32>();
+    let output = outputs[0].data_mut::<f32>();
+    output.copy_from_slice(input);
+    tanh(output);
 }
 
 fn compute_softmax(

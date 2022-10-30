@@ -135,6 +135,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             "Relu" => Op::ReLU,
             "Sigmoid" => Op::Sigmoid,
             "Erf" => Op::Erf,
+            "Tanh" => Op::Tanh,
             "Where" => Op::Where,
             "Softmax" => Op::Softmax(Softmax {
                 axis: get_attribute(&node.attribute, "axis").map_or(-1, |a| a.i()),

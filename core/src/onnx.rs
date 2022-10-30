@@ -8,8 +8,8 @@ use crate::{
     model::Model,
     node::{
         BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gather, Gemm, HardSigmoid,
-        LeakyReLU, MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape, Softmax, Squeeze,
-        Transpose, Unsqueeze,
+        LeakyReLU, MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape, Softmax, Split,
+        Squeeze, Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
 };
@@ -141,6 +141,9 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             "Round" => Op::Round,
             "Exp" => Op::Exp,
             "Tile" => Op::Tile,
+            "Split" => Op::Split(Split {
+                axis: get_attribute(&node.attribute, "axis").map_or(0, |a| a.i()),
+            }),
             "Slice" => Op::Slice,
             "Gather" => Op::Gather(Gather {
                 axis: get_attribute(&node.attribute, "axis").map_or(0, |a| a.i()),

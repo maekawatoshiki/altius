@@ -130,9 +130,10 @@ pub struct Squeeze {
     pub axes: Vec<i64>,
 }
 
+/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Unsqueeze
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Unsqueeze {
-    pub axes: Vec<i64>,
+    pub axes: Vec<i64>, // From opset version 13, this attribute is no longer used.
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -601,17 +602,25 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             ))
         }
         Op::Unsqueeze(unsqueeze) => {
-            assert!(!unsqueeze.axes.is_empty());
-            assert!(unsqueeze.axes.iter().all(|&x| x >= 0));
-            let in_dims = inputs[Node::UNSQUEEZE_IN].dims().as_slice().to_vec();
-            let mut dims = in_dims;
-            for &x in unsqueeze.axes.iter() {
-                dims.insert(x as usize, 1);
+            if unsqueeze.axes.is_empty() {
+                let in_dims = inputs[0].dims().as_slice().to_vec();
+                let axes = inputs[1].data::<i64>();
+                let mut dims = in_dims;
+                for &x in axes {
+                    dims.insert(x as usize, 1);
+                }
+                shapes.push(TypedShape::new(dims.into(), inputs[0].elem_ty()))
+            } else {
+                let in_dims = inputs[Node::UNSQUEEZE_IN].dims().as_slice().to_vec();
+                let mut dims = in_dims;
+                for &x in unsqueeze.axes.iter() {
+                    dims.insert(x as usize, 1);
+                }
+                shapes.push(TypedShape::new(
+                    dims.into(),
+                    inputs[Node::UNSQUEEZE_IN].elem_ty(),
+                ))
             }
-            shapes.push(TypedShape::new(
-                dims.into(),
-                inputs[Node::UNSQUEEZE_IN].elem_ty(),
-            ))
         }
         Op::ReduceMin(rmin) => {
             let in_dims = inputs[0].dims();

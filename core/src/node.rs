@@ -714,8 +714,16 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 inputs[Node::TILE_IN].elem_ty(),
             ));
         }
-        Op::Split(_) => {
-            todo!()
+        Op::Split(split) => {
+            let axis = split.axis;
+            assert!(axis >= 0, "Negative index not supported");
+            let input = inputs[0].dims();
+            let split = inputs[1].data::<i64>();
+            for s in split {
+                let mut dims = input.clone();
+                dims[axis as usize] = *s as usize;
+                shapes.push(TypedShape::new(dims, inputs[0].elem_ty()));
+            }
         }
         Op::Slice => {
             let in_data_dims = inputs[Node::SLICE_IN_DATA].dims();

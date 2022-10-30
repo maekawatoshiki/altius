@@ -12,8 +12,8 @@ use altius_core::{
     model::Model,
     node::{
         compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gather, Gemm,
-        HardSigmoid, LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize, Softmax, Squeeze,
-        Transpose, Unsqueeze,
+        HardSigmoid, LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize, Softmax, Split,
+        Squeeze, Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -254,7 +254,7 @@ impl<'a> Interpreter<'a> {
             Op::BatchNormalization(ref batchnorm) => {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
-            Op::Split(_) => todo!("Split"),
+            Op::Split(ref split) => compute_split(split, &inputs, &mut outputs),
             Op::Slice => compute_slice(node, &inputs, &mut outputs),
             Op::Gather(ref gather) => compute_gather(gather, &inputs, &mut outputs),
             Op::Shape(_) => todo!("shape"),
@@ -1564,6 +1564,20 @@ fn compute_batch_normalization(
                 }
             }
         }
+    }
+}
+
+fn compute_split(split: &Split, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    assert!(split.axis >= 0);
+    let axis = split.axis as usize;
+    assert_eq!(axis, inputs[0].dims().len() - 1);
+    let mut input = inputs[0].data::<f32>();
+    let _split = inputs[1].data::<i64>();
+
+    for output in outputs {
+        let output = output.data_mut::<f32>();
+        output.copy_from_slice(&input[0..output.len() as usize]);
+        input = &input[output.len() as usize..];
     }
 }
 

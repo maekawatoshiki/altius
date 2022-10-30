@@ -49,6 +49,7 @@ pub enum Op {
     Exp,
     Loop,
     Tile,
+    Split(Split),
     Slice,
     Gather(Gather),
     Shape(Shape),
@@ -147,6 +148,13 @@ pub struct ReduceMin {
 pub struct ReduceMean {
     pub axes: Vec<i64>,
     pub keep_dims: bool,
+}
+
+/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Split
+/// Only opset version 13 is supported.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Split {
+    pub axis: i64,
 }
 
 /// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Gather
@@ -371,6 +379,7 @@ impl Op {
             Op::Exp => "Exp",
             Op::Loop => "Loop",
             Op::Tile => "Tile",
+            Op::Split(_) => "Split",
             Op::Slice => "Slice",
             Op::Gather(_) => "Gather",
             Op::Shape(_) => "Shape",
@@ -694,6 +703,9 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
                 dims.into(),
                 inputs[Node::TILE_IN].elem_ty(),
             ));
+        }
+        Op::Split(_) => {
+            todo!()
         }
         Op::Slice => {
             let in_data_dims = inputs[Node::SLICE_IN_DATA].dims();

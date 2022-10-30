@@ -252,6 +252,7 @@ impl<'a> Interpreter<'a> {
             Op::BatchNormalization(ref batchnorm) => {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
+            Op::Split(_) => todo!("Split"),
             Op::Slice => compute_slice(node, &inputs, &mut outputs),
             Op::Gather(ref gather) => compute_gather(gather, &inputs, &mut outputs),
             Op::Shape(_) => todo!("shape"),

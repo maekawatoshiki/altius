@@ -32,6 +32,7 @@ pub enum Op {
     Sigmoid,
     Erf,
     Clip,
+    Where,
     Softmax(Softmax),
     Cast(Cast),
     MaxPool(MaxPool),
@@ -362,6 +363,7 @@ impl Op {
             Op::Sigmoid => "Sigmoid",
             Op::Erf => "Erf",
             Op::Clip => "Clip",
+            Op::Where => "Where",
             Op::Softmax(_) => "Softmax",
             Op::Cast(_) => "Cast",
             Op::MaxPool(_) => "MaxPool",
@@ -453,6 +455,12 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             let y = inputs[1].dims();
             let shape = x.broadcast(y).unwrap();
             shapes.push(TypedShape::new(shape, inputs[0].elem_ty()));
+        }
+        Op::Where => {
+            let x = inputs[1].dims();
+            let y = inputs[2].dims();
+            let shape = x.broadcast(y).unwrap();
+            shapes.push(TypedShape::new(shape, inputs[1].elem_ty()));
         }
         Op::MaxPool(maxpool) => {
             let auto_pad = &maxpool.auto_pad;

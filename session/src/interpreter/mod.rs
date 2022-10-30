@@ -236,6 +236,7 @@ impl<'a> Interpreter<'a> {
             Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
             Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
+            Op::Where => todo!("Where"),
             Op::Softmax(ref softmax) => compute_softmax(&self.tctx, softmax, &inputs, &mut outputs),
             Op::Resize(ref resize) => compute_resize(&self.tctx, resize, &inputs, &mut outputs),
             Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),

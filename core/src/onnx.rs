@@ -215,7 +215,8 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
             }),
             "Unsqueeze" => Op::Unsqueeze(Unsqueeze {
-                axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
+                axes: get_attribute(&node.attribute, "axes")
+                    .map_or_else(|| vec![], |a| a.ints.clone()),
             }),
             "ReduceMin" => Op::ReduceMin(ReduceMin {
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),

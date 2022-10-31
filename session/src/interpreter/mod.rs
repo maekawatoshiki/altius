@@ -237,7 +237,7 @@ impl<'a> Interpreter<'a> {
             Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Tanh => compute_tanh(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
-            Op::Where => todo!("Where"),
+            Op::Where => compute_where(&inputs, &mut outputs),
             Op::Softmax(ref softmax) => compute_softmax(&self.tctx, softmax, &inputs, &mut outputs),
             Op::Resize(ref resize) => compute_resize(&self.tctx, resize, &inputs, &mut outputs),
             Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
@@ -1264,6 +1264,44 @@ fn compute_tanh(inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let output = outputs[0].data_mut::<f32>();
     output.copy_from_slice(input);
     tanh(output);
+}
+
+fn compute_where(inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let condition = inputs[0];
+    let x = inputs[1];
+    let y = inputs[2];
+    let output = &mut outputs[0];
+
+    assert!(y.dims().is_scalar());
+    assert!(
+        x.dims().len() == 4
+            && condition.dims().len() == 4
+            && condition.dims()[0] == 1
+            && condition.dims()[1] == 1
+    );
+
+    let out0 = output.dims()[0];
+    let out1 = output.dims()[1];
+    let out2 = output.dims()[2];
+    let out3 = output.dims()[3];
+    let mut x = x.data::<f32>();
+    let y = y.data::<f32>()[0];
+    let condition = condition.data::<bool>();
+    let mut output = output.data_mut::<f32>();
+
+    for _o0 in 0..out0 {
+        for _o1 in 0..out1 {
+            for ((&c, &x), o) in condition
+                .iter()
+                .zip(x[..out2 * out3].iter())
+                .zip(output[..out2 * out3].iter_mut())
+            {
+                *o = if c { x } else { y };
+            }
+            x = &x[out2 * out3..];
+            output = &mut output[out2 * out3..];
+        }
+    }
 }
 
 fn compute_softmax(

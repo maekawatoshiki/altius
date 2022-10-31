@@ -1610,13 +1610,24 @@ fn compute_split(split: &Split, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     assert!(split.axis >= 0);
     let axis = split.axis as usize;
     assert_eq!(axis, inputs[0].dims().len() - 1);
-    let mut input = inputs[0].data::<f32>();
-    let _split = inputs[1].data::<i64>();
+    assert_eq!(inputs[0].dims().len(), 3);
+    assert_eq!(inputs[0].dims()[1], 100);
+    let axis_len = *inputs[0].dims().as_slice().last().unwrap();
+    let input = inputs[0].data::<f32>();
+    let split = inputs[1].data::<i64>();
+    assert!(
+        split.windows(2).all(|w| w[0] == w[1]),
+        "All split lengths must be the same."
+    );
+    let split = split[0] as usize;
 
-    for output in outputs {
-        let output = output.data_mut::<f32>();
-        output.copy_from_slice(&input[0..output.len() as usize]);
-        input = &input[output.len() as usize..];
+    let mut offset = 0;
+    for input in input.chunks(axis_len) {
+        for (input, output) in input[0..axis_len].chunks(split).zip(outputs.iter_mut()) {
+            let output = output.data_mut::<f32>();
+            output[offset..offset + input.len()].copy_from_slice(&input);
+        }
+        offset += split;
     }
 }
 

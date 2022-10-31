@@ -1505,10 +1505,11 @@ fn compute_cast(cast: &Cast, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             input.data::<i64>().iter().map(|x| *x as i32).collect(),
         );
     } else if input.elem_ty().is_i64() && cast.to.is_f32() {
-        *output = Tensor::new(
-            output.dims().clone(),
-            input.data::<i64>().iter().map(|x| *x as f32).collect(),
-        );
+        let input = input.data::<i64>();
+        let output = output.data_mut::<f32>();
+        for (i, o) in input.iter().zip(output.iter_mut()) {
+            *o = *i as f32;
+        }
     } else {
         todo!()
     }

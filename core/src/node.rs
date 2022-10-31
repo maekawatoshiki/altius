@@ -853,7 +853,6 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         | Op::Erf
         | Op::Tanh
         | Op::Clip
-        | Op::Cast(_)
         | Op::HardSigmoid(_)
         | Op::Round
         | Op::Exp
@@ -861,6 +860,10 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
         | Op::BatchNormalization(_) => {
             let input = inputs[0];
             shapes.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
+        }
+        Op::Cast(cast) => {
+            let input = inputs[0];
+            shapes.push(TypedShape::new(input.dims().clone(), cast.to));
         }
     }
     shapes

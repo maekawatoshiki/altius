@@ -104,7 +104,9 @@ impl PySession {
         {
             let arr =
                 ArrayD::from_shape_vec(out.dims().as_slice().to_vec(), out.data::<f32>().to_vec())
-                    .map_err(|_| PyRuntimeError::new_err("Failed to create output array"))?;
+                    .map_err(|e| {
+                        PyRuntimeError::new_err(format!("Failed to create output array: {:?}", e))
+                    })?;
             outputs.push(PyArrayDyn::from_array(py, &arr))
         }
         Ok(outputs)

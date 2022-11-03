@@ -317,7 +317,7 @@ impl Tensor {
             Some(new_stride.into())
         }
 
-        upcast(&dims, &self.dims.as_slice(), &self.stride.as_slice())
+        upcast(dims, self.dims.as_slice(), self.stride.as_slice())
     }
 }
 

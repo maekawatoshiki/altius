@@ -1743,10 +1743,9 @@ fn infer_shapes(
 
     for &val_id in &model.inputs {
         let shape = &model.values.inner()[val_id].shape;
-        if let Some(shape) = shape {
-            let tensor = Tensor::zeros_of_type(shape.elem_ty, shape.dims.clone());
-            values.insert(val_id, tensor);
-        }
+        let Some(shape) = shape else { continue };
+        let tensor = Tensor::zeros_of_type(shape.elem_ty, shape.dims.clone());
+        values.insert(val_id, tensor);
     }
 
     for &node in sorted_nodes {
@@ -1764,11 +1763,7 @@ fn infer_shape(
     let mut op = node.op.clone();
     let mut inputs = vec![];
     for input in &node.inputs {
-        let input = if let Some(input) = values.get(input) {
-            input
-        } else {
-            return;
-        };
+        let Some(input) = values.get(input) else { return };
         inputs.push(input);
     }
     let output_shapes = compute_output_shapes(&mut op, &inputs, model.opset_version);

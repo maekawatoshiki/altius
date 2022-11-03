@@ -119,7 +119,7 @@ def op_elemwise(filepath, op_type, shape, **kwargs):
     model = helper.make_model(graph)
 
     onnx.save(model, filepath)
-    ort_sess = ort.InferenceSession(filepath)
+    ort_sess = ort.InferenceSession(filepath, providers=["CPUExecutionProvider"])
     altius_sess = altius_py.InferenceSession(filepath)
 
     x = np.random.random_sample(shape).astype(np.float32)

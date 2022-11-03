@@ -22,6 +22,8 @@ include!(concat!(env!("OUT_DIR"), "/onnx.rs"));
 pub enum ModelLoadError {
     Io(#[from] io::Error),
     NoGraph,
+    DuplicateOpset,
+    UnknownOpsetVersion,
     Todo(Cow<'static, str>),
 }
 
@@ -40,6 +42,20 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
     let mut model = Model::default();
 
     let mut name_to_val = FxHashMap::default();
+
+    let mut opset_version = None;
+    for opset_import in &model_proto.opset_import {
+        match opset_import.domain() {
+            "" if opset_version.is_none() => opset_version = Some(opset_import.version()),
+            "" => return Err(ModelLoadError::DuplicateOpset),
+            domain => {
+                return Err(ModelLoadError::Todo(
+                    format!("Custom domain ('{domain}') not supported yet").into(),
+                ))
+            }
+        }
+    }
+    model.opset_version = opset_version.ok_or(ModelLoadError::DuplicateOpset)?;
 
     // Load initializers.
     for init in graph.initializer.iter() {

@@ -71,13 +71,12 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
         let val = x.r#type.as_ref().unwrap().value.as_ref().unwrap();
         let mut dims = vec![];
         let mut is_dynamic_shape = false;
-        let tensor = if let type_proto::Value::TensorType(tensor) = val {
-            tensor
-        } else {
+        let type_proto::Value::TensorType(tensor) = val else {
             return Err(ModelLoadError::Todo(
                 "Graph input must be tensor type".into(),
             ));
         };
+
         for d in tensor
             .shape
             .as_ref()
@@ -86,14 +85,13 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             .iter()
             .map(|d| d.value.as_ref().unwrap())
         {
-            match d {
-                tensor_shape_proto::dimension::Value::DimValue(i) => dims.push(*i),
-                _ => {
-                    is_dynamic_shape = true;
-                    break;
-                }
-            }
+            let tensor_shape_proto::dimension::Value::DimValue(i) = d else {
+                is_dynamic_shape = true;
+                break
+            };
+            dims.push(*i)
         }
+
         let input = if is_dynamic_shape {
             *name_to_val
                 .entry(x.name())
@@ -109,6 +107,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 )
             })
         };
+
         model.inputs.push(input);
     }
 
@@ -237,7 +236,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             }),
             "Unsqueeze" => Op::Unsqueeze(Unsqueeze {
                 axes: get_attribute(&node.attribute, "axes")
-                    .map_or_else(|| vec![], |a| a.ints.clone()),
+                    .map_or_else(Vec::new, |a| a.ints.clone()),
             }),
             "ReduceMin" => Op::ReduceMin(ReduceMin {
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),

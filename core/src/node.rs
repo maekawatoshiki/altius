@@ -712,7 +712,7 @@ pub fn compute_output_shapes(
             let reps = inputs[Node::TILE_REPEATS].data::<i64>();
             let mut dims = vec![];
             for (i, &x) in in_dims.as_slice().iter().enumerate() {
-                dims.push(x * reps[i as usize] as usize);
+                dims.push(x * reps[i] as usize);
             }
             shapes.push(TypedShape::new(
                 dims.into(),

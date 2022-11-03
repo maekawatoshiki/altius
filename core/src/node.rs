@@ -399,7 +399,11 @@ impl Op {
 
 /// Computes the output shape for `op`.
 /// `op` could be overwritten. (e.g. paddings given auto_pad)
-pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape> {
+pub fn compute_output_shapes(
+    op: &mut Op,
+    inputs: &[&Tensor],
+    opset_version: i64,
+) -> Vec<TypedShape> {
     let mut shapes = vec![];
     match op {
         Op::Conv2d(conv) => {
@@ -621,7 +625,8 @@ pub fn compute_output_shapes(op: &mut Op, inputs: &[&Tensor]) -> Vec<TypedShape>
             ))
         }
         Op::Unsqueeze(unsqueeze) => {
-            if unsqueeze.axes.is_empty() {
+            if opset_version >= 13 {
+                // axes is no longer an attribute but node input.
                 let in_dims = inputs[0].dims().as_slice().to_vec();
                 let axes = inputs[1].data::<i64>();
                 let mut dims = in_dims;

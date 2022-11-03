@@ -1771,7 +1771,7 @@ fn infer_shape(
         };
         inputs.push(input);
     }
-    let output_shapes = compute_output_shapes(&mut op, &inputs);
+    let output_shapes = compute_output_shapes(&mut op, &inputs, model.opset_version);
     let mut outputs = vec![];
     for shape in &output_shapes {
         outputs.push(Tensor::empty_of_type(shape.elem_ty, shape.dims.clone()));

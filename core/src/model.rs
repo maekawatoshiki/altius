@@ -12,6 +12,7 @@ pub struct Model {
     pub inits: FxHashMap<ValueId, Tensor>,
     pub inputs: Vec<ValueId>,
     pub outputs: Vec<ValueId>,
+    pub opset_version: i64,
 }
 
 impl Model {

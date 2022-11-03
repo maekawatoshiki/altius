@@ -30,7 +30,7 @@ def op_concat(filepath, shape_x, shape_y, shape_z, **kwargs):
     model = helper.make_model(graph)
 
     onnx.save(model, filepath)
-    ort_sess = ort.InferenceSession(filepath)
+    ort_sess = ort.InferenceSession(filepath, providers=["CPUExecutionProvider"])
     altius_sess = altius_py.InferenceSession(filepath)
 
     x = np.random.random_sample(shape_x).astype(np.float32)

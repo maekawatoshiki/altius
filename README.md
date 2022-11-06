@@ -5,6 +5,8 @@
 
 Small DNN runtime written in Rust
 
+Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) and [discussions](https://github.com/maekawatoshiki/altius/discussions)
+
 # Requirements
 
 - [git-lfs](https://github.com/git-lfs/git-lfs) to pull ONNX models
@@ -12,26 +14,24 @@ Small DNN runtime written in Rust
 
 # Run
 
-- First of all, to download large models, run `cd models && ./download.sh`.
-- Use `./run.sh` to run examples (e.g. `./run.sh {mnist, mobilenet, vit}`)
-  - For `vit` (vision transformer) example, you can specify the number of threads for computation in `./session/examples/vit.rs`.
-  - You can manually run examples by the following commands.
-
 ```sh
-export RUST_LOG=debug
-cargo run --release --example mnist
-cargo run --release --example mobilenet
-cargo run --release --example mobilenet --features cuda # -- --profile
-NO_AFFINITY=1 OPENBLAS_NUM_THREADS=8 cargo run --release --example mobilenet --features openblas # -- --profile
-BLIS_NUM_THREADS=8 cargo run --release --example vit --features blis
-cargo run --release --example mobilenet --features accelerate # for macOS
-```
+# Download large models.
+(cd models && ./download.sh)
 
-- Recommend to use `blis` feature and set `GOMP_CPU_AFFINITY='0-31' BLIS_NUM_THREADS=32` (adjust the number of cores for your machine) for better performance
+# Run examples.
+# {mnist, mobilenet, vit} are available.
+./run.sh mnist
+./run.sh mobilenet
+./run.sh vit # You can specify the number of threads in ./session/examples/vit.rs
+
+# For macOS, you can use 'accelerate' library.
+RUSTFLAGS="-C target-cpu=native" \
+    cargo run --release --example mobilenet --features accelerate
+```
 
 # Run from WebAssembly
 
-- Currently, mobilenet v3 runs on web browsers.
+Currently, mobilenet v3 runs on web browsers.
 
 ```sh
 cd wasm

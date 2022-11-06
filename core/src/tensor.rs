@@ -1,4 +1,4 @@
-use std::{cell::RefCell, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, iter::Sum, sync::Arc};
 
 use crate::dim::{Dimension, Dimensions};
 use rand::{
@@ -21,6 +21,16 @@ pub struct Tensor {
 pub struct TypedShape {
     pub dims: Dimensions,
     pub elem_ty: TensorElemType,
+}
+
+#[derive(Debug)]
+pub struct Statistics<T>
+where
+    T: TensorElemTypeExt,
+{
+    pub max: T,
+    pub min: T,
+    pub mean: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -341,6 +351,24 @@ impl Tensor {
         }
 
         upcast(dims, self.dims.as_slice(), self.stride.as_slice())
+    }
+
+    pub fn statistics<'a, T>(&'a self) -> Statistics<T>
+    where
+        T: TensorElemTypeExt + Sum<&'a T> + 'a + Into<f64>,
+    {
+        let data = self.data::<T>();
+        Statistics {
+            max: *data
+                .iter()
+                .max_by(|x, y| x.partial_cmp(&y).unwrap_or(Ordering::Equal))
+                .unwrap_or(&T::zero()),
+            min: *data
+                .iter()
+                .min_by(|x, y| x.partial_cmp(&y).unwrap_or(Ordering::Equal))
+                .unwrap_or(&T::zero()),
+            mean: data.iter().sum::<T>().into() / data.len() as f64,
+        }
     }
 }
 

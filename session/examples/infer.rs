@@ -1,6 +1,6 @@
 use altius_core::onnx::load_onnx;
 use altius_core::optimize::gelu_fusion::fuse_gelu;
-use altius_core::tensor::Tensor;
+use altius_core::tensor::{Tensor, TensorElemType};
 use altius_session::interpreter::Interpreter;
 use std::path::PathBuf;
 use std::process::exit;
@@ -56,7 +56,7 @@ fn main() {
         let input = &model.values.inner()[input_id];
         let name = input.name.as_ref().map(String::as_str).unwrap_or("");
         let Some(shape) = input.shape.as_ref() else {
-            log::info!("failed to feed input({i}, name={name}): unknown shape");
+            log::error!("failed to feed input({i}, name={name}): unknown shape (or dynamic shape?)");
             exit(1);
         };
 
@@ -76,7 +76,7 @@ fn main() {
     let outputs = match sess.run(inputs) {
         Ok(outputs) => outputs,
         Err(e) => {
-            log::info!("inference failed: {:?}", e);
+            log::error!("inference failed: {:?}", e);
             exit(1);
         }
     };
@@ -87,6 +87,23 @@ fn main() {
             .as_ref()
             .map(String::as_str)
             .unwrap_or("");
-        log::info!("output({i}, name={}, shape={:?}): ...", name, output.dims());
+        // TODO: Dirty.
+        let stat = match output.elem_ty() {
+            TensorElemType::F32 => {
+                format!("{:?}", output.statistics::<f32>())
+            }
+            TensorElemType::I32 => {
+                format!("{:?}", output.statistics::<i32>())
+            }
+            TensorElemType::I64 => "no stats".to_string(),
+            TensorElemType::Bool => "no stats".to_string(),
+        };
+        log::info!(
+            "output({i}, name={}, ty={:?}, shape={:?}): {}",
+            name,
+            output.elem_ty(),
+            output.dims(),
+            stat
+        );
     }
 }

@@ -34,7 +34,6 @@ jobs:
             export LLVM_PROFILE_FILE="coverage-%p-%m.profraw" && \
             rustup component add llvm-tools-preview && \
             cargo install grcov && \
-            cargo test --release && \
             cargo test --release --features blis && \
             cargo run --release --features blis --example mnist && \
             cargo run --release --features blis --example mobilenet && \

@@ -20,7 +20,7 @@ pub fn fast_exp(output: &mut [f32], input: &[f32]) {
     const MINIMUM_EXPONENT: i32 = -1056964608i32;
     const MAXIMUM_EXPONENT: i32 = 0x3F800000i32;
 
-    const SIMD_LEN: usize = 4;
+    const SIMD_LEN: usize = 8;
 
     assert_eq!(input.len(), output.len());
 

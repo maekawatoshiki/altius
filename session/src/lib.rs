@@ -1,4 +1,5 @@
 #![feature(portable_simd)]
+#![feature(int_roundings)]
 
 pub mod interpreter;
 pub mod wgpu;

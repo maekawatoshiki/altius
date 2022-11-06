@@ -1732,7 +1732,7 @@ fn compute_flatten(_flatten: &Flatten, inputs: &[&Tensor], outputs: &mut [Tensor
 // TODO: Better move to another file.
 /// Infer `TypedShape`s of output tensors for each node.
 /// It skips to infer on nodes without information for inference.
-fn infer_shapes(
+pub(super) fn infer_shapes(
     model: &Model,
     sorted_nodes: &[NodeId],
     shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,

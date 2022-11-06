@@ -372,11 +372,12 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let adims = input_a.dims();
     let bdims = input_b.dims();
 
+    const SIMD_LEN: usize = 8;
+
     if adims == bdims {
         let input_a = input_a.data::<f32>();
         let input_b = input_b.data::<f32>();
         let output = output.data_mut::<f32>();
-        const SIMD_LEN: usize = 4;
         let chunk = 100000;
 
         tctx.scope(|scope| {
@@ -481,7 +482,6 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let output = output.data_mut::<f32>();
     let blen = *bdims.as_slice().last().unwrap();
     let batch = (100000 / blen).max(1);
-    const SIMD_LEN: usize = 4;
 
     tctx.scope(|scope| {
         input_a
@@ -621,13 +621,13 @@ fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_a = inputs[Node::SUB_IN_A];
     let input_b = inputs[Node::SUB_IN_B];
     let output = &mut outputs[Node::SUB_OUT];
+    const SIMD_LEN: usize = 8;
 
     if input_a.dims() == input_b.dims() {
         let mut input_a = input_a.data::<f32>();
         let mut input_b = input_b.data::<f32>();
         let mut output = output.data_mut::<f32>();
         let mut len = output.len();
-        const SIMD_LEN: usize = 4;
 
         while len >= SIMD_LEN {
             let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
@@ -648,8 +648,6 @@ fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     }
 
     if input_a.dims().is_scalar() {
-        const SIMD_LEN: usize = 4;
-
         let input_a = input_a.data::<f32>()[0];
         let mut input_b = input_b.data::<f32>();
         let mut output = output.data_mut::<f32>();
@@ -808,7 +806,7 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_b = inputs[Node::MUL_IN_B];
     let output = &mut outputs[Node::MUL_OUT];
 
-    const SIMD_LEN: usize = 4;
+    const SIMD_LEN: usize = 8;
 
     if input_a.dims() == input_b.dims() {
         let mut input_a = input_a.data::<f32>();
@@ -1192,7 +1190,7 @@ fn tanh(mut data: &mut [f32]) {
     const BETA_2: f32 = 2.26843463243900e-03f32;
     const BETA_0: f32 = 4.89352518554385e-03f32;
 
-    const SIMD_LEN: usize = 4;
+    const SIMD_LEN: usize = 8;
 
     let mut len = data.len();
 
@@ -1351,7 +1349,7 @@ fn compute_softmax(
 }
 
 fn fast_sum(mut slice: &[f32]) -> f32 {
-    const SIMD_LEN: usize = 4;
+    const SIMD_LEN: usize = 8;
     let mut sum = Simd::<f32, SIMD_LEN>::splat(0f32);
     let mut len = slice.len();
 

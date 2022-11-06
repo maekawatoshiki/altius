@@ -135,6 +135,29 @@ impl Tensor {
         )
     }
 
+    pub fn rand_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
+        fn new<T>(total_elems: usize) -> Vec<T>
+        where
+            T: TensorElemTypeExt,
+            Standard: Distribution<T>,
+        {
+            RNG.with(|r| {
+                (&mut *r.borrow_mut())
+                    .sample_iter(Standard)
+                    .take(total_elems)
+                    .collect::<Vec<T>>()
+            })
+        }
+
+        let total_elems = dims.total_elems();
+        match ty {
+            TensorElemType::Bool => Self::new(dims, new::<bool>(total_elems)),
+            TensorElemType::F32 => Self::new(dims, new::<f32>(total_elems)),
+            TensorElemType::I32 => Self::new(dims, new::<i32>(total_elems)),
+            TensorElemType::I64 => Self::new(dims, new::<i64>(total_elems)),
+        }
+    }
+
     pub fn seed_rng_from_u64(seed: u64) {
         RNG.with(|r| *r.borrow_mut() = StdRng::seed_from_u64(seed));
     }

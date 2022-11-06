@@ -5,8 +5,14 @@ use std::{
 
 pub type Dimension = usize;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
 pub struct Dimensions(pub Vec<Dimension>);
+
+impl std::fmt::Debug for Dimensions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
 
 impl Dimensions {
     pub fn len(&self) -> usize {

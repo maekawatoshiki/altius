@@ -4,6 +4,7 @@ use opencl3::{
     context::Context,
     device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU},
 };
+use rustc_hash::FxHashMap;
 
 use crate::SessionError;
 
@@ -52,11 +53,59 @@ impl<'a> OpenclSessionBuilder<'a> {
             SessionError::Message(format!("Failed to create command queue: {}", e.to_string()))
         })?;
 
+        // let buffer =
+        // memory::create_buffer(context.get(), flags, count * mem::size_of::<T>(), host_ptr)?;
+        // let a = unsafe {
+        // memory::create_buffer(context.get(), CL_MEM_READ_ONLY, 4 * 100, ptr::null_mut())
+        // }
+        // .unwrap();
+        // let mut sums = vec![1.0; 100];
+        // let _event = unsafe {
+        //     enqueue_read_buffer(
+        //         queue.get(),
+        //         a,
+        //         CL_BLOCKING,
+        //         0,
+        //         4 * 100,
+        //         sums.as_mut_ptr() as *mut _,
+        //         0,
+        //         ptr::null(),
+        //     )
+        //     .unwrap()
+        // };
+        // pub unsafe fn enqueue_read_buffer<T>(
+        //     &self,
+        //     buffer: &Buffer<T>,
+        //     blocking_read: cl_bool,
+        //     offset: size_t,
+        //     data: &mut [T],
+        //     event_wait_list: &[cl_event],
+        // ) -> Result<Event> {
+        //     let event = enqueue_read_buffer(
+        //         self.queue,
+        //         buffer.get(),
+        //         blocking_read,
+        //         offset,
+        //         (data.len() * mem::size_of::<T>()) as size_t,
+        //         data.as_mut_ptr() as cl_mem,
+        //         event_wait_list.len() as cl_uint,
+        //         if !event_wait_list.is_empty() {
+        //             event_wait_list.as_ptr()
+        //         } else {
+        //             ptr::null()
+        //         },
+        //     )?;
+        //     Ok(Event::new(event))
+        // Ok(Event::new(event))
+
+        // TODO: Actual compilation performs here...
+
         Ok(OpenclSession {
             model,
             device,
             context,
             queue,
+            values: FxHashMap::default(),
         })
 
         //
@@ -84,9 +133,9 @@ impl<'a> OpenclSessionBuilder<'a> {
         //             println!("cpu: {:?}", start.elapsed());
         //
         //             // Create OpenCL device buffers
-        //             let mut x = unsafe {
-        //                 Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, ARRAY_SIZE, ptr::null_mut())?
-        //             };
+        // let mut x = unsafe {
+        //     Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, ARRAY_SIZE, ptr::null_mut())?
+        // };
         //             let mut y = unsafe {
         //                 Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, ARRAY_SIZE, ptr::null_mut())?
         //             };

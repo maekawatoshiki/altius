@@ -1,5 +1,8 @@
-use altius_core::model::Model;
+use altius_core::{model::Model, value::ValueId};
 use opencl3::{command_queue::CommandQueue, context::Context, device::Device};
+use rustc_hash::FxHashMap;
+
+use super::tensor::OpenclTensor;
 
 pub struct OpenclSession<'a> {
     /// Model
@@ -17,6 +20,10 @@ pub struct OpenclSession<'a> {
     /// OpenCL queue
     #[allow(dead_code)] // TODO: Remove later.
     pub(super) queue: CommandQueue,
+
+    /// Mapping from `ValueId` to `OpenclTensor`
+    #[allow(dead_code)] // TODO: Remove later.
+    pub(super) values: FxHashMap<ValueId, OpenclTensor>,
 }
 
 impl<'a> OpenclSession<'a> {}

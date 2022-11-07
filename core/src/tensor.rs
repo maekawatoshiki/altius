@@ -298,6 +298,10 @@ impl Tensor {
         }
     }
 
+    pub fn data_as_ptr(&self) -> *const u8 {
+        self.data.as_ptr()
+    }
+
     pub fn copy_data_from(&mut self, other: &Self) {
         self.data = other.data.clone()
     }

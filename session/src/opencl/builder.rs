@@ -205,7 +205,7 @@ impl<'a> OpenclSessionBuilder<'a> {
             device,
             context,
             queue,
-            values: FxHashMap::default(),
+            values,
             execution_plans,
         })
 
@@ -376,8 +376,14 @@ fn test_build_add() {
     model.inputs.push(in_1);
     model.outputs.push(out);
 
-    let _ = OpenclSessionBuilder::new()
+    let sess = OpenclSessionBuilder::new()
         .with_model(&model)
         .build()
         .unwrap();
+
+    let x = Tensor::rand::<f32>(vec![8, 8].into());
+    let y = Tensor::rand::<f32>(vec![8, 8].into());
+    let z = sess.run(vec![(in_0, x), (in_1, y)]);
+
+    println!("{:?}", z);
 }

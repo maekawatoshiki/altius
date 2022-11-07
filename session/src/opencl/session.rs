@@ -1,5 +1,13 @@
+use std::ptr;
+
 use altius_core::{model::Model, node::NodeId, tensor::Tensor, value::ValueId};
-use opencl3::{command_queue::CommandQueue, context::Context, device::Device, kernel::Kernel};
+use opencl3::{
+    command_queue::{enqueue_read_buffer, CommandQueue},
+    context::Context,
+    device::Device,
+    kernel::Kernel,
+    types::CL_BLOCKING,
+};
 use rustc_hash::FxHashMap;
 
 use crate::SessionError;
@@ -40,7 +48,26 @@ pub(super) struct ExecutionPlan {
 }
 
 impl<'a> OpenclSession<'a> {
-    pub fn run(&self, _inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
-        todo!()
+    pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
+        for (input_id, input) in inputs {
+            let val = &self.values[&input_id];
+
+            let _event = unsafe {
+                enqueue_read_buffer(
+                    self.queue.get(),
+                    val.buf,
+                    CL_BLOCKING,
+                    0,
+                    val.tensor.elem_ty().size() * val.tensor.dims().total_elems(),
+                    input.data_as_ptr() as *mut _,
+                    0,
+                    ptr::null(),
+                )
+                .unwrap()
+            };
+        }
+
+        Ok(vec![])
+        // todo!()
     }
 }

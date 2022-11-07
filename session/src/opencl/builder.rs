@@ -6,12 +6,13 @@ use altius_core::{
     tensor::{Tensor, TypedShape},
 };
 use opencl3::{
-    command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE},
+    command_queue::{enqueue_read_buffer, CommandQueue, CL_QUEUE_PROFILING_ENABLE},
     context::Context,
     device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU},
     kernel::Kernel,
     memory::{self, CL_MEM_READ_ONLY, CL_MEM_READ_WRITE},
     program::Program,
+    types::CL_BLOCKING,
 };
 use rustc_hash::FxHashMap;
 
@@ -79,6 +80,21 @@ impl<'a> OpenclSessionBuilder<'a> {
                 )
             }
             .map_err(|e| SessionError::Message(format!("Failed to create buffer: {e:?}")))?;
+
+            let _event = unsafe {
+                enqueue_read_buffer(
+                    queue.get(),
+                    buf,
+                    CL_BLOCKING,
+                    0,
+                    tensor.elem_ty().size() * tensor.dims().total_elems(),
+                    tensor.data_as_ptr() as *mut _,
+                    0,
+                    ptr::null(),
+                )
+                .unwrap()
+            };
+
             values.insert(init_id, OpenclTensor { tensor, buf });
         }
 
@@ -126,9 +142,10 @@ impl<'a> OpenclSessionBuilder<'a> {
                     .as_slice(),
                 model.opset_version,
             );
-            let mut outputs = vec![];
 
-            for TypedShape { elem_ty, dims } in output_shapes {
+            for (TypedShape { elem_ty, dims }, &output_id) in
+                output_shapes.into_iter().zip(node.outputs.iter())
+            {
                 let buf = unsafe {
                     memory::create_buffer(
                         context.get(),
@@ -140,65 +157,22 @@ impl<'a> OpenclSessionBuilder<'a> {
                 .map_err(|e| {
                     SessionError::Message(format!("Failed to create buffer: {}", e.to_string()))
                 })?;
-                outputs.push(OpenclTensor {
-                    tensor: Tensor::empty_of_type(elem_ty, dims),
-                    buf,
-                })
+                values.insert(
+                    output_id,
+                    OpenclTensor {
+                        tensor: Tensor::empty_of_type(elem_ty, dims),
+                        buf,
+                    },
+                );
             }
 
+            // TODO: Actual compilation performs here...
             let kernel = match &node.op {
                 Op::Add => compile_add(&context)?,
                 op => todo!("{op:?}"),
             };
             execution_plans.push(ExecutionPlan { kernel, node_id });
         }
-
-        // let buffer =
-        // memory::create_buffer(context.get(), flags, count * mem::size_of::<T>(), host_ptr)?;
-        // let a = unsafe {
-        // memory::create_buffer(context.get(), CL_MEM_READ_ONLY, 4 * 100, ptr::null_mut())
-        // }
-        // .unwrap();
-        // let mut sums = vec![1.0; 100];
-        // let _event = unsafe {
-        //     enqueue_read_buffer(
-        //         queue.get(),
-        //         a,
-        //         CL_BLOCKING,
-        //         0,
-        //         4 * 100,
-        //         sums.as_mut_ptr() as *mut _,
-        //         0,
-        //         ptr::null(),
-        //     )
-        //     .unwrap()
-        // };
-        // pub unsafe fn enqueue_read_buffer<T>(
-        //     &self,
-        //     buffer: &Buffer<T>,
-        //     blocking_read: cl_bool,
-        //     offset: size_t,
-        //     data: &mut [T],
-        //     event_wait_list: &[cl_event],
-        // ) -> Result<Event> {
-        //     let event = enqueue_read_buffer(
-        //         self.queue,
-        //         buffer.get(),
-        //         blocking_read,
-        //         offset,
-        //         (data.len() * mem::size_of::<T>()) as size_t,
-        //         data.as_mut_ptr() as cl_mem,
-        //         event_wait_list.len() as cl_uint,
-        //         if !event_wait_list.is_empty() {
-        //             event_wait_list.as_ptr()
-        //         } else {
-        //             ptr::null()
-        //         },
-        //     )?;
-        //     Ok(Event::new(event))
-        // Ok(Event::new(event))
-
-        // TODO: Actual compilation performs here...
 
         Ok(OpenclSession {
             model,
@@ -208,105 +182,6 @@ impl<'a> OpenclSessionBuilder<'a> {
             values,
             execution_plans,
         })
-
-        //
-        //             // Create a command_queue on the Context's device
-        //             let queue = CommandQueue::create_default(&context, CL_QUEUE_PROFILING_ENABLE)
-        //                 .expect("CommandQueue::create_default failed");
-        //
-        //             // Build the OpenCL program source and create the kernel.
-        //             let program = Program::create_and_build_from_source(&context, PROGRAM_SOURCE, "")
-        //                 .expect("Program::create_and_build_from_source failed");
-        //             let kernel = Kernel::create(&program, KERNEL_NAME).expect("Kernel::create failed");
-        //
-        //             /////////////////////////////////////////////////////////////////////
-        //             // Compute data
-        //
-        //             // The input data
-        //             const ARRAY_SIZE: usize = 1 << 29;
-        //             // let ones: [cl_float; ARRAY_SIZE] = [1.0; ARRAY_SIZE];
-        //             let ones = vec![1.0; ARRAY_SIZE];
-        //             let mut sums = vec![0.0; ARRAY_SIZE];
-        //             let start = Instant::now();
-        //             for i in 0..ARRAY_SIZE {
-        //                 sums[i] = 1.0 + 1.0 * i as cl_float;
-        //             }
-        //             println!("cpu: {:?}", start.elapsed());
-        //
-        //             // Create OpenCL device buffers
-        // let mut x = unsafe {
-        //     Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, ARRAY_SIZE, ptr::null_mut())?
-        // };
-        //             let mut y = unsafe {
-        //                 Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, ARRAY_SIZE, ptr::null_mut())?
-        //             };
-        //             let z = unsafe {
-        //                 Buffer::<cl_float>::create(
-        //                     &context,
-        //                     CL_MEM_WRITE_ONLY,
-        //                     ARRAY_SIZE,
-        //                     ptr::null_mut(),
-        //                 )?
-        //             };
-        //
-        //             // Blocking write
-        //             let _x_write_event =
-        //                 unsafe { queue.enqueue_write_buffer(&mut x, cl_blocking, 0, &ones, &[])? };
-        //
-        //             // non-blocking write, wait for y_write_event
-        //             let y_write_event =
-        //                 unsafe { queue.enqueue_write_buffer(&mut y, cl_non_blocking, 0, &sums, &[])? };
-        //
-        //             // a value for the kernel function
-        //             let a: cl_float = 300.0;
-        //
-        //             // use the executekernel builder to set the kernel buffer and
-        //             // cl_float value arguments, before setting the one dimensional
-        //             // global_work_size for the call to enqueue_nd_range.
-        //             // unwraps the result to get the kernel execution event.
-        //             let kernel_event = unsafe {
-        //                 executekernel::new(&kernel)
-        //                     .set_arg(&z)
-        //                     .set_arg(&x)
-        //                     .set_arg(&y)
-        //                     .set_arg(&a)
-        //                     .set_global_work_size(array_size)
-        //                     .set_wait_event(&y_write_event)
-        //                     .enqueue_nd_range(&queue)?
-        //             };
-        //
-        //             let mut events: vec<cl_event> = vec::default();
-        //             events.push(kernel_event.get());
-        //
-        //             // create a results array to hold the results from the opencl device
-        //             // and enqueue a read command to read the device buffer into the array
-        //             // after the kernel event completes.
-        //             // let mut results: [cl_float; array_size] = [0.0; array_size];
-        //             let mut results = vec![0.0; array_size];
-        //             let start = instant::now();
-        //             let read_event = unsafe {
-        //                 queue.enqueue_read_buffer(&z, cl_non_blocking, 0, &mut results, &events)?
-        //             };
-        //
-        //             // wait for the read_event to complete.
-        //             read_event.wait()?;
-        //             println!("gpu {:?}", start.elapsed());
-        //
-        //             // output the first and last results
-        //             println!("results front: {}", results[0]);
-        //             println!("results back: {}", results[array_size - 1]);
-        //
-        //             // calculate the kernel duration, from the kernel_event
-        //             let start_time = kernel_event.profiling_command_start()?;
-        //             let end_time = kernel_event.profiling_command_end()?;
-        //             let duration = end_time - start_time;
-        //             println!(
-        //                 "kernel execution duration (ms): {}",
-        //                 duration as f64 / 1000. / 1000.0
-        //             );
-        //
-        //             ok(())
-        //         }
     }
 }
 
@@ -347,6 +222,7 @@ fn test_build() {
 
 #[test]
 fn test_build_add() {
+    use crate::interpreter::Interpreter;
     use altius_core::{
         node::{Node, Op},
         tensor::{TensorElemType, TypedShape},
@@ -358,17 +234,18 @@ fn test_build_add() {
 
     let mut model = Model::default();
 
+    let n = 1;
     let in_0 = model.values.new_val_named_and_shaped(
         "x".to_owned(),
-        TypedShape::new(vec![8, 8].into(), TensorElemType::F32),
+        TypedShape::new(vec![n, 1024, 8, 8].into(), TensorElemType::F32),
     );
     let in_1 = model.values.new_val_named_and_shaped(
         "y".to_owned(),
-        TypedShape::new(vec![8, 8].into(), TensorElemType::F32),
+        TypedShape::new(vec![n, 1024, 8, 8].into(), TensorElemType::F32),
     );
     let out = model.values.new_val_named_and_shaped(
         "z".to_owned(),
-        TypedShape::new(vec![8, 8].into(), TensorElemType::F32),
+        TypedShape::new(vec![n, 1024, 8, 8].into(), TensorElemType::F32),
     );
     model.add_node(Node::new(Op::Add).with_ins(vec![in_0, in_1]).with_out(out));
 
@@ -376,14 +253,33 @@ fn test_build_add() {
     model.inputs.push(in_1);
     model.outputs.push(out);
 
-    let sess = OpenclSessionBuilder::new()
+    let opencl_sess = OpenclSessionBuilder::new()
         .with_model(&model)
         .build()
         .unwrap();
+    let cpu_sess = Interpreter::new(&model);
 
-    let x = Tensor::rand::<f32>(vec![8, 8].into());
-    let y = Tensor::rand::<f32>(vec![8, 8].into());
-    let z = sess.run(vec![(in_0, x), (in_1, y)]);
+    let x = Tensor::rand::<f32>(vec![n, 1024, 8, 8].into());
+    let y = Tensor::rand::<f32>(vec![n, 1024, 8, 8].into());
+    let opencl_z = opencl_sess
+        .run(vec![(in_0, x.clone()), (in_1, y.clone())])
+        .unwrap();
+    let cpu_z = cpu_sess.run(vec![(in_0, x), (in_1, y)]).unwrap();
 
-    println!("{:?}", z);
+    assert!(allclose(opencl_z[0].data::<f32>(), cpu_z[0].data::<f32>()));
+}
+
+#[cfg(test)]
+fn allclose(x: &[f32], y: &[f32]) -> bool {
+    let atol = 1e-5;
+    let rtol = 1e-5;
+
+    if x.len() != y.len() {
+        return false;
+    }
+
+    x.iter().zip(y.iter()).all(|(x, y)| {
+        ((x - y).abs() <= (atol + rtol * y.abs()))
+            || (x.is_infinite() && y.is_infinite() && x.is_sign_positive() == y.is_sign_positive())
+    })
 }

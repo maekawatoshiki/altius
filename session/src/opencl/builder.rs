@@ -227,6 +227,7 @@ fn test_build_add() {
         node::{Node, Op},
         tensor::{TensorElemType, TypedShape},
     };
+    use std::time::Instant;
 
     if !is_opencl_supported() {
         return;
@@ -234,7 +235,7 @@ fn test_build_add() {
 
     let mut model = Model::default();
 
-    let n = 1;
+    let n = 8;
     let in_0 = model.values.new_val_named_and_shaped(
         "x".to_owned(),
         TypedShape::new(vec![n, 1024, 8, 8].into(), TensorElemType::F32),
@@ -264,7 +265,9 @@ fn test_build_add() {
     let opencl_z = opencl_sess
         .run(vec![(in_0, x.clone()), (in_1, y.clone())])
         .unwrap();
+    let start = Instant::now();
     let cpu_z = cpu_sess.run(vec![(in_0, x), (in_1, y)]).unwrap();
+    println!("cpu {:?}", start.elapsed());
 
     assert!(allclose(opencl_z[0].data::<f32>(), cpu_z[0].data::<f32>()));
 }

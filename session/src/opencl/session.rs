@@ -71,31 +71,27 @@ impl<'a> OpenclSession<'a> {
 
         for plan in &self.execution_plans {
             let node = &self.model.nodes[plan.node_id];
-            let mut inputs = vec![];
-            let mut outputs = vec![];
-            for &input in &node.inputs {
-                inputs.push(self.values[&input].buf);
-            }
+            let mut exec_kernel = ExecuteKernel::new(&plan.kernel);
+
             let mut size = 0;
-            assert!(node.outputs.len() == 1);
             for &output in &node.outputs {
                 let t = &self.values[&output].tensor;
-                size = t.dims().total_elems() * t.elem_ty().size();
-                outputs.push(self.values[&output].buf);
+                size = t.dims().total_elems();
+                unsafe { exec_kernel.set_arg(&self.values[&output].buf) };
             }
-            let max_size: usize = self.device.max_work_item_sizes().unwrap().iter().product();
-            assert!(size <= max_size);
 
-            let kernel_event = unsafe {
-                ExecuteKernel::new(&plan.kernel)
-                    .set_arg(&outputs[0])
-                    .set_arg(&inputs[0])
-                    .set_arg(&inputs[1])
-                    .set_global_work_size(size)
-                    .enqueue_nd_range(&self.queue)
+            for &input in &node.inputs {
+                unsafe { exec_kernel.set_arg(&self.values[&input].buf) };
             }
-            .unwrap();
-            events.push(kernel_event);
+
+            events.push(
+                unsafe {
+                    exec_kernel
+                        .set_global_work_size(size)
+                        .enqueue_nd_range(&self.queue)
+                }
+                .unwrap(),
+            );
         }
 
         let mut outputs = vec![];
@@ -104,7 +100,7 @@ impl<'a> OpenclSession<'a> {
             let val = &self.values[out_id];
             let out = Tensor::uninit_of_type(val.tensor.elem_ty(), val.tensor.dims().clone());
 
-            let event = unsafe {
+            let _event = unsafe {
                 enqueue_read_buffer(
                     self.queue.get(),
                     val.buf,
@@ -115,11 +111,10 @@ impl<'a> OpenclSession<'a> {
                     0,
                     ptr::null(),
                 )
-            };
-            if let Err(e) = event {
-                println!(">>>> {}", e.to_string());
-                todo!();
             }
+            .map_err(|e| {
+                SessionError::Message(format!("Failed to read buffer: {}", e.to_string()))
+            })?;
 
             outputs.push(out)
         }

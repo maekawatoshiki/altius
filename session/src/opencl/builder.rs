@@ -17,7 +17,10 @@ use rustc_hash::FxHashMap;
 
 use crate::SessionError;
 
-use super::{session::OpenclSession, tensor::OpenclTensor};
+use super::{
+    session::{ExecutionPlan, OpenclSession},
+    tensor::OpenclTensor,
+};
 
 #[derive(Default)]
 pub struct OpenclSessionBuilder<'a> {
@@ -43,7 +46,7 @@ impl<'a> OpenclSessionBuilder<'a> {
         let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
             .map_err(|e| SessionError::Message(format!("Failed to get device: {}", e.to_string())))?
             .first()
-            .unwrap();
+            .ok_or_else(|| SessionError::Message("No device found".into()))?;
         let device = Device::new(device_id);
 
         let context = Context::from_device(&device).map_err(|e| {
@@ -103,7 +106,7 @@ impl<'a> OpenclSessionBuilder<'a> {
             values.insert(input_id, OpenclTensor { tensor, buf });
         }
 
-        let mut kernels = vec![];
+        let mut execution_plans = vec![];
 
         for node_id in sorted_nodes {
             let node = &model.nodes[node_id];
@@ -143,10 +146,11 @@ impl<'a> OpenclSessionBuilder<'a> {
                 })
             }
 
-            kernels.push(match &node.op {
+            let kernel = match &node.op {
                 Op::Add => compile_add(&context)?,
                 op => todo!("{op:?}"),
-            });
+            };
+            execution_plans.push(ExecutionPlan { kernel, node_id });
         }
 
         // let buffer =
@@ -202,6 +206,7 @@ impl<'a> OpenclSessionBuilder<'a> {
             context,
             queue,
             values: FxHashMap::default(),
+            execution_plans,
         })
 
         //
@@ -327,10 +332,7 @@ kernel void add(global float *out,
 #[test]
 fn test_build() {
     let model = Model::default();
-    let _ = OpenclSessionBuilder::new()
-        .with_model(&model)
-        .build()
-        .unwrap();
+    let _ = OpenclSessionBuilder::new().with_model(&model).build();
 }
 
 #[test]

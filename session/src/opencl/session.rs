@@ -1,6 +1,8 @@
-use altius_core::{model::Model, value::ValueId};
-use opencl3::{command_queue::CommandQueue, context::Context, device::Device};
+use altius_core::{model::Model, node::NodeId, tensor::Tensor, value::ValueId};
+use opencl3::{command_queue::CommandQueue, context::Context, device::Device, kernel::Kernel};
 use rustc_hash::FxHashMap;
+
+use crate::SessionError;
 
 use super::tensor::OpenclTensor;
 
@@ -24,6 +26,21 @@ pub struct OpenclSession<'a> {
     /// Mapping from `ValueId` to `OpenclTensor`
     #[allow(dead_code)] // TODO: Remove later.
     pub(super) values: FxHashMap<ValueId, OpenclTensor>,
+
+    #[allow(dead_code)] // TODO: Remove later.
+    pub(super) execution_plans: Vec<ExecutionPlan>,
 }
 
-impl<'a> OpenclSession<'a> {}
+pub(super) struct ExecutionPlan {
+    #[allow(dead_code)] // TODO: Remove later.
+    pub(super) node_id: NodeId,
+
+    #[allow(dead_code)] // TODO: Remove later
+    pub(super) kernel: Kernel,
+}
+
+impl<'a> OpenclSession<'a> {
+    pub fn run(&self, _inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
+        todo!()
+    }
+}

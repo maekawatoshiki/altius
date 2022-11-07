@@ -1,14 +1,21 @@
-use altius_core::model::Model;
+use std::ptr;
+
+use altius_core::{
+    model::Model,
+    node::{compute_output_shapes, Op},
+    tensor::Tensor,
+};
 use opencl3::{
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE},
     context::Context,
     device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU},
+    memory::{self, CL_MEM_READ_ONLY},
 };
 use rustc_hash::FxHashMap;
 
 use crate::SessionError;
 
-use super::session::OpenclSession;
+use super::{session::OpenclSession, tensor::OpenclTensor};
 
 #[derive(Default)]
 pub struct OpenclSessionBuilder<'a> {
@@ -52,6 +59,75 @@ impl<'a> OpenclSessionBuilder<'a> {
         .map_err(|e| {
             SessionError::Message(format!("Failed to create command queue: {}", e.to_string()))
         })?;
+
+        let sorted_nodes = model.topo_sort_nodes();
+        let mut values = FxHashMap::default();
+
+        // Allocate initializers.
+        for (init_id, tensor) in model.inits.clone() {
+            let buf = unsafe {
+                memory::create_buffer(
+                    context.get(),
+                    CL_MEM_READ_ONLY,
+                    tensor.elem_ty().size() * tensor.dims().total_elems(),
+                    ptr::null_mut(),
+                )
+            }
+            .map_err(|e| SessionError::Message(format!("Failed to create buffer: {e:?}")))?;
+            values.insert(init_id, OpenclTensor { tensor, buf });
+        }
+
+        // Allocate inputs.
+        for &input_id in &model.inputs {
+            if model.inits.contains_key(&input_id) {
+                continue;
+            }
+
+            let input = &model.values.inner()[input_id];
+            let Some(shape) = input.shape.as_ref() else {
+                return Err(SessionError::Message(format!("Unknown shape input")));
+            };
+
+            let buf = unsafe {
+                memory::create_buffer(
+                    context.get(),
+                    CL_MEM_READ_ONLY,
+                    shape.elem_ty.size() * shape.dims.total_elems(),
+                    ptr::null_mut(),
+                )
+            }
+            .map_err(|e| SessionError::Message(format!("Failed to create buffer: {e:?}")))?;
+            let tensor = Tensor::empty_of_type(shape.elem_ty, shape.dims.clone());
+            values.insert(input_id, OpenclTensor { tensor, buf });
+        }
+
+        for node_id in sorted_nodes {
+            let node = &model.nodes[node_id];
+            let mut op = node.op.clone();
+
+            let inputs = node
+                .inputs
+                .iter()
+                .map(|input| values.get(input).unwrap())
+                .collect::<Vec<_>>();
+
+            compute_output_shapes(
+                &mut op,
+                inputs
+                    .iter()
+                    .map(|t| &t.tensor)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+                model.opset_version,
+            );
+
+            match &node.op {
+                Op::Add => {
+                    // TODO
+                }
+                op => todo!("{op:?}"),
+            }
+        }
 
         // let buffer =
         // memory::create_buffer(context.get(), flags, count * mem::size_of::<T>(), host_ptr)?;
@@ -212,6 +288,39 @@ impl<'a> OpenclSessionBuilder<'a> {
 #[test]
 fn test_build() {
     let model = Model::default();
+    let _ = OpenclSessionBuilder::new()
+        .with_model(&model)
+        .build()
+        .unwrap();
+}
+
+#[test]
+fn test_build_add() {
+    use altius_core::{
+        node::{Node, Op},
+        tensor::{TensorElemType, TypedShape},
+    };
+
+    let mut model = Model::default();
+
+    let in_0 = model.values.new_val_named_and_shaped(
+        "x".to_owned(),
+        TypedShape::new(vec![8, 8].into(), TensorElemType::F32),
+    );
+    let in_1 = model.values.new_val_named_and_shaped(
+        "y".to_owned(),
+        TypedShape::new(vec![8, 8].into(), TensorElemType::F32),
+    );
+    let out = model.values.new_val_named_and_shaped(
+        "z".to_owned(),
+        TypedShape::new(vec![8, 8].into(), TensorElemType::F32),
+    );
+    model.add_node(Node::new(Op::Add).with_ins(vec![in_0, in_1]).with_out(out));
+
+    model.inputs.push(in_0);
+    model.inputs.push(in_1);
+    model.outputs.push(out);
+
     let _ = OpenclSessionBuilder::new()
         .with_model(&model)
         .build()

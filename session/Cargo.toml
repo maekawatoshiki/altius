@@ -26,14 +26,16 @@ pollster = "0.2.5"
 bytemuck = "1.12.1"
 wgpu = "0.14.0"
 futures-intrusive = "0.4"
+opencl3 = { version = "0.9.1", optional = true }
 
 [features]
 cuda = ["cudnn", "cust"]
-matrixmultiply-threading = [ "matrixmultiply/threading" ]
-openblas = [ "blas-src/openblas", "cblas" ]
-blis = [ "blis-src", "cblas" ]
-accelerate = [ "blas-src/accelerate", "cblas" ]
-cblas = [ "cblas-sys" ]
+matrixmultiply-threading = ["matrixmultiply/threading"]
+openblas = ["blas-src/openblas", "cblas"]
+blis = ["blis-src", "cblas"]
+accelerate = ["blas-src/accelerate", "cblas"]
+cblas = ["cblas-sys"]
+opencl = ["opencl3"]
 heavy-log = []
 
 [dev-dependencies]

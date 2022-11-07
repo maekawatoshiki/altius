@@ -1,6 +1,8 @@
 #![feature(portable_simd)]
 
 pub mod interpreter;
+#[cfg(feature = "opencl")]
+pub mod opencl;
 pub mod wgpu;
 
 use std::fmt::Display;

@@ -329,8 +329,18 @@ kernel void add(global float *out,
     Ok(kernel)
 }
 
+#[cfg(test)]
+fn is_opencl_supported() -> bool {
+    let Ok(devices) = get_all_devices(CL_DEVICE_TYPE_GPU) else { return false };
+    !devices.is_empty()
+}
+
 #[test]
 fn test_build() {
+    if !is_opencl_supported() {
+        return;
+    }
+
     let model = Model::default();
     let _ = OpenclSessionBuilder::new().with_model(&model).build();
 }
@@ -341,6 +351,10 @@ fn test_build_add() {
         node::{Node, Op},
         tensor::{TensorElemType, TypedShape},
     };
+
+    if !is_opencl_supported() {
+        return;
+    }
 
     let mut model = Model::default();
 

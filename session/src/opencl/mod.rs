@@ -1,1 +1,2 @@
-pub struct OpenclSession {}
+pub mod builder;
+pub mod session;

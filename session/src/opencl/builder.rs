@@ -3,13 +3,13 @@ use std::ptr;
 use altius_core::{
     model::Model,
     node::{compute_output_shapes, Op},
-    tensor::Tensor,
+    tensor::{Tensor, TypedShape},
 };
 use opencl3::{
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE},
     context::Context,
     device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU},
-    memory::{self, CL_MEM_READ_ONLY},
+    memory::{self, CL_MEM_KERNEL_READ_AND_WRITE, CL_MEM_READ_ONLY, CL_MEM_READ_WRITE},
 };
 use rustc_hash::FxHashMap;
 
@@ -110,8 +110,7 @@ impl<'a> OpenclSessionBuilder<'a> {
                 .iter()
                 .map(|input| values.get(input).unwrap())
                 .collect::<Vec<_>>();
-
-            compute_output_shapes(
+            let output_shapes = compute_output_shapes(
                 &mut op,
                 inputs
                     .iter()
@@ -120,10 +119,29 @@ impl<'a> OpenclSessionBuilder<'a> {
                     .as_slice(),
                 model.opset_version,
             );
+            let mut outputs = vec![];
+
+            for TypedShape { elem_ty, dims } in output_shapes {
+                let buf = unsafe {
+                    memory::create_buffer(
+                        context.get(),
+                        CL_MEM_READ_WRITE, // TODO: Is this appropriate?
+                        elem_ty.size() * dims.total_elems(),
+                        ptr::null_mut(),
+                    )
+                }
+                .map_err(|e| {
+                    SessionError::Message(format!("Failed to create buffer: {}", e.to_string()))
+                })?;
+                outputs.push(OpenclTensor {
+                    tensor: Tensor::empty_of_type(elem_ty, dims),
+                    buf,
+                })
+            }
 
             match &node.op {
                 Op::Add => {
-                    // TODO
+                    // compile_add();
                 }
                 op => todo!("{op:?}"),
             }

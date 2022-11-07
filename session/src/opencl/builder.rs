@@ -9,7 +9,9 @@ use opencl3::{
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE},
     context::Context,
     device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU},
-    memory::{self, CL_MEM_KERNEL_READ_AND_WRITE, CL_MEM_READ_ONLY, CL_MEM_READ_WRITE},
+    kernel::Kernel,
+    memory::{self, CL_MEM_READ_ONLY, CL_MEM_READ_WRITE},
+    program::Program,
 };
 use rustc_hash::FxHashMap;
 
@@ -101,6 +103,8 @@ impl<'a> OpenclSessionBuilder<'a> {
             values.insert(input_id, OpenclTensor { tensor, buf });
         }
 
+        let mut kernels = vec![];
+
         for node_id in sorted_nodes {
             let node = &model.nodes[node_id];
             let mut op = node.op.clone();
@@ -139,12 +143,10 @@ impl<'a> OpenclSessionBuilder<'a> {
                 })
             }
 
-            match &node.op {
-                Op::Add => {
-                    // compile_add();
-                }
+            kernels.push(match &node.op {
+                Op::Add => compile_add(&context)?,
                 op => todo!("{op:?}"),
-            }
+            });
         }
 
         // let buffer =
@@ -301,6 +303,25 @@ impl<'a> OpenclSessionBuilder<'a> {
         //             ok(())
         //         }
     }
+}
+
+fn compile_add(context: &Context) -> Result<Kernel, SessionError> {
+    let name = "add";
+    let program = r#"
+kernel void add(global float *out,
+                global float const *in_0,
+                global float const *in_1) {
+    const size_t i = get_global_id(0);
+    out[i] = in_0[i] + in_1[i];
+}"#;
+    let program = Program::create_and_build_from_source(context, program, "").map_err(|e| {
+        SessionError::Message(format!("Failed to compile kernel: {}", e.to_string()))
+    })?;
+    let kernel = Kernel::create(&program, name).map_err(|e| {
+        SessionError::Message(format!("Failed to create kernel: {}", e.to_string()))
+    })?;
+
+    Ok(kernel)
 }
 
 #[test]

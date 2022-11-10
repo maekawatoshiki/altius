@@ -1,6 +1,6 @@
 use altius_core::onnx::load_onnx;
 use altius_core::tensor::*;
-use altius_session::interpreter::InterpreterSession;
+use altius_session::interpreter::InterpreterSessionBuilder;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
@@ -35,7 +35,7 @@ fn main() {
 
     let validation_count = 10000;
     let input_value = mnist.lookup_named_value("Input3").unwrap();
-    let sess = InterpreterSession::new(&mnist);
+    let sess = InterpreterSessionBuilder::new(&mnist).build();
 
     let correct: i32 = inputs
         .iter()

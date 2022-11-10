@@ -70,43 +70,6 @@ struct NodeExecutionPlan {
 }
 
 impl<'a> InterpreterSession<'a> {
-    pub fn new(model: &'a Model) -> Self {
-        let sorted_nodes = model.topo_sort_nodes();
-        let mut inferred_shapes = FxHashMap::default();
-        infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
-
-        InterpreterSession {
-            model,
-            #[cfg(feature = "cuda")]
-            cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
-            execution_plans: create_execution_plan(model, &sorted_nodes),
-            inferred_shapes,
-            enable_profiling: false,
-            values: ThreadLocal::new(),
-            dummy_value: Tensor::zeros::<f32>(vec![0].into()),
-            tctx: ThreadCtx::new(),
-        }
-    }
-
-    pub fn with_profiling(mut self, enable: bool) -> Self {
-        self.enable_profiling = enable;
-        self
-    }
-
-    pub fn with_intra_op_num_threads(mut self, num_threads: usize) -> Self {
-        #[cfg(feature = "blis")]
-        {
-            extern "C" {
-                fn bli_thread_set_num_threads(n_threads: usize);
-            }
-            unsafe { bli_thread_set_num_threads(num_threads) };
-        }
-
-        self.tctx = ThreadCtx::new_with_num_threads(num_threads);
-
-        self
-    }
-
     pub fn model(&self) -> &Model {
         self.model
     }

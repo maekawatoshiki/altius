@@ -41,6 +41,7 @@ impl<'a> Scope<'a> {
 }
 
 impl ThreadCtx {
+    #[allow(dead_code)]
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Self {
         let tp = ThreadPool::new(1);
@@ -49,6 +50,7 @@ impl ThreadCtx {
         Self { tp }
     }
 
+    #[allow(dead_code)]
     #[cfg(target_arch = "wasm32")]
     pub fn new() -> Self {
         Self {}

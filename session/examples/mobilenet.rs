@@ -1,5 +1,5 @@
 use altius_core::{onnx::load_onnx, tensor::Tensor};
-use altius_session::interpreter::InterpreterSession;
+use altius_session::interpreter::InterpreterSessionBuilder;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
@@ -29,12 +29,19 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
 
-    let i = InterpreterSession::new(&model).with_profiling(opt.profile);
+    let i = InterpreterSessionBuilder::new()
+        .with_model(&model)
+        .with_profiling_enabled(opt.profile)
+        .build()
+        .unwrap();
     #[cfg(feature = "cuda")]
-    InterpreterSession::new(&model)
-        .run(vec![(input_value, input.clone())])
-        .unwrap(); // First run is slow so
-                   // ignore it.
+    {
+        use altius_session::interpreter::InterpreterSession;
+        // First run is slow so ignore it.
+        InterpreterSession::new(&model)
+            .run(vec![(input_value, input.clone())])
+            .unwrap();
+    }
     let out = i.run(vec![(input_value, input)]).expect("Inference failed");
     let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
     out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));

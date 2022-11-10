@@ -1,7 +1,10 @@
+mod builder;
 mod conv2d;
 mod exp;
 mod gemm;
 mod thread;
+
+pub use builder::InterpreterSessionBuilder;
 
 use exp::fast_exp;
 use gemm::{sgemm, sgemm2};

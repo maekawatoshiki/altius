@@ -37,11 +37,9 @@ fn mobilenet() {
             .collect::<Vec<_>>(),
     );
 
-    let i = InterpreterSessionBuilder::new()
-        .with_model(&model)
+    let i = InterpreterSessionBuilder::new(&model)
         .with_profiling_enabled(true)
-        .build()
-        .expect("Failed to build interpreter session");
+        .build();
     #[cfg(feature = "cuda")]
     {
         use altius_session::interpreter::InterpreterSession;

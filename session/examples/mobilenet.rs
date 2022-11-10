@@ -29,11 +29,9 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
 
-    let i = InterpreterSessionBuilder::new()
-        .with_model(&model)
+    let i = InterpreterSessionBuilder::new(&model)
         .with_profiling_enabled(opt.profile)
-        .build()
-        .unwrap();
+        .build();
     #[cfg(feature = "cuda")]
     {
         use altius_session::interpreter::InterpreterSession;

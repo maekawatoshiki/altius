@@ -1,35 +1,22 @@
-use altius_core::model::Model;
+use altius_core::{model::Model, tensor::Tensor};
+use rustc_hash::FxHashMap;
+use thread_local::ThreadLocal;
 
-use super::InterpreterSession;
+use super::{create_execution_plan, infer_shapes, thread::ThreadCtx, InterpreterSession};
 
 pub struct InterpreterSessionBuilder<'a> {
-    model: Option<&'a Model>,
+    model: &'a Model,
     intra_op_num_threads: usize,
     enable_profiling: bool,
 }
 
-impl<'a> Default for InterpreterSessionBuilder<'a> {
-    fn default() -> Self {
-        Self {
-            model: None,
-            intra_op_num_threads: 1,
-            enable_profiling: false,
-        }
-    }
-}
-
 impl<'a> InterpreterSessionBuilder<'a> {
-    pub const fn new() -> Self {
+    pub const fn new(model: &'a Model) -> Self {
         Self {
-            model: None,
+            model,
             intra_op_num_threads: 1,
             enable_profiling: false,
         }
-    }
-
-    pub const fn with_model(mut self, model: &'a Model) -> Self {
-        self.model = Some(model);
-        self
     }
 
     pub const fn with_intra_op_num_threads(mut self, intra_op_num_threads: usize) -> Self {
@@ -42,10 +29,33 @@ impl<'a> InterpreterSessionBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> Option<InterpreterSession<'a>> {
-        let sess = InterpreterSession::new(self.model?)
-            .with_profiling(self.enable_profiling)
-            .with_intra_op_num_threads(self.intra_op_num_threads);
-        Some(sess)
+    pub fn build(self) -> InterpreterSession<'a> {
+        let model = self.model;
+        let enable_profiling = self.enable_profiling;
+        let intra_op_num_threads = self.intra_op_num_threads;
+
+        let sorted_nodes = model.topo_sort_nodes();
+        let mut inferred_shapes = FxHashMap::default();
+        infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
+
+        #[cfg(feature = "blis")]
+        {
+            extern "C" {
+                fn bli_thread_set_num_threads(n_threads: usize);
+            }
+            unsafe { bli_thread_set_num_threads(intra_op_num_threads) };
+        }
+
+        InterpreterSession {
+            model,
+            #[cfg(feature = "cuda")]
+            cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
+            execution_plans: create_execution_plan(model, &sorted_nodes),
+            inferred_shapes,
+            enable_profiling,
+            values: ThreadLocal::new(),
+            dummy_value: Tensor::zeros::<f32>(vec![0].into()),
+            tctx: ThreadCtx::new_with_num_threads(intra_op_num_threads),
+        }
     }
 }

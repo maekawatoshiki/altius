@@ -1,5 +1,5 @@
 use altius_core::{onnx::load_onnx, tensor::Tensor};
-use altius_session::interpreter::Interpreter;
+use altius_session::interpreter::InterpreterSession;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
@@ -29,9 +29,9 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
 
-    let i = Interpreter::new(&model).with_profiling(opt.profile);
+    let i = InterpreterSession::new(&model).with_profiling(opt.profile);
     #[cfg(feature = "cuda")]
-    Interpreter::new(&model)
+    InterpreterSession::new(&model)
         .run(vec![(input_value, input.clone())])
         .unwrap(); // First run is slow so
                    // ignore it.

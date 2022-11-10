@@ -222,7 +222,7 @@ fn test_build() {
 
 #[test]
 fn test_build_add() {
-    use crate::interpreter::Interpreter;
+    use crate::interpreter::InterpreterSession;
     use altius_core::{
         node::{Node, Op},
         tensor::{TensorElemType, TypedShape},
@@ -258,7 +258,7 @@ fn test_build_add() {
         .with_model(&model)
         .build()
         .unwrap();
-    let cpu_sess = Interpreter::new(&model);
+    let cpu_sess = InterpreterSession::new(&model);
 
     let x = Tensor::rand::<f32>(vec![n, 1024, 8, 8].into());
     let y = Tensor::rand::<f32>(vec![n, 1024, 8, 8].into());

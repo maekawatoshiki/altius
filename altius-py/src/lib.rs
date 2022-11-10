@@ -5,7 +5,7 @@ use altius_core::optimize;
 use altius_core::tensor::TensorElemTypeExt;
 use altius_core::value::ValueId;
 use altius_core::{model::Model, tensor::Tensor};
-use altius_session::interpreter::Interpreter;
+use altius_session::interpreter::InterpreterSession;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 
 use numpy::ndarray::ArrayD;
@@ -18,7 +18,7 @@ pub struct PyModel(pub Model);
 
 #[pyclass]
 #[repr(transparent)]
-pub struct PySession(pub Interpreter<'static>);
+pub struct PySession(pub InterpreterSession<'static>);
 
 #[pyfunction]
 fn load(path: String) -> PyResult<PyModel> {
@@ -38,7 +38,7 @@ fn session<'a>(
         unsafe { std::mem::transmute::<&'a mut Model, &'static mut Model>(&mut model.0) };
     optimize::gelu_fusion::fuse_gelu(&mut model);
     Ok(PySession(
-        Interpreter::new(model)
+        InterpreterSession::new(model)
             .with_profiling(enable_profiling)
             .with_intra_op_num_threads(intra_op_num_threads),
     ))

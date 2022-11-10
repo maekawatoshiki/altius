@@ -4,7 +4,7 @@ use altius_core::{
     node::{Node, Op},
     tensor::Tensor,
 };
-use altius_session::interpreter::Interpreter;
+use altius_session::interpreter::InterpreterSession;
 
 macro_rules! test_op {
     ($name:ident, $op:ident, $shape:expr) => {
@@ -39,7 +39,7 @@ macro_rules! op {
             model.inputs.push(y);
             model.outputs.push(z);
 
-            let sess = Interpreter::new(&model);
+            let sess = InterpreterSession::new(&model);
             let x_val = Tensor::rand::<f32>(shape.to_owned());
             let y_val = Tensor::rand::<f32>(shape);
 

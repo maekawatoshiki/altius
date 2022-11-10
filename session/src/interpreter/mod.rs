@@ -44,7 +44,7 @@ mod cuda {
 #[cfg(feature = "cuda")]
 use cuda::*;
 
-pub struct Interpreter<'a> {
+pub struct InterpreterSession<'a> {
     model: &'a Model,
     #[cfg(feature = "cuda")]
     cudnn_ctx: SafeCudnnContext,
@@ -66,13 +66,13 @@ struct NodeExecutionPlan {
     free_vals: Vec<ValueId>,
 }
 
-impl<'a> Interpreter<'a> {
+impl<'a> InterpreterSession<'a> {
     pub fn new(model: &'a Model) -> Self {
         let sorted_nodes = model.topo_sort_nodes();
         let mut inferred_shapes = FxHashMap::default();
         infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
 
-        Interpreter {
+        InterpreterSession {
             model,
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),

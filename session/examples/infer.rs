@@ -1,7 +1,7 @@
 use altius_core::onnx::load_onnx;
 use altius_core::optimize::gelu_fusion::fuse_gelu;
 use altius_core::tensor::{Tensor, TensorElemType};
-use altius_session::interpreter::Interpreter;
+use altius_session::interpreter::InterpreterSession;
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Instant;
@@ -42,7 +42,7 @@ fn main() {
         opt.threads
     );
     let start = Instant::now();
-    let sess = Interpreter::new(&model)
+    let sess = InterpreterSession::new(&model)
         .with_profiling(opt.profile)
         .with_intra_op_num_threads(opt.threads);
     log::info!("create session: finished in {:?}", start.elapsed());

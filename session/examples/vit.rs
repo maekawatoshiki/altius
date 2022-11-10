@@ -1,6 +1,6 @@
 use altius_core::optimize::gelu_fusion::fuse_gelu;
 use altius_core::{onnx::load_onnx, tensor::Tensor};
-use altius_session::interpreter::Interpreter;
+use altius_session::interpreter::InterpreterSession;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
@@ -31,11 +31,11 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 384, 384].into(), image.into_raw_vec());
 
-    let i = Interpreter::new(&model)
+    let i = InterpreterSession::new(&model)
         .with_profiling(opt.profile)
         .with_intra_op_num_threads(8);
     #[cfg(feature = "cuda")]
-    Interpreter::new(&model)
+    InterpreterSession::new(&model)
         .run(vec![(input_value, input.clone())])
         .unwrap(); // First run is slow so ignore it.
     for _ in 0..10 {

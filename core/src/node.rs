@@ -92,7 +92,7 @@ pub struct LeakyReLU {
     pub alpha: f32,
 }
 
-/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Softmax
+/// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Softmax>
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Softmax {
     pub axis: i64,
@@ -133,7 +133,7 @@ pub struct Squeeze {
     pub axes: Vec<i64>,
 }
 
-/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Unsqueeze
+/// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Unsqueeze>
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Unsqueeze {
     pub axes: Vec<i64>, // From opset version 13, this attribute is no longer used.
@@ -145,27 +145,28 @@ pub struct ReduceMin {
     pub keep_dims: bool,
 }
 
-/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#ReduceMean
+/// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#ReduceMean>
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ReduceMean {
     pub axes: Vec<i64>,
     pub keep_dims: bool,
 }
 
-/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Split
+/// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Split>
+///
 /// Only opset version 13 is supported.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Split {
     pub axis: i64,
 }
 
-/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Gather
+/// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Gather>
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Gather {
     pub axis: i64,
 }
 
-/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Shape
+/// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Shape>
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Shape {
     pub end: Option<i64>,
@@ -187,7 +188,7 @@ pub struct BatchNormalization {
     pub training_mode: bool,
 }
 
-/// https://github.com/onnx/onnx/blob/main/docs/Operators.md#Constant
+/// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Constant>
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Constant {
     pub value: Tensor,

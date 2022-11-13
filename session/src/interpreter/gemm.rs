@@ -68,28 +68,28 @@ pub fn sgemm2(
     c: &mut [f32],
     ldc: usize,
 ) {
-    unsafe {
-        #[cfg(not(feature = "cblas"))]
-        todo!();
-        // matrixmultiply::sgemm(
-        //     m,
-        //     k,
-        //     n,
-        //     alpha,
-        //     a.as_ptr(),
-        //     lda as isize,
-        //     1,
-        //     b.as_ptr(),
-        //     ldb as isize,
-        //     1,
-        //     beta,
-        //     c.as_mut_ptr(),
-        //     ldc as isize,
-        //     1,
-        // );
+    #[cfg(not(feature = "cblas"))]
+    todo!();
+    // matrixmultiply::sgemm(
+    //     m,
+    //     k,
+    //     n,
+    //     alpha,
+    //     a.as_ptr(),
+    //     lda as isize,
+    //     1,
+    //     b.as_ptr(),
+    //     ldb as isize,
+    //     1,
+    //     beta,
+    //     c.as_mut_ptr(),
+    //     ldc as isize,
+    //     1,
+    // );
 
-        #[cfg(feature = "cblas")]
-        {
+    #[cfg(feature = "cblas")]
+    {
+        unsafe {
             cblas_sys::cblas_sgemm(
                 cblas_sys::CblasRowMajor,
                 if trans_a {

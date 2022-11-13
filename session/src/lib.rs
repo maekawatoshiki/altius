@@ -6,7 +6,7 @@ pub mod opencl;
 #[cfg(feature = "wgpu-backend")]
 pub mod wgpu;
 
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 #[cfg(all(feature = "cblas", not(feature = "blis")))]
 #[allow(unused)]
@@ -18,7 +18,7 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum SessionError {
-    Message(String),
+    Message(Cow<'static, str>),
 }
 
 impl Display for SessionError {

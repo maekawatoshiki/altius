@@ -113,7 +113,7 @@ impl<'a> OpenclSession<'a> {
                 )
             }
             .map_err(|e| {
-                SessionError::Message(format!("Failed to read buffer: {}", e.to_string()))
+                SessionError::Message(format!("Failed to read buffer: {}", e.to_string()).into())
             })?;
 
             outputs.push(out)

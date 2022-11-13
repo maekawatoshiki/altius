@@ -42,16 +42,18 @@ impl<'a> OpenclSessionBuilder<'a> {
     pub fn build(self) -> Result<OpenclSession<'a>, SessionError> {
         let model = self
             .model
-            .ok_or(SessionError::Message("Model is not set".to_string()))?;
+            .ok_or(SessionError::Message("Model is not set".into()))?;
 
         let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
-            .map_err(|e| SessionError::Message(format!("Failed to get device: {}", e.to_string())))?
+            .map_err(|e| {
+                SessionError::Message(format!("Failed to get device: {}", e.to_string()).into())
+            })?
             .first()
             .ok_or_else(|| SessionError::Message("No device found".into()))?;
         let device = Device::new(device_id);
 
         let context = Context::from_device(&device).map_err(|e| {
-            SessionError::Message(format!("Failed to create context: {}", e.to_string()))
+            SessionError::Message(format!("Failed to create context: {}", e.to_string()).into())
         })?;
 
         let queue = unsafe {
@@ -63,7 +65,9 @@ impl<'a> OpenclSessionBuilder<'a> {
             )
         }
         .map_err(|e| {
-            SessionError::Message(format!("Failed to create command queue: {}", e.to_string()))
+            SessionError::Message(
+                format!("Failed to create command queue: {}", e.to_string()).into(),
+            )
         })?;
 
         let sorted_nodes = model.topo_sort_nodes();
@@ -79,7 +83,7 @@ impl<'a> OpenclSessionBuilder<'a> {
                     ptr::null_mut(),
                 )
             }
-            .map_err(|e| SessionError::Message(format!("Failed to create buffer: {e:?}")))?;
+            .map_err(|e| SessionError::Message(format!("Failed to create buffer: {e:?}").into()))?;
 
             let _event = unsafe {
                 enqueue_read_buffer(
@@ -106,7 +110,7 @@ impl<'a> OpenclSessionBuilder<'a> {
 
             let input = &model.values.inner()[input_id];
             let Some(shape) = input.shape.as_ref() else {
-                return Err(SessionError::Message(format!("Unknown shape input")));
+                return Err(SessionError::Message("Unknown shape input".into()));
             };
 
             let buf = unsafe {
@@ -117,7 +121,7 @@ impl<'a> OpenclSessionBuilder<'a> {
                     ptr::null_mut(),
                 )
             }
-            .map_err(|e| SessionError::Message(format!("Failed to create buffer: {e:?}")))?;
+            .map_err(|e| SessionError::Message(format!("Failed to create buffer: {e:?}").into()))?;
             let tensor = Tensor::empty_of_type(shape.elem_ty, shape.dims.clone());
             values.insert(input_id, OpenclTensor { tensor, buf });
         }
@@ -155,7 +159,9 @@ impl<'a> OpenclSessionBuilder<'a> {
                     )
                 }
                 .map_err(|e| {
-                    SessionError::Message(format!("Failed to create buffer: {}", e.to_string()))
+                    SessionError::Message(
+                        format!("Failed to create buffer: {}", e.to_string()).into(),
+                    )
                 })?;
                 values.insert(
                     output_id,
@@ -195,10 +201,10 @@ kernel void add(global float *out,
     out[i] = in_0[i] + in_1[i];
 }"#;
     let program = Program::create_and_build_from_source(context, program, "").map_err(|e| {
-        SessionError::Message(format!("Failed to compile kernel: {}", e.to_string()))
+        SessionError::Message(format!("Failed to compile kernel: {}", e.to_string()).into())
     })?;
     let kernel = Kernel::create(&program, name).map_err(|e| {
-        SessionError::Message(format!("Failed to create kernel: {}", e.to_string()))
+        SessionError::Message(format!("Failed to create kernel: {}", e.to_string()).into())
     })?;
 
     Ok(kernel)
@@ -222,7 +228,7 @@ fn test_build() {
 
 #[test]
 fn test_build_add() {
-    use crate::interpreter::InterpreterSession;
+    use crate::interpreter::InterpreterSessionBuilder;
     use altius_core::{
         node::{Node, Op},
         tensor::{TensorElemType, TypedShape},
@@ -258,7 +264,7 @@ fn test_build_add() {
         .with_model(&model)
         .build()
         .unwrap();
-    let cpu_sess = InterpreterSession::new(&model);
+    let cpu_sess = InterpreterSessionBuilder::new(&model).build();
 
     let x = Tensor::rand::<f32>(vec![n, 1024, 8, 8].into());
     let y = Tensor::rand::<f32>(vec![n, 1024, 8, 8].into());

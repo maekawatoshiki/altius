@@ -9,7 +9,6 @@ Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) an
 
 # Requirements
 
-- [git-lfs](https://github.com/git-lfs/git-lfs) to pull ONNX models
 - Python 3.x (Used in some tests; You can disable them by just ignoring tests in `./altius-py`)
 
 # Run

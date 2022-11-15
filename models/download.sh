@@ -31,3 +31,4 @@ download 1PkSkHolMuM8_Eefj4Nu0LDSF_xqezgsT ./cat.png
 download 1QPbKB7KjJxIXe3Zv3Q5HqrdwQOJWMTLt ./dog.jpg
 download 1KsIguzhvffIKFYIDhAMFWxU_cii9DOJT ./deeplab_mobilenetv3.onnx
 download 1HZ__4-EqloRWwXZJrMlCZvyGZteY64WO ./fcn-resnet50.onnx
+download 129ns91SK-LEv6kWy5hNA86uZhMJe6FDl ./yolov5s.onnx

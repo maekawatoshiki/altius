@@ -160,6 +160,8 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             "Tile" => Op::Tile,
             "Split" => Op::Split(Split {
                 axis: get_attribute(&node.attribute, "axis").map_or(0, |a| a.i()),
+                split: get_attribute(&node.attribute, "split")
+                    .map_or_else(Vec::new, |a| a.ints.clone()),
             }),
             "Slice" => Op::Slice,
             "Gather" => Op::Gather(Gather {

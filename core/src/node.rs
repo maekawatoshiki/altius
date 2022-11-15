@@ -153,11 +153,10 @@ pub struct ReduceMean {
 }
 
 /// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Split>
-///
-/// Only opset version 13 is supported.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Split {
     pub axis: i64,
+    pub split: Vec<i64>, // From opset verion 13, this attribute is no longer used.
 }
 
 /// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Gather>
@@ -721,14 +720,26 @@ pub fn compute_output_shapes(
             ));
         }
         Op::Split(split) => {
-            let axis = split.axis;
-            assert!(axis >= 0, "Negative index not supported");
-            let input = inputs[0].dims();
-            let split = inputs[1].data::<i64>();
-            for s in split {
-                let mut dims = input.clone();
-                dims[axis as usize] = *s as usize;
-                shapes.push(TypedShape::new(dims, inputs[0].elem_ty()));
+            if opset_version >= 13 {
+                let axis = split.axis;
+                assert!(axis >= 0, "Negative index not supported");
+                let input = inputs[0].dims();
+                let split = inputs[1].data::<i64>();
+                for s in split {
+                    let mut dims = input.clone();
+                    dims[axis as usize] = *s as usize;
+                    shapes.push(TypedShape::new(dims, inputs[0].elem_ty()));
+                }
+            } else {
+                let axis = split.axis;
+                let split = &split.split;
+                assert!(axis >= 0, "Negative index not supported");
+                let input = inputs[0].dims();
+                for s in split {
+                    let mut dims = input.clone();
+                    dims[axis as usize] = *s as usize;
+                    shapes.push(TypedShape::new(dims, inputs[0].elem_ty()));
+                }
             }
         }
         Op::Slice => {

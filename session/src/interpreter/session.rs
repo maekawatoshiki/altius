@@ -1406,17 +1406,38 @@ fn compute_resize(tctx: &ThreadCtx, resize: &Resize, inputs: &[&Tensor], outputs
 }
 
 fn compute_concat(concat: &Concat, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let output = &mut outputs[Node::CONCAT_OUT];
-
-    assert!(matches!(output.dims().len(), 3 | 4));
-    assert_eq!(concat.axis, 1);
-
-    let mut output = output.data_mut::<f32>();
-    for input in inputs {
-        let input = input.data::<f32>();
-        output[0..input.len()].copy_from_slice(input);
-        output = &mut output[input.len()..];
+    // TODO: Stop using ndarray!
+    macro_rules! concat {
+        ($n:expr) => {{
+            let mut views = vec![];
+            for input in inputs {
+                views.push(
+                    ArrayView::<f32, Dim<[Ix; $n]>>::from_shape(
+                        input.fixed_dims::<$n>(),
+                        input.data::<f32>(),
+                    )
+                    .unwrap(),
+                );
+            }
+            ndarray::concatenate(Axis(concat.axis as usize), &views)
+                .unwrap()
+                .as_standard_layout()
+                .to_owned()
+                .into_raw_vec()
+        }};
     }
+
+    let output = &mut outputs[Node::CONCAT_OUT];
+    let d = output.dims().len();
+
+    output.set_raw_vec(match d {
+        1 => concat!(1),
+        2 => concat!(2),
+        3 => concat!(3),
+        4 => concat!(4),
+        5 => concat!(5),
+        _ => todo!("Concat: Unsupported shape."),
+    });
 }
 
 fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [Tensor]) {

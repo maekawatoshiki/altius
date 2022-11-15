@@ -1327,9 +1327,7 @@ fn fast_sum(mut slice: &[f32]) -> f32 {
     sum.reduce_sum() + slice.iter().sum::<f32>()
 }
 
-fn compute_resize(tctx: &ThreadCtx, _resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    log::info!("Resize: Current implementation uses bilinear interpolation!");
-
+fn compute_resize(tctx: &ThreadCtx, resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     assert!(matches!(inputs.len(), 3 | 4));
 
     let input = inputs[Node::RESIZE_IN_X];
@@ -1347,41 +1345,63 @@ fn compute_resize(tctx: &ThreadCtx, _resize: &Resize, inputs: &[&Tensor], output
 
     let scale = output_h as f32 / input_h as f32;
 
-    let mut input = input.data::<f32>();
-    let mut output = output.data_mut::<f32>();
+    if resize.mode == "nearest" {
+        let mut input = input.data::<f32>();
+        let mut output = output.data_mut::<f32>();
 
-    for _ in 0..outer {
-        tctx.scope(|scope| {
+        for _ in 0..outer {
             for (h, o) in (0..output_h).zip(output.chunks_mut(output_w)) {
-                let ihf = (h as f32 / scale - 0.5).max(0.);
-                let ih = ihf as usize;
-                let ih0 = ih.min(input_h - 1);
-                let ih1 = (ih + 1).min(input_h - 1);
-                let ih0w = input_w * ih0;
-                let ih1w = input_w * ih1;
-                scope.spawn(move || {
-                    for (w, o) in (0..output_w).zip(o.iter_mut()) {
-                        let iwf = (w as f32 / scale - 0.5).max(0.);
-                        let iw = iwf as usize;
-                        let iw0 = iw.min(input_w - 1);
-                        let iw1 = (iw + 1).min(input_w - 1);
+                let ih = (h as f32 / scale) as usize;
+                let ihw = input_w * ih;
+                for (w, o) in (0..output_w).zip(o.iter_mut()) {
+                    let iwf = (w as f32 / scale) as usize;
+                    let iw = iwf as usize;
+                    *o = input[ihw + iw];
+                }
+            }
+            output = &mut output[output_h * output_w..];
+            input = &input[input_hw..];
+        }
+    } else {
+        log::info!("Resize: Current implementation uses bilinear interpolation!");
 
-                        let v00 = input[ih0w + iw0];
-                        let v01 = input[ih0w + iw1];
-                        let v10 = input[ih1w + iw0];
-                        let v11 = input[ih1w + iw1];
+        // TODO: Multi-threading could make the performance worse depending on height and/or width.
+        tctx.scope(|scope| {
+            let mut input = input.data::<f32>();
+            let mut output = output.data_mut::<f32>();
 
-                        let hd = v00 + (v10 - v00) * (ihf - ih as f32);
-                        let hw = v01 + (v11 - v01) * (ihf - ih as f32);
-                        let r = hd + (hw - hd) * (iwf - iw as f32);
+            for _ in 0..outer {
+                for (h, o) in (0..output_h).zip(output.chunks_mut(output_w)) {
+                    let ihf = (h as f32 / scale - 0.5).max(0.);
+                    let ih = ihf as usize;
+                    let ih0 = ih.min(input_h - 1);
+                    let ih1 = (ih + 1).min(input_h - 1);
+                    let ih0w = input_w * ih0;
+                    let ih1w = input_w * ih1;
+                    scope.spawn(move || {
+                        for (w, o) in (0..output_w).zip(o.iter_mut()) {
+                            let iwf = (w as f32 / scale - 0.5).max(0.);
+                            let iw = iwf as usize;
+                            let iw0 = iw.min(input_w - 1);
+                            let iw1 = (iw + 1).min(input_w - 1);
 
-                        *o = r
-                    }
-                });
+                            let v00 = input[ih0w + iw0];
+                            let v01 = input[ih0w + iw1];
+                            let v10 = input[ih1w + iw0];
+                            let v11 = input[ih1w + iw1];
+
+                            let hd = v00 + (v10 - v00) * (ihf - ih as f32);
+                            let hw = v01 + (v11 - v01) * (ihf - ih as f32);
+                            let r = hd + (hw - hd) * (iwf - iw as f32);
+
+                            *o = r
+                        }
+                    });
+                }
+                output = &mut output[output_h * output_w..];
+                input = &input[input_hw..];
             }
         });
-        output = &mut output[output_h * output_w..];
-        input = &input[input_hw..];
     }
 }
 

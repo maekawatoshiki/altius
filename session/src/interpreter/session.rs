@@ -18,7 +18,7 @@ use altius_core::{
 };
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-use ndarray::{s, ArrayView2, ArrayView3, ArrayView4};
+use ndarray::{s, ArrayView, ArrayView2, ArrayView3, ArrayView4, ArrayView5, Axis, Dim, Ix};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 
@@ -215,7 +215,9 @@ impl<'a> InterpreterSession<'a> {
             Op::BatchNormalization(ref batchnorm) => {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
-            Op::Split(ref split) => compute_split(split, &inputs, &mut outputs),
+            Op::Split(ref split) => {
+                compute_split(self.model.opset_version, split, &inputs, &mut outputs)
+            }
             Op::Slice => compute_slice(node, &inputs, &mut outputs),
             Op::Gather(ref gather) => compute_gather(gather, &inputs, &mut outputs),
             Op::Shape(_) => todo!("shape"),
@@ -1565,28 +1567,29 @@ fn compute_batch_normalization(
     }
 }
 
-fn compute_split(split: &Split, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_split(opset_version: i64, split: &Split, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     assert!(split.axis >= 0);
     let axis = split.axis as usize;
     assert_eq!(axis, inputs[0].dims().len() - 1);
-    assert_eq!(inputs[0].dims().len(), 3);
-    assert_eq!(inputs[0].dims()[1], 100);
     let axis_len = *inputs[0].dims().as_slice().last().unwrap();
     let input = inputs[0].data::<f32>();
-    let split = inputs[1].data::<i64>();
-    assert!(
-        split.windows(2).all(|w| w[0] == w[1]),
-        "All split lengths must be the same."
-    );
-    let split = split[0] as usize;
 
-    let mut offset = 0;
+    let split = if opset_version >= 13 {
+        inputs[1].data::<i64>()
+    } else {
+        &split.split
+    };
+
+    let mut offset = vec![0; split.len()];
     for input in input.chunks(axis_len) {
-        for (input, output) in input[0..axis_len].chunks(split).zip(outputs.iter_mut()) {
+        let mut s = 0;
+        for (i, (sp, output)) in split.iter().zip(outputs.iter_mut()).enumerate() {
+            let input = &input[s..s + *sp as usize];
             let output = output.data_mut::<f32>();
-            output[offset..offset + input.len()].copy_from_slice(&input);
+            output[offset[i]..offset[i] + input.len()].copy_from_slice(&input);
+            offset[i] += *sp as usize;
+            s += *sp as usize
         }
-        offset += split;
     }
 }
 

@@ -281,6 +281,7 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
     assert!(input.dims().len() == 4);
     assert!(output.dims().len() == 4);
 
+    let padding = &maxpool.padding;
     let batches = output.dims()[0];
     let channels = output.dims()[1];
     let outer = batches * channels;
@@ -298,22 +299,24 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
     let mut input = input.data::<f32>();
     let mut output = output.data_mut::<f32>();
 
+    let pad_t = padding[0] as isize;
+    let pad_l = padding[1] as isize;
+
     for _ in 0..outer {
-        let mut y = 0isize; // TODO: pad
+        let mut y = -pad_t;
         for ay in 0..output_h {
-            let mut x = 0isize; // TODO: pad
+            let mut x = -pad_l;
             let output = &mut output[ay * output_w..];
             for ax in 0..output_w {
                 let mut max = f32::MIN;
                 for fy in 0..kernel_h {
                     let oy = y + fy as isize;
-                    let input = &input[oy as usize * input_w..];
                     for fx in 0..kernel_w {
                         let ox = x + fx as isize;
                         if ox < 0 || oy < 0 || ox >= input_w as isize || oy >= input_h as isize {
                             continue;
                         }
-                        max = input[ox as usize].max(max);
+                        max = input[oy as usize * input_w + ox as usize].max(max);
                     }
                 }
                 output[ax] = if max == f32::MIN { 0.0 } else { max };

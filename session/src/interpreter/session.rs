@@ -1475,6 +1475,18 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
             ]);
             output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
         }
+        5 => {
+            let in_view =
+                ArrayView5::from_shape(input.fixed_dims::<5>(), input.data::<f32>()).unwrap();
+            let in_view = in_view.permuted_axes([
+                transpose.perm[0] as usize,
+                transpose.perm[1] as usize,
+                transpose.perm[2] as usize,
+                transpose.perm[3] as usize,
+                transpose.perm[4] as usize,
+            ]);
+            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+        }
         _ => todo!("Transpose: Unsupported shape."),
     }
 }

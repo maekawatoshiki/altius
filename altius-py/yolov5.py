@@ -16,6 +16,89 @@ import numpy as np
 from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
 
+coco_labels = (
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "airplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "couch",
+    "potted plant",
+    "bed",
+    "dining table",
+    "toilet",
+    "tv",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
+)
+
 
 def xyxy2xywh(x):
     # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
@@ -195,6 +278,7 @@ def main():
 
     for o in output:
         for *xyxy, conf, cls in reversed(o):
+            name = coco_labels[int(cls)]
             draw = ImageDraw.Draw(image)
             draw.rectangle(
                 list(
@@ -206,6 +290,11 @@ def main():
                 outline=(0, 255, 0),
                 width=1,
             )
+            xyxy = list(
+                (np.array(xyxy) / 640)
+                * np.array([image.size[0], image.size[1], image.size[0], image.size[1]])
+            )
+            draw.text((xyxy[0], xyxy[1]), name, '#FF0000')
 
     img = np.asarray(image)
     ax.imshow(img)

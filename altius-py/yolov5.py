@@ -13,7 +13,7 @@ import altius_py
 
 import numpy as np
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from matplotlib import pyplot as plt
 
 coco_labels = (
@@ -248,6 +248,18 @@ def non_max_suppression(
     return output
 
 
+def get_font() -> ImageFont:
+    path = "Arial.ttf"
+
+    if os.path.exists(path):
+        return ImageFont.truetype(path, size=20)
+
+    url = "http://ultralytics.com/assets/Arial.ttf"
+    torch.hub.download_url_to_file(url, "Arial.ttf")
+
+    return get_font()
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
 
@@ -275,26 +287,23 @@ def main():
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
+    font = get_font()
 
     for o in output:
         for *xyxy, conf, cls in reversed(o):
             name = coco_labels[int(cls)]
-            draw = ImageDraw.Draw(image)
-            draw.rectangle(
-                list(
-                    (np.array(xyxy) / 640)
-                    * np.array(
-                        [image.size[0], image.size[1], image.size[0], image.size[1]]
-                    )
-                ),
-                outline=(0, 255, 0),
-                width=1,
-            )
             xyxy = list(
                 (np.array(xyxy) / 640)
                 * np.array([image.size[0], image.size[1], image.size[0], image.size[1]])
             )
-            draw.text((xyxy[0], xyxy[1]), name, '#FF0000')
+
+            draw = ImageDraw.Draw(image)
+            draw.rectangle(
+                xyxy,
+                outline=(0, 255, 0),
+                width=1,
+            )
+            draw.text((xyxy[0], xyxy[1]), name, "#FF0000", font=font)
 
     img = np.asarray(image)
     ax.imshow(img)

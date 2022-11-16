@@ -292,9 +292,8 @@ def main():
     for o in output:
         for *xyxy, conf, cls in reversed(o):
             name = coco_labels[int(cls)]
-            xyxy = list(
-                (np.array(xyxy) / 640)
-                * np.array([image.size[0], image.size[1], image.size[0], image.size[1]])
+            xyxy = tuple(
+                (np.array(xyxy) / 640) * np.array([image.size[0], image.size[1]] * 2)
             )
 
             draw = ImageDraw.Draw(image)
@@ -302,6 +301,12 @@ def main():
                 xyxy,
                 outline=(0, 255, 0),
                 width=1,
+            )
+            w, h = font.getsize(name)
+            draw.rectangle(
+                (xyxy[0], xyxy[1], xyxy[0] + w, xyxy[1] + h),
+                outline=(0, 255, 0),
+                fill=(0, 255, 0),
             )
             draw.text((xyxy[0], xyxy[1]), name, "#FF0000", font=font)
 

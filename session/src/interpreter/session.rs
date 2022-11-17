@@ -194,7 +194,7 @@ impl<'a> InterpreterSession<'a> {
             Op::HardSigmoid(ref hs) => compute_hard_sigmoid(hs, &inputs, &mut outputs),
             Op::LeakyReLU(ref leaky) => compute_leaky_relu(leaky, &inputs, &mut outputs),
             Op::Gelu => compute_gelu(&self.tctx, &inputs, &mut outputs),
-            Op::Sigmoid => compute_sigmoid(&inputs, &mut outputs),
+            Op::Sigmoid => compute_sigmoid(&self.tctx, &inputs, &mut outputs),
             Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Tanh => compute_tanh(&inputs, &mut outputs),
             Op::Clip => todo!("clip"),
@@ -1205,11 +1205,23 @@ fn tanh(mut data: &mut [f32]) {
     }
 }
 
-fn compute_sigmoid(inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_sigmoid(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input: &[f32] = inputs[Node::SIGMOID_IN].data();
     let output: &mut [f32] = outputs[Node::SIGMOID_OUT].data_mut();
 
-    fast_sigmoid(output, input);
+    let threshold = 512;
+    let chunk_size = output.len() / tctx.num_threads();
+
+    if chunk_size > threshold {
+        tctx.scope(|scope| {
+            input
+                .chunks(chunk_size)
+                .zip(output.chunks_mut(chunk_size))
+                .for_each(|(input, output)| scope.spawn(move || fast_sigmoid(output, input)))
+        })
+    } else {
+        fast_sigmoid(output, input)
+    }
 }
 
 fn compute_erf(inputs: &[&Tensor], outputs: &mut [Tensor]) {

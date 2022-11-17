@@ -307,15 +307,16 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
         for ay in 0..output_h {
             let mut x = -pad_l;
             let output = &mut output[ay * output_w..];
+            let fy_min = (-y).max(0) as usize;
+            let fy_max = kernel_h.min((input_h as isize - y) as usize);
             for ax in 0..output_w {
                 let mut max = f32::MIN;
-                for fy in 0..kernel_h {
+                let fx_min = (-x).max(0) as usize;
+                let fx_max = kernel_w.min((input_w as isize - x) as usize);
+                for fy in fy_min..fy_max {
                     let oy = y + fy as isize;
-                    for fx in 0..kernel_w {
+                    for fx in fx_min..fx_max {
                         let ox = x + fx as isize;
-                        if ox < 0 || oy < 0 || ox >= input_w as isize || oy >= input_h as isize {
-                            continue;
-                        }
                         max = input[oy as usize * input_w + ox as usize].max(max);
                     }
                 }

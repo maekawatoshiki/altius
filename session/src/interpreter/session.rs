@@ -1,6 +1,6 @@
 use super::{
     conv2d::{self, Conv2dCtx},
-    exp::fast_exp,
+    fast_math::{fast_exp, fast_sigmoid},
     gemm::{sgemm, sgemm2},
     thread::ThreadCtx,
 };
@@ -1209,9 +1209,7 @@ fn compute_sigmoid(inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input: &[f32] = inputs[Node::SIGMOID_IN].data();
     let output: &mut [f32] = outputs[Node::SIGMOID_OUT].data_mut();
 
-    for (i, o) in input.iter().zip(output.iter_mut()) {
-        *o = 1. / (1. + (-i).exp())
-    }
+    fast_sigmoid(output, input);
 }
 
 fn compute_erf(inputs: &[&Tensor], outputs: &mut [Tensor]) {

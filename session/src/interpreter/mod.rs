@@ -1,6 +1,6 @@
 mod builder;
 mod conv2d;
-mod exp;
+mod fast_math;
 mod gemm;
 mod session;
 mod thread;

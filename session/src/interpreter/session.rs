@@ -5,7 +5,7 @@ use super::{
     thread::ThreadCtx,
 };
 
-use crate::SessionError;
+use crate::{NodeExecutionPlan, SessionError};
 use altius_core::{
     model::Model,
     node::{
@@ -51,16 +51,6 @@ pub struct InterpreterSession<'a> {
     pub(super) values: ThreadLocal<RefCell<FxHashMap<ValueId, Tensor>>>,
     pub(super) dummy_value: Tensor,
     pub(super) tctx: ThreadCtx,
-}
-
-/// Represents a node to execute and values to be freed after the execution of the node.
-#[derive(Debug)]
-pub(super) struct NodeExecutionPlan {
-    /// The node to execute.
-    node_id: NodeId,
-
-    /// Values to be freed after the execution of the node.
-    free_vals: Vec<ValueId>,
 }
 
 impl<'a> InterpreterSession<'a> {
@@ -1757,100 +1747,4 @@ fn compute_flatten(_flatten: &Flatten, inputs: &[&Tensor], outputs: &mut [Tensor
     let input = inputs[Node::FLATTEN_IN];
     let output = &mut outputs[Node::FLATTEN_OUT];
     output.copy_data_from(input);
-}
-
-// TODO: Better move to another file.
-/// Infer `TypedShape`s of output tensors for each node.
-/// It skips to infer on nodes without information for inference.
-pub(super) fn infer_shapes(
-    model: &Model,
-    sorted_nodes: &[NodeId],
-    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
-) {
-    let mut values = model.inits.clone();
-
-    for &val_id in &model.inputs {
-        let shape = &model.values.inner()[val_id].shape;
-        let Some(shape) = shape else { continue };
-        let tensor = Tensor::zeros_of_type(shape.elem_ty, shape.dims.clone());
-        values.insert(val_id, tensor);
-    }
-
-    for &node in sorted_nodes {
-        infer_shape(model, &mut values, shapes, node)
-    }
-}
-
-fn infer_shape(
-    model: &Model,
-    values: &mut FxHashMap<ValueId, Tensor>,
-    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
-    node_id: NodeId,
-) {
-    let node = &model.nodes[node_id];
-    let mut op = node.op.clone();
-    let mut inputs = vec![];
-    for input in &node.inputs {
-        let Some(input) = values.get(input) else { return };
-        inputs.push(input);
-    }
-    let output_shapes = compute_output_shapes(&mut op, &inputs, model.opset_version);
-    let mut outputs = vec![];
-    for shape in &output_shapes {
-        outputs.push(Tensor::empty_of_type(shape.elem_ty, shape.dims.clone()));
-    }
-    for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
-        values.insert(val, output);
-    }
-    shapes.insert(node_id, (op, output_shapes));
-}
-
-pub(super) fn create_execution_plan(
-    model: &Model,
-    sorted_nodes: &[NodeId],
-) -> Vec<NodeExecutionPlan> {
-    let node_order: FxHashMap<NodeId, usize> = sorted_nodes
-        .iter()
-        .enumerate()
-        .map(|(i, id)| (*id, i))
-        .collect();
-    let mut new_sorted_nodes = vec![];
-    let mut node_to_free_vals = FxHashMap::default();
-    let value_users = model.get_value_users();
-
-    for &node_id in sorted_nodes {
-        let node = &model.nodes[node_id];
-        new_sorted_nodes.push(NodeExecutionPlan {
-            node_id,
-            free_vals: vec![],
-        });
-
-        for &output_id in &node.outputs {
-            if !value_users.contains_key(&output_id) {
-                continue;
-            }
-
-            let users = &value_users[&output_id];
-            let last_user = users
-                .iter()
-                .map(|id| (node_order[id], id))
-                .max_by(|x, y| x.0.cmp(&y.0))
-                .unwrap()
-                .1;
-            node_to_free_vals
-                .entry(last_user)
-                .or_insert_with(|| vec![])
-                .push(output_id)
-        }
-
-        if let Some(mut vals) = node_to_free_vals.remove(&node_id) {
-            new_sorted_nodes
-                .last_mut()
-                .unwrap()
-                .free_vals
-                .append(&mut vals);
-        }
-    }
-
-    new_sorted_nodes
 }

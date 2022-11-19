@@ -2,10 +2,9 @@ use altius_core::{model::Model, tensor::Tensor};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 
-use super::{
-    session::{create_execution_plan, infer_shapes, InterpreterSession},
-    thread::ThreadCtx,
-};
+use crate::{create_execution_plan, infer_shapes};
+
+use super::{session::InterpreterSession, thread::ThreadCtx};
 
 pub struct InterpreterSessionBuilder<'a> {
     model: &'a Model,

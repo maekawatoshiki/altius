@@ -1,5 +1,6 @@
 #![feature(portable_simd)]
 
+pub mod cpu;
 pub mod interpreter;
 #[cfg(feature = "opencl")]
 pub mod opencl;

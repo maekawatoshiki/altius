@@ -7,11 +7,14 @@ use threadpool::ThreadPool;
 pub struct ThreadCtx {
     #[cfg(not(target_arch = "wasm32"))]
     pub tp: ThreadPool,
+
+    #[cfg(not(target_arch = "wasm32"))]
+    num_threads: usize,
 }
 
 pub struct Scope<'a> {
     #[cfg(not(target_arch = "wasm32"))]
-    tp: &'a ThreadPool,
+    ctx: &'a ThreadCtx,
 
     #[cfg(target_arch = "wasm32")]
     _phantom: PhantomData<&'a fn()>,
@@ -24,13 +27,17 @@ impl<'a> Scope<'a> {
     {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let f = unsafe {
-                std::mem::transmute::<
-                    Box<dyn FnOnce() + Send + 'a>,
-                    Box<dyn FnOnce() + Send + 'static>,
-                >(Box::new(f))
-            };
-            self.tp.execute(f)
+            if self.ctx.num_threads() == 1 {
+                f()
+            } else {
+                let f = unsafe {
+                    std::mem::transmute::<
+                        Box<dyn FnOnce() + Send + 'a>,
+                        Box<dyn FnOnce() + Send + 'static>,
+                    >(Box::new(f))
+                };
+                self.ctx.tp.execute(f)
+            }
         }
 
         #[cfg(target_arch = "wasm32")]
@@ -49,7 +56,7 @@ impl ThreadCtx {
             core_affinity::set_for_current(core_affinity::CoreId { id: 0 });
         });
         tp.join();
-        Self { tp }
+        Self { tp, num_threads: 1 }
     }
 
     #[allow(dead_code)]
@@ -67,7 +74,7 @@ impl ThreadCtx {
             })
         }
         tp.join();
-        Self { tp }
+        Self { tp, num_threads: n }
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -76,8 +83,8 @@ impl ThreadCtx {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn num_threads(&self) -> usize {
-        self.tp.max_count()
+    pub const fn num_threads(&self) -> usize {
+        self.num_threads
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -90,9 +97,11 @@ impl ThreadCtx {
     where
         F: FnMut(&Scope),
     {
-        let scope = Scope { tp: &self.tp };
+        let scope = Scope { ctx: self };
         f(&scope);
-        self.tp.join();
+        if self.num_threads != 1 {
+            self.tp.join();
+        }
     }
 
     #[cfg(target_arch = "wasm32")]

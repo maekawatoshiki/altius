@@ -206,60 +206,71 @@ pub fn compute(ctx: &mut Conv2dCtx) {
         });
     }
 
-    let mut col_ptr = col.data::<f32>().as_ptr();
     let col_stride = in_c_per_g * kernel[0] * kernel[1] * output_h * output_w;
-    let weight_ptr = weight.data::<f32>().as_ptr();
     let weight_stride = out_c_per_g * in_c_per_g * kernel[0] * kernel[1];
-    let mut output_ptr = output.data_mut::<f32>().as_mut_ptr();
     let output_stride = out_c_per_g * output_hw;
     let k = in_c_per_g * kernel[0] * kernel[1];
+    let col = col.data::<f32>();
+    let weight = weight.data::<f32>();
+    let output = output.data_mut::<f32>();
 
-    for _ in 0..batch_size {
-        let mut weight_ptr = weight_ptr;
-        for _ in 0..group {
-            unsafe {
-                #[cfg(not(feature = "cblas"))]
-                matrixmultiply::sgemm(
-                    out_c_per_g,
-                    k,
-                    output_hw,
-                    1.0,
-                    weight_ptr,
-                    k as isize,
-                    1,
-                    col_ptr,
-                    output_hw as isize,
-                    1,
-                    1.0,
-                    output_ptr,
-                    output_hw as isize,
-                    1,
-                );
-                #[cfg(feature = "cblas")]
-                {
-                    cblas_sys::cblas_sgemm(
-                        cblas_sys::CblasRowMajor,
-                        cblas_sys::CblasNoTrans,
-                        cblas_sys::CblasNoTrans,
-                        out_c_per_g as i32,
-                        output_hw as i32,
-                        k as i32,
-                        1.0f32,
+    ctx.tctx.scope(|scope| {
+        for ((col, weight), output) in col
+            .chunks(col_stride)
+            .zip(weight.chunks(weight_stride).cycle())
+            .zip(output.chunks_mut(output_stride))
+        {
+            let mut inner = move || {
+                let col_ptr = col.as_ptr();
+                let weight_ptr = weight.as_ptr();
+                let output_ptr = output.as_mut_ptr();
+
+                unsafe {
+                    #[cfg(not(feature = "cblas"))]
+                    matrixmultiply::sgemm(
+                        out_c_per_g,
+                        k,
+                        output_hw,
+                        1.0,
                         weight_ptr,
-                        k as i32,
-                        col_ptr as *const _,
-                        output_hw as i32,
-                        1.0f32,
-                        output_ptr as *mut f32,
-                        output_hw as i32,
+                        k as isize,
+                        1,
+                        col_ptr,
+                        output_hw as isize,
+                        1,
+                        1.0,
+                        output_ptr,
+                        output_hw as isize,
+                        1,
                     );
+                    #[cfg(feature = "cblas")]
+                    {
+                        cblas_sys::cblas_sgemm(
+                            cblas_sys::CblasRowMajor,
+                            cblas_sys::CblasNoTrans,
+                            cblas_sys::CblasNoTrans,
+                            out_c_per_g as i32,
+                            output_hw as i32,
+                            k as i32,
+                            1.0f32,
+                            weight_ptr,
+                            k as i32,
+                            col_ptr as *const _,
+                            output_hw as i32,
+                            1.0f32,
+                            output_ptr as *mut f32,
+                            output_hw as i32,
+                        );
+                    }
                 }
-                col_ptr = col_ptr.add(col_stride);
-                weight_ptr = weight_ptr.add(weight_stride);
-                output_ptr = output_ptr.add(output_stride);
             };
+            if group == 1 {
+                inner();
+            } else {
+                scope.spawn(inner);
+            }
         }
-    }
+    });
 }
 
 #[cfg(feature = "cuda")]

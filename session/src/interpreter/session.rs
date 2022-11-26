@@ -39,7 +39,7 @@ mod cuda {
 }
 
 #[cfg(feature = "cuda")]
-use cuda::*;
+pub(super) use cuda::*;
 
 pub struct InterpreterSession<'a> {
     pub(super) model: &'a Model,

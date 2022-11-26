@@ -3,9 +3,9 @@ use altius_core::{
     tensor::Tensor,
 };
 
-use super::thread::ThreadCtx;
 #[cfg(feature = "cuda")]
-use super::SafeCudnnContext;
+use super::session::SafeCudnnContext;
+use super::thread::ThreadCtx;
 #[cfg(feature = "cuda")]
 pub use cudnn::{
     ActivationDescriptor, ActivationMode, ConvDescriptor, ConvFwdAlgo, ConvMode, FilterDescriptor,

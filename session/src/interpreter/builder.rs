@@ -4,7 +4,11 @@ use thread_local::ThreadLocal;
 
 use crate::{create_execution_plan, infer_shapes};
 
+#[cfg(feature = "cuda")]
+use super::session::SafeCudnnContext;
 use super::{session::InterpreterSession, thread::ThreadCtx};
+#[cfg(feature = "cuda")]
+use cudnn::CudnnContext;
 
 pub struct InterpreterSessionBuilder<'a> {
     model: &'a Model,

@@ -46,6 +46,6 @@ cd altius-py
 python -m venv .env
 source .env/bin/activate
 pip install -r requirements.txt
-maturin develop -r
+RUSTFLAGS="-C target-cpu=native" maturin develop -r --features blis
 python mobilenet.py
 ```

@@ -23,7 +23,7 @@ Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) an
 ./run.sh mobilenet
 ./run.sh vit # You can specify the number of threads in ./session/examples/vit.rs
 
-# For macOS, you can use 'accelerate' library.
+# On macOS, you can use 'accelerate' library.
 RUSTFLAGS="-C target-cpu=native" \
     cargo run --release --example mobilenet --features accelerate
 ```

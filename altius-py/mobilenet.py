@@ -1,9 +1,14 @@
-import altius_py
-import numpy as np
-from PIL import Image
-from torchvision import transforms
-import os, random
+import os
+import random
+import time
+
 from matplotlib import pyplot as plt
+from PIL import Image
+import numpy as np
+
+from torchvision import transforms
+import onnxruntime as ort
+import altius_py
 
 
 def main():

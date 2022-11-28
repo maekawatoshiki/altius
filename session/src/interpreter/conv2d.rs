@@ -125,6 +125,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
                     let input = input;
                     let mut col = col;
 
+                    // TODO: This can be faster.
                     for fy in 0..kernel_h {
                         let ih = fy as isize - pad_t as isize;
                         for fx in 0..kernel_w {

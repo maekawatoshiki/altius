@@ -127,31 +127,24 @@ pub fn compute(ctx: &mut Conv2dCtx) {
 
                     // TODO: This can be faster.
                     for fy in 0..kernel_h {
-                        let ih = fy as isize - pad_t as isize;
                         for fx in 0..kernel_w {
-                            let iw = fx as isize - pad_l as isize;
-                            let mut ih = ih;
-                            let mut owh = 0;
-                            for _oh in 0..output_h {
-                                if 0 <= ih && ih < input_h as isize {
-                                    let jh = ih as usize * input_w;
-                                    let mut iw = iw;
-                                    for ow in 0..output_w {
-                                        unsafe { *col.get_unchecked_mut(owh + ow) = 0. };
-                                        if 0 <= iw && iw < input_w as isize {
-                                            let jw = jh + iw as usize;
-                                            unsafe {
-                                                *col.get_unchecked_mut(owh + ow) =
-                                                    *input.get_unchecked(jw)
-                                            };
-                                        }
-                                        iw += stride_w as isize;
-                                    }
-                                } else {
+                            for oh in 0..output_h {
+                                let owh = oh * output_h;
+                                let ih = fy + (oh * stride_h);
+                                if pad_t > ih || ih >= input_h + pad_t {
                                     unsafe { col.get_unchecked_mut(owh..owh + output_w).fill(0.) };
+                                    continue;
                                 }
-                                owh += output_w;
-                                ih += stride_h as isize;
+                                for ow in 0..output_w {
+                                    let iw = fx + (ow * stride_w);
+                                    if pad_l > iw || iw >= input_w + pad_l {
+                                        unsafe { *col.get_unchecked_mut(owh + ow) = 0. };
+                                        continue;
+                                    }
+                                    let jw = (ih - pad_t) * input_w + iw - pad_l;
+                                    let pixel = unsafe { *input.get_unchecked(jw) };
+                                    unsafe { *col.get_unchecked_mut(owh + ow) = pixel };
+                                }
                             }
                             col = unsafe { col.get_unchecked_mut(output_hw..) };
                         }

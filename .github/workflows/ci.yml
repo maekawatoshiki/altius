@@ -21,7 +21,7 @@ jobs:
         toolchain: nightly
     - name: Install dependencies
       run: |
-        sudo apt install -y git-lfs mesa-common-dev libvulkan1 mesa-vulkan-drivers vulkan-utils libpocl2 ocl-icd-opencl-dev
+        sudo apt install -y git-lfs # mesa-common-dev libvulkan1 mesa-vulkan-drivers vulkan-utils libpocl2 ocl-icd-opencl-dev
     - name: Download large files
       run: |
         git lfs install && \

@@ -114,104 +114,33 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     } else if dilation_h == 1 && dilation_w == 1 {
         let col = col.data_mut::<f32>();
         let input = input.data::<f32>();
-        let _outer = batch_size * input_c;
-
         ctx.tctx.scope(|scope| {
-            for (col, input) in col
-                .chunks_mut(output_hw * kernel_h * kernel_w)
+            col.chunks_mut(output_hw * kernel_h * kernel_w)
                 .zip(input.chunks(input_hw))
-            {
-                scope.spawn(move || {
-                    let input = input;
-                    let mut col = col;
-
-                    // TODO: This can be faster.
-                    for fy in 0..kernel_h {
-                        for fx in 0..kernel_w {
-                            for oh in 0..output_h {
-                                let owh = oh * output_h;
-                                let ih = fy + (oh * stride_h);
-                                if pad_t > ih || ih >= input_h + pad_t {
-                                    unsafe { col.get_unchecked_mut(owh..owh + output_w).fill(0.) };
-                                    continue;
-                                }
-                                let mut ow = 0;
-                                loop {
-                                    let iw = fx + (ow * stride_w);
-                                    if pad_l <= iw {
-                                        break;
-                                    }
-                                    unsafe { *col.get_unchecked_mut(owh + ow) = 0. };
-                                    ow += 1;
-                                }
-                                loop {
-                                    let iw = fx + (ow * stride_w);
-                                    if iw >= input_w + pad_l {
-                                        break;
-                                    }
-                                    let jw = (ih - pad_t) * input_w + iw - pad_l;
-                                    let pixel = unsafe { *input.get_unchecked(jw) };
-                                    unsafe { *col.get_unchecked_mut(owh + ow) = pixel };
-                                    ow += 1;
-                                }
-                                if ow < output_w {
-                                    unsafe {
-                                        col.get_unchecked_mut(owh + ow..owh + output_w).fill(0.)
-                                    }
-                                }
-                            }
-                            col = unsafe { col.get_unchecked_mut(output_hw..) };
-                        }
-                    }
-                });
-            }
+                .for_each(|(col, input)| {
+                    scope.spawn(move || {
+                        im2col(
+                            input_h, input_w, output_h, output_w, stride_h, stride_w, pad_t, pad_l,
+                            kernel_h, kernel_w, input, col,
+                        )
+                    })
+                })
         })
     } else {
         let col = col.data_mut::<f32>();
         let input = input.data::<f32>();
-
         ctx.tctx.scope(|scope| {
-            for (col, input) in col
-                .chunks_mut(output_hw * kernel_h * kernel_w)
+            col.chunks_mut(output_hw * kernel_h * kernel_w)
                 .zip(input.chunks(input_hw))
-            {
-                scope.spawn(move || {
-                    let input = input;
-                    let mut col = col;
-
-                    for fy in 0..kernel_h {
-                        let ih = (fy * dilation_h) as isize - pad_t as isize;
-                        for fx in 0..kernel_w {
-                            let iw = (fx * dilation_w) as isize - pad_l as isize;
-                            let mut ih = ih;
-                            let mut owh = 0;
-                            for _oh in 0..output_h {
-                                if 0 <= ih && ih < input_h as isize {
-                                    let jh = ih as usize * input_w;
-                                    let mut iw = iw;
-                                    for ow in 0..output_w {
-                                        unsafe { *col.get_unchecked_mut(owh + ow) = 0. };
-                                        if 0 <= iw && iw < input_w as isize {
-                                            let jw = jh + iw as usize;
-                                            unsafe {
-                                                *col.get_unchecked_mut(owh + ow) =
-                                                    *input.get_unchecked(jw)
-                                            };
-                                        }
-                                        iw += stride_w as isize;
-                                    }
-                                } else {
-                                    unsafe { col.get_unchecked_mut(owh..owh + output_w).fill(0.) };
-                                }
-                                owh += output_w;
-                                ih += stride_h as isize;
-                            }
-                            col = unsafe { col.get_unchecked_mut(output_hw..) };
-                        }
-                    }
-                });
-            }
-        });
+                .for_each(|(col, input)| {
+                    scope.spawn(move || {
+                        im2col_with_dilation(
+                            input_h, input_w, output_h, output_w, stride_h, stride_w, dilation_h,
+                            dilation_w, pad_t, pad_l, kernel_h, kernel_w, input, col,
+                        )
+                    })
+                })
+        })
     }
 
     let col_stride = in_c_per_g * kernel[0] * kernel[1] * output_h * output_w;
@@ -279,6 +208,124 @@ pub fn compute(ctx: &mut Conv2dCtx) {
             }
         }
     });
+}
+
+#[inline]
+fn im2col(
+    input_h: usize,
+    input_w: usize,
+    output_h: usize,
+    output_w: usize,
+    stride_h: usize,
+    stride_w: usize,
+    pad_t: usize,
+    pad_l: usize,
+    kernel_h: usize,
+    kernel_w: usize,
+    input: &[f32],
+    mut col: &mut [f32],
+) {
+    let output_hw = output_h * output_w;
+
+    for fy in 0..kernel_h {
+        for fx in 0..kernel_w {
+            for oh in 0..output_h {
+                let col = &mut col[oh * output_h..];
+                let ih = fy + oh * stride_h;
+
+                if pad_t > ih || ih >= input_h + pad_t {
+                    col[..output_w].fill(0.);
+                    continue;
+                }
+
+                let mut ow = 0;
+                loop {
+                    let iw = fx + (ow * stride_w);
+                    if pad_l <= iw {
+                        break;
+                    }
+                    unsafe { *col.get_unchecked_mut(ow) = 0. };
+                    ow += 1;
+                }
+
+                let c = (ih - pad_t) * input_w;
+                loop {
+                    let iw = fx + (ow * stride_w);
+                    if iw >= input_w + pad_l {
+                        break;
+                    }
+                    let jw = c + iw - pad_l;
+                    unsafe { *col.get_unchecked_mut(ow) = *input.get_unchecked(jw) };
+                    ow += 1;
+                }
+
+                if ow < output_w {
+                    col[ow..output_w].fill(0.);
+                }
+            }
+            col = unsafe { col.get_unchecked_mut(output_hw..) };
+        }
+    }
+}
+
+#[inline]
+fn im2col_with_dilation(
+    input_h: usize,
+    input_w: usize,
+    output_h: usize,
+    output_w: usize,
+    stride_h: usize,
+    stride_w: usize,
+    dilation_h: usize,
+    dilation_w: usize,
+    pad_t: usize,
+    pad_l: usize,
+    kernel_h: usize,
+    kernel_w: usize,
+    input: &[f32],
+    mut col: &mut [f32],
+) {
+    let output_hw = output_h * output_w;
+
+    for fy in 0..kernel_h {
+        for fx in 0..kernel_w {
+            for oh in 0..output_h {
+                let col = &mut col[oh * output_h..];
+                let ih = fy * dilation_h + oh * stride_h;
+
+                if pad_t > ih || ih >= input_h + pad_t {
+                    col[..output_w].fill(0.);
+                    continue;
+                }
+
+                let mut ow = 0;
+                loop {
+                    let iw = fx * dilation_w + (ow * stride_w);
+                    if pad_l <= iw {
+                        break;
+                    }
+                    unsafe { *col.get_unchecked_mut(ow) = 0. };
+                    ow += 1;
+                }
+
+                let c = (ih - pad_t) * input_w;
+                loop {
+                    let iw = fx * dilation_w + (ow * stride_w);
+                    if iw >= input_w + pad_l {
+                        break;
+                    }
+                    let jw = c + iw - pad_l;
+                    unsafe { *col.get_unchecked_mut(ow) = *input.get_unchecked(jw) };
+                    ow += 1;
+                }
+
+                if ow < output_w {
+                    col[ow..output_w].fill(0.);
+                }
+            }
+            col = unsafe { col.get_unchecked_mut(output_hw..) };
+        }
+    }
 }
 
 #[cfg(feature = "cuda")]

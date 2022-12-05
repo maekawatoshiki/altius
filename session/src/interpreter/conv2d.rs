@@ -135,15 +135,29 @@ pub fn compute(ctx: &mut Conv2dCtx) {
                                     unsafe { col.get_unchecked_mut(owh..owh + output_w).fill(0.) };
                                     continue;
                                 }
-                                for ow in 0..output_w {
+                                let mut ow = 0;
+                                loop {
                                     let iw = fx + (ow * stride_w);
-                                    if pad_l > iw || iw >= input_w + pad_l {
-                                        unsafe { *col.get_unchecked_mut(owh + ow) = 0. };
-                                        continue;
+                                    if pad_l <= iw {
+                                        break;
+                                    }
+                                    unsafe { *col.get_unchecked_mut(owh + ow) = 0. };
+                                    ow += 1;
+                                }
+                                loop {
+                                    let iw = fx + (ow * stride_w);
+                                    if iw >= input_w + pad_l {
+                                        break;
                                     }
                                     let jw = (ih - pad_t) * input_w + iw - pad_l;
                                     let pixel = unsafe { *input.get_unchecked(jw) };
                                     unsafe { *col.get_unchecked_mut(owh + ow) = pixel };
+                                    ow += 1;
+                                }
+                                if ow < output_w {
+                                    unsafe {
+                                        col.get_unchecked_mut(owh + ow..owh + output_w).fill(0.)
+                                    }
                                 }
                             }
                             col = unsafe { col.get_unchecked_mut(output_hw..) };

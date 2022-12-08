@@ -1071,28 +1071,20 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_relu(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input = inputs[Node::RELU_IN];
-    let output = &mut outputs[Node::RELU_OUT];
+    let input: &[f32] = inputs[Node::RELU_IN].data();
+    let output: &mut [f32] = &mut outputs[Node::RELU_OUT].data_mut();
 
-    for (i, o) in input
-        .data::<f32>()
-        .iter()
-        .zip(output.data_mut::<f32>().iter_mut())
-    {
+    for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = i.max(0.0);
     }
 }
 
 fn compute_hard_sigmoid(hs: &HardSigmoid, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input = inputs[Node::HARDSIGMOID_IN];
-    let output = &mut outputs[Node::HARDSIGMOID_OUT];
+    let input: &[f32] = inputs[Node::HARDSIGMOID_IN].data();
+    let output: &mut [f32] = &mut outputs[Node::HARDSIGMOID_OUT].data_mut();
 
-    for (i, o) in input
-        .data::<f32>()
-        .iter()
-        .zip(output.data_mut::<f32>().iter_mut())
-    {
-        *o = (hs.alpha * i + hs.beta).min(1.0).max(0.0);
+    for (&i, o) in input.iter().zip(output.iter_mut()) {
+        *o = hs.alpha.mul_add(i, hs.beta).clamp(0.0, 1.0)
     }
 }
 

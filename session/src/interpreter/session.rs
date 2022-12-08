@@ -234,29 +234,17 @@ fn compute_gavg_pool(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     assert!(input.dims().len() == 4);
     assert!(output.dims().len() == 4);
 
-    let n = input.dims()[0];
-    let c = input.dims()[1];
-    let h = input.dims()[2];
-    let w = input.dims()[3];
-    let area = (h * w) as f32;
-    let input_strides = input.strides();
+    let Some(&[_, _, h, w]) = input.dims().get(0..4) else { todo!() };
+    let Some([isn, isc, _, _]) = input.strides().get(0..4) else { todo!() };
+    let area = h * w;
+    let osn = output.strides()[0];
     let input = input.data::<f32>();
-    let out_stride_n = output.strides()[0];
     let output = output.data_mut::<f32>();
 
-    for n in 0..n {
-        let idx_n = input_strides[0] * n;
-        for c in 0..c {
-            let idx_c = idx_n + input_strides[1] * c;
-            let mut sum = 0f32;
-            for h in 0..h {
-                let idx_h = idx_c + input_strides[2] * h;
-                for w in 0..w {
-                    let idx_w = idx_h + input_strides[3] * w;
-                    sum += input[idx_w];
-                }
-            }
-            output[n * out_stride_n + c] = sum / area;
+    for (o_channels, i_channels) in output.chunks_mut(osn).zip(input.chunks(*isn)) {
+        for (o_channel, i_channel) in o_channels.iter_mut().zip(i_channels.chunks(*isc)) {
+            let sum: f32 = i_channel.iter().sum();
+            *o_channel = sum / area as f32;
         }
     }
 }

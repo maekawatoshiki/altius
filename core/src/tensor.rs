@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::Ordering, iter::Sum, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, iter::Sum, ops::Deref, sync::Arc};
 
 use crate::dim::{Dimension, Dimensions};
 use rand::{
@@ -373,6 +373,13 @@ impl Tensor {
                 .unwrap_or(&T::zero()),
             mean: data.iter().sum::<T>().into() / data.len() as f64,
         }
+    }
+}
+
+impl Deref for Dimensions {
+    type Target = Vec<usize>;
+    fn deref(&self) -> &Vec<usize> {
+        &self.0
     }
 }
 

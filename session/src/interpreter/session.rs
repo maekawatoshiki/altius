@@ -1260,37 +1260,31 @@ fn compute_softmax(
 
     assert!(softmax.axis == -1 || softmax.axis == (input.dims().len() - 1) as i64);
 
-    let axis_len = *input.dims().as_slice().last().unwrap();
+    let axis_len = *input.dims().last().unwrap();
     let input = input.data::<f32>();
     let output = output.data_mut::<f32>();
 
-    let n = tctx.num_threads();
-    let chunk = if input.len() < n {
-        input.len()
-    } else {
-        input.len() / n
-    };
-
-    tctx.scope(|scope| {
-        input
-            .chunks(chunk)
-            .zip(output.chunks_mut(chunk))
-            .for_each(|(input, output)| scope.spawn(|| fast_exp(output, input)));
-    });
-
+    // let _n = tctx.num_threads();
     let batch = (output.len() / 100000).max(1); // 100000 is magic number :(
                                                 // I think processing more than 100000 elements for
                                                 // each core is just right.
 
     tctx.scope(|scope| {
-        output.chunks_mut(axis_len * batch).for_each(|output| {
-            scope.spawn(|| {
-                output.chunks_mut(axis_len).for_each(|output| {
-                    let sum = fast_sum(output);
-                    output.iter_mut().for_each(|o| *o /= sum);
-                });
-            })
-        });
+        output
+            .chunks_mut(axis_len * batch)
+            .zip(input.chunks(axis_len * batch))
+            .for_each(|(output, input)| {
+                scope.spawn(|| {
+                    output
+                        .chunks_mut(axis_len)
+                        .zip(input.chunks(axis_len))
+                        .for_each(|(output, input)| {
+                            fast_exp(output, input);
+                            let sum = fast_sum(output);
+                            output.iter_mut().for_each(|o| *o /= sum);
+                        });
+                })
+            });
     });
 }
 

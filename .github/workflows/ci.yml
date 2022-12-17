@@ -38,6 +38,7 @@ jobs:
             cargo run --release --features blis --example mnist && \
             cargo run --release --features blis --example mobilenet && \
             cargo run --release --features blis --example vit && \
+            cargo run --release --features blis --example infer -- ./models/mnist-8.onnx && \
             mkdir -p /tmp/cov/ && \
             cp -rf ./target/release/* ./altius-py/target/release/* /tmp/cov/ && \
             grcov . --binary-path /tmp/cov/ -s . -t cobertura --branch --ignore-not-existing --ignore "*cargo*" -o coverage.xml && \

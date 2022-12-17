@@ -183,23 +183,23 @@ impl Tensor {
         });
     }
 
-    pub fn reshape_into(mut self, dims: Dimensions) -> Self {
-        self.stride = compute_strides(&dims);
-        self.dims = dims;
-        assert!(self.verify());
-        self
-    }
+    // pub fn reshape_into(mut self, dims: Dimensions) -> Self {
+    //     self.stride = compute_strides(&dims);
+    //     self.dims = dims;
+    //     assert!(self.verify());
+    //     self
+    // }
 
-    pub fn to_transposed_2d(&self) -> Self {
-        assert!(self.dims.len() == 2);
-        let mut out = Tensor::zeros::<f32>(vec![self.dims[1], self.dims[0]].into());
-        for x in 0..self.dims[0] {
-            for y in 0..self.dims[1] {
-                *out.at_2d_mut(y, x) = self.at_2d(x, y);
-            }
-        }
-        out
-    }
+    // pub fn to_transposed_2d(&self) -> Self {
+    //     assert!(self.dims.len() == 2);
+    //     let mut out = Tensor::zeros::<f32>(vec![self.dims[1], self.dims[0]].into());
+    //     for x in 0..self.dims[0] {
+    //         for y in 0..self.dims[1] {
+    //             *out.at_2d_mut(y, x) = self.at_2d(x, y);
+    //         }
+    //     }
+    //     out
+    // }
 
     pub fn slice_at<T: TensorElemTypeExt>(&self, indices: &[Dimension]) -> &[T] {
         let mut index = 0;

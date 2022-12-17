@@ -48,6 +48,11 @@ def test_sigmoid_2():
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Sigmoid", [3, 1, 28, 28])
 
 
+def test_sigmoid_3():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_elemwise(os.path.join(tmpdir, "model.onnx"), "Sigmoid", [3, 1, 7, 7])
+
+
 @pytest.mark.xfail
 def test_clip_1():
     with tempfile.TemporaryDirectory() as tmpdir:

@@ -524,3 +524,39 @@ fn test_tensor_elem_type_ext() {
     assert!(<i32 as TensorElemTypeExt>::get_type().is_i32());
     assert!(<i64 as TensorElemTypeExt>::get_type().is_i64());
 }
+
+#[test]
+fn test_tensor_rand() {
+    fn check<T>()
+    where
+        T: TensorElemTypeExt,
+        Standard: Distribution<T>,
+    {
+        let shape = vec![3, 6, 2, 9, 1, 11];
+        let x = Tensor::rand::<T>(shape.to_owned().into());
+        let y = Tensor::rand::<T>(shape.into());
+        assert_ne!(x, y);
+    }
+
+    check::<f32>();
+    check::<i32>();
+    check::<i64>();
+    check::<bool>();
+}
+
+#[test]
+fn test_tensor_rand_of_type() {
+    use TensorElemType::*;
+
+    fn check(ty: TensorElemType) {
+        let shape = vec![3, 6, 2, 9, 1, 11];
+        let x = Tensor::rand_of_type(ty, shape.to_owned().into());
+        let y = Tensor::rand_of_type(ty, shape.into());
+        assert_ne!(x, y);
+    }
+
+    check(F32);
+    check(I32);
+    check(I64);
+    check(Bool);
+}

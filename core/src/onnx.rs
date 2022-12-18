@@ -397,7 +397,7 @@ pub fn load_onnx_model_proto(path: impl AsRef<Path>) -> Result<ModelProto, io::E
 
 impl std::fmt::Display for ModelLoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 

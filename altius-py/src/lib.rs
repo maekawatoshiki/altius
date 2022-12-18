@@ -34,9 +34,8 @@ fn session<'a>(
     enable_profiling: bool,
     intra_op_num_threads: usize,
 ) -> PyResult<PySession> {
-    let mut model =
-        unsafe { std::mem::transmute::<&'a mut Model, &'static mut Model>(&mut model.0) };
-    optimize::gelu_fusion::fuse_gelu(&mut model);
+    let model = unsafe { std::mem::transmute::<&'a mut Model, &'static mut Model>(&mut model.0) };
+    optimize::gelu_fusion::fuse_gelu(model);
     Ok(PySession(
         InterpreterSessionBuilder::new(model)
             .with_profiling_enabled(enable_profiling)
@@ -59,7 +58,7 @@ impl PySession {
         ) -> PyResult<(ValueId, Tensor)> {
             let val_id = model
                 .lookup_named_value(&name)
-                .ok_or_else(|| PyRuntimeError::new_err(format!("Input '{}' not found", name)))?;
+                .ok_or_else(|| PyRuntimeError::new_err(format!("Input '{name}' not found")))?;
             Ok((
                 val_id,
                 Tensor::new(
@@ -106,7 +105,7 @@ impl PySession {
             let arr =
                 ArrayD::from_shape_vec(out.dims().as_slice().to_vec(), out.data::<f32>().to_vec())
                     .map_err(|e| {
-                        PyRuntimeError::new_err(format!("Failed to create output array: {:?}", e))
+                        PyRuntimeError::new_err(format!("Failed to create output array: {e:?}"))
                     })?;
             outputs.push(PyArrayDyn::from_array(py, &arr))
         }

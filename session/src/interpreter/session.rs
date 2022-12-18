@@ -441,8 +441,8 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                             let mut len = output.len();
 
                             while len >= SIMD_LEN {
-                                let a = Simd::<_, SIMD_LEN>::from_slice(&input_a);
-                                let b = Simd::<_, SIMD_LEN>::from_slice(&input_b);
+                                let a = Simd::<_, SIMD_LEN>::from_slice(input_a);
+                                let b = Simd::<_, SIMD_LEN>::from_slice(input_b);
                                 let c = a + b;
                                 output[0..SIMD_LEN].copy_from_slice(c.as_ref());
                                 input_a = &input_a[SIMD_LEN..];
@@ -557,7 +557,6 @@ fn compute_general_add(input_a: &Tensor, input_b: &Tensor, output: &mut Tensor) 
             }
             (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
         }
-        return;
     }
 }
 

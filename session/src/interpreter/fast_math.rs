@@ -72,7 +72,7 @@ pub fn fast_exp(output: &mut [f32], input: &[f32]) {
         let val = m.mul_add(LOG2HIGH, val);
         let val = m.mul_add(LOG2LOW, val);
 
-        let overflow = unsafe { transmute::<_, i32>(biased) } << 23i32;
+        let overflow = (biased.to_bits() as i32) << 23i32;
         let normal = overflow.min(MAXIMUM_EXPONENT);
         let normal = normal.max(MINIMUM_EXPONENT);
         let overflow = overflow - normal;
@@ -86,9 +86,9 @@ pub fn fast_exp(output: &mut [f32], input: &[f32]) {
         let p = p.mul_add(val, POLY_4);
         let p = p.mul_add(val, POLY_56);
 
-        let val = val * unsafe { transmute::<_, f32>(overflow) };
-        let p = p.mul_add(val, unsafe { transmute::<_, f32>(overflow) });
-        let p = p * unsafe { transmute::<_, f32>(normal) };
+        let val = val * f32::from_bits(overflow as u32);
+        let p = p.mul_add(val, f32::from_bits(overflow as u32));
+        let p = p * f32::from_bits(normal as u32);
 
         *out = p;
     }
@@ -162,7 +162,7 @@ pub fn fast_sigmoid(output: &mut [f32], input: &[f32]) {
         let val = m.mul_add(LOG2HIGH, val);
         let val = m.mul_add(LOG2LOW, val);
 
-        let overflow = unsafe { transmute::<_, i32>(biased) } << 23i32;
+        let overflow = (biased.to_bits() as i32) << 23i32;
         let normal = overflow.min(MAXIMUM_EXPONENT);
         let normal = normal.max(MINIMUM_EXPONENT);
         let overflow = overflow - normal;
@@ -176,9 +176,9 @@ pub fn fast_sigmoid(output: &mut [f32], input: &[f32]) {
         let p = p.mul_add(val, POLY_4);
         let p = p.mul_add(val, POLY_56);
 
-        let val = val * unsafe { transmute::<_, f32>(overflow) };
-        let p = p.mul_add(val, unsafe { transmute::<_, f32>(overflow) });
-        let p = p * unsafe { transmute::<_, f32>(normal) };
+        let val = val * f32::from_bits(overflow as u32);
+        let p = p.mul_add(val, f32::from_bits(overflow as u32));
+        let p = p * f32::from_bits(normal as u32);
 
         *out = 1. / (1. + p);
     }

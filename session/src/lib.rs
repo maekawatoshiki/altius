@@ -1,4 +1,5 @@
 #![feature(portable_simd)]
+#![allow(clippy::excessive_precision)]
 
 pub mod interpreter;
 #[cfg(feature = "opencl")]
@@ -122,7 +123,7 @@ fn create_execution_plan(model: &Model, sorted_nodes: &[NodeId]) -> Vec<NodeExec
                 .1;
             node_to_free_vals
                 .entry(last_user)
-                .or_insert_with(|| vec![])
+                .or_insert_with(Vec::new)
                 .push(output_id)
         }
 

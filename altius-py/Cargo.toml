@@ -11,9 +11,9 @@ crate-type = ["cdylib"]
 [dependencies]
 altius-core = { path = "../core" }
 altius-session = { path = "../session" }
-pyo3 = { version = "0.16.5", features = ["extension-module"] }
-pyo3-log = "^0.6.0"
-numpy = "^0.16.0"
+pyo3 = { version = "0.17.3", features = ["extension-module"] }
+pyo3-log = "^0.7.0"
+numpy = "^0.17.0"
 
 [dev-dependencies]
 cargo-util = "0.2.1"

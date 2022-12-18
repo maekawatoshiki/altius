@@ -287,7 +287,7 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
             let output = &mut output[ay * output_w..];
             let fy_min = (-y).max(0) as usize;
             let fy_max = kernel_h.min((input_h as isize - y) as usize);
-            for ax in 0..output_w {
+            for out in output.iter_mut().take(output_w) {
                 let mut max = f32::MIN;
                 let fx_min = (-x).max(0) as usize;
                 let fx_max = kernel_w.min((input_w as isize - x) as usize);
@@ -298,7 +298,7 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
                         max = input[oy as usize * input_w + ox as usize].max(max);
                     }
                 }
-                output[ax] = if max == f32::MIN { 0.0 } else { max };
+                *out = if max == f32::MIN { 0.0 } else { max };
                 x += stride_w as isize
             }
             y += stride_h as isize
@@ -1059,7 +1059,7 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
 fn compute_relu(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input: &[f32] = inputs[Node::RELU_IN].data();
-    let output: &mut [f32] = &mut outputs[Node::RELU_OUT].data_mut();
+    let output: &mut [f32] = outputs[Node::RELU_OUT].data_mut();
 
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = i.max(0.0);
@@ -1068,7 +1068,7 @@ fn compute_relu(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
 fn compute_hard_sigmoid(hs: &HardSigmoid, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input: &[f32] = inputs[Node::HARDSIGMOID_IN].data();
-    let output: &mut [f32] = &mut outputs[Node::HARDSIGMOID_OUT].data_mut();
+    let output: &mut [f32] = outputs[Node::HARDSIGMOID_OUT].data_mut();
 
     for (&i, o) in input.iter().zip(output.iter_mut()) {
         *o = hs.alpha.mul_add(i, hs.beta).clamp(0.0, 1.0)
@@ -1293,7 +1293,7 @@ fn fast_sum(mut slice: &[f32]) -> f32 {
     let mut len = slice.len();
 
     while len >= SIMD_LEN {
-        sum += Simd::<f32, SIMD_LEN>::from_slice(&slice);
+        sum += Simd::<f32, SIMD_LEN>::from_slice(slice);
         slice = &slice[SIMD_LEN..];
         len -= SIMD_LEN
     }
@@ -1328,8 +1328,7 @@ fn compute_resize(tctx: &ThreadCtx, resize: &Resize, inputs: &[&Tensor], outputs
                 let ih = (h as f32 / scale) as usize;
                 let ihw = input_w * ih;
                 for (w, o) in (0..output_w).zip(o.iter_mut()) {
-                    let iwf = (w as f32 / scale) as usize;
-                    let iw = iwf as usize;
+                    let iw = (w as f32 / scale) as usize;
                     *o = input[ihw + iw];
                 }
             }
@@ -1468,13 +1467,13 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
 fn compute_squeeze(_squeeze: &Squeeze, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input = inputs[Node::SQUEEZE_IN];
     let output = &mut outputs[Node::SQUEEZE_OUT];
-    output.copy_data_from(&input);
+    output.copy_data_from(input);
 }
 
 fn compute_unsqueeze(_: &Unsqueeze, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input = inputs[0];
     let output = &mut outputs[0];
-    output.copy_data_from(&input);
+    output.copy_data_from(input);
 }
 
 fn compute_reduce_mean(rmean: &ReduceMean, inputs: &[&Tensor], outputs: &mut [Tensor]) {
@@ -1616,7 +1615,7 @@ fn compute_split(opset_version: i64, split: &Split, inputs: &[&Tensor], outputs:
         for (i, (sp, output)) in split.iter().zip(outputs.iter_mut()).enumerate() {
             let input = &input[s..s + *sp as usize];
             let output = output.data_mut::<f32>();
-            output[offset[i]..offset[i] + input.len()].copy_from_slice(&input);
+            output[offset[i]..offset[i] + input.len()].copy_from_slice(input);
             offset[i] += *sp as usize;
             s += *sp as usize
         }

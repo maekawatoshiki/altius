@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::Ordering, iter::Sum, ops::Deref, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, iter::Sum, mem::MaybeUninit, ops::Deref, sync::Arc};
 
 use crate::dim::{Dimension, Dimensions};
 use rand::{
@@ -103,9 +103,11 @@ impl Tensor {
 
     pub fn uninit_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
         fn uninit_of<T: TensorElemTypeExt>(total_elems: usize) -> Vec<T> {
-            let mut vec: Vec<T> = Vec::with_capacity(total_elems);
-            unsafe { vec.set_len(total_elems) };
-            vec
+            let mut vec = MaybeUninit::new(Vec::with_capacity(total_elems));
+            unsafe {
+                vec.assume_init_mut().set_len(total_elems);
+                vec.assume_init()
+            }
         }
 
         let total_elems = dims.total_elems();
@@ -119,9 +121,11 @@ impl Tensor {
 
     pub fn uninit<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
         fn uninit_of<T: TensorElemTypeExt>(total_elems: usize) -> Vec<T> {
-            let mut vec: Vec<T> = Vec::with_capacity(total_elems);
-            unsafe { vec.set_len(total_elems) };
-            vec
+            let mut vec = MaybeUninit::new(Vec::with_capacity(total_elems));
+            unsafe {
+                vec.assume_init_mut().set_len(total_elems);
+                vec.assume_init()
+            }
         }
 
         let total_elems = dims.total_elems();
@@ -365,11 +369,11 @@ impl Tensor {
         Statistics {
             max: *data
                 .iter()
-                .max_by(|x, y| x.partial_cmp(&y).unwrap_or(Ordering::Equal))
+                .max_by(|x, y| x.partial_cmp(y).unwrap_or(Ordering::Equal))
                 .unwrap_or(&T::zero()),
             min: *data
                 .iter()
-                .min_by(|x, y| x.partial_cmp(&y).unwrap_or(Ordering::Equal))
+                .min_by(|x, y| x.partial_cmp(y).unwrap_or(Ordering::Equal))
                 .unwrap_or(&T::zero()),
             mean: data.iter().sum::<T>().into() / data.len() as f64,
         }

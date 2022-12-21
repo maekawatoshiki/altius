@@ -3,7 +3,6 @@ name = "altius-py"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 name = "altius_py"
 crate-type = ["cdylib"]
@@ -11,12 +10,12 @@ crate-type = ["cdylib"]
 [dependencies]
 altius-core = { path = "../core" }
 altius-session = { path = "../session" }
-pyo3 = { version = "0.17.3", features = ["extension-module"] }
+pyo3 = { version = "^0.17.3", features = ["extension-module"] }
 pyo3-log = "^0.7.0"
 numpy = "^0.17.0"
 
 [dev-dependencies]
-cargo-util = "0.2.1"
+cargo-util = "^0.2.1"
 
 [features]
 matrixmultiply-threading = [ "altius-session/matrixmultiply-threading" ]

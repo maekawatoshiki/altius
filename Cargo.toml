@@ -7,6 +7,11 @@ members = [
 ]
 resolver = "2"
 
+[workspace.dependencies]
+thiserror = "^1.0.31"
+log = "^0.4.17"
+rustc-hash = "^1.1.0"
+
 [profile.release]
 opt-level = 3
 overflow-checks = false

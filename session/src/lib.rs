@@ -7,7 +7,7 @@ pub mod opencl;
 #[cfg(feature = "wgpu-backend")]
 pub mod wgpu;
 
-use std::{borrow::Cow, fmt::Display};
+use std::borrow::Cow;
 
 use altius_core::{
     model::Model,
@@ -26,15 +26,8 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum SessionError {
+    #[error("Something went wrong: {0}")]
     Message(Cow<'static, str>),
-}
-
-impl Display for SessionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Message(msg) => writeln!(f, "{msg}"),
-        }
-    }
 }
 
 /// Represents a node to execute and values to be freed after the execution of the node.

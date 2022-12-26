@@ -18,7 +18,7 @@ use altius_core::{
 };
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-use ndarray::{s, ArrayView, ArrayView2, ArrayView3, ArrayView4, ArrayView5, Axis, Dim, Ix};
+use ndarray::{s, ArrayView, ArrayView3, Axis, Dim, Ix};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 
@@ -1418,49 +1418,115 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
     let output = &mut outputs[Node::TRANSPOSE_OUT];
     assert!(input.elem_ty().is_f32());
 
-    // TODO: Refactor.
-    match input.dims().len() {
-        2 => {
-            let in_view =
-                ArrayView2::from_shape(input.fixed_dims::<2>(), input.data::<f32>()).unwrap();
-            let in_view =
-                in_view.permuted_axes([transpose.perm[0] as usize, transpose.perm[1] as usize]);
-            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+    // TODO: Refactor!
+
+    let strides = input.strides();
+    let dims = input.dims().to_vec();
+    let out_dims = output.dims();
+    let num_axes = dims.len();
+    let new_strides = transpose
+        .perm
+        .iter()
+        .map(|&axis| strides[axis as usize])
+        .collect::<Vec<_>>();
+
+    #[derive(Default, Debug)]
+    struct Index {
+        index: Vec<usize>,
+        upper_bound: Vec<usize>,
+        stride: Vec<usize>,
+    }
+
+    let mut num_blocks = 1;
+    let mut num_elems_in_block = 1;
+    let mut suffix = true;
+    let mut reduced_num_axes = 0;
+
+    for i in (0..num_axes).rev() {
+        let input_axis = transpose.perm[i] as usize;
+        if suffix && input_axis == i {
+            num_elems_in_block *= dims[input_axis];
+        } else {
+            suffix = false;
+            num_blocks *= dims[input_axis];
+            reduced_num_axes += 1;
         }
-        3 => {
-            let in_view =
-                ArrayView3::from_shape(input.fixed_dims::<3>(), input.data::<f32>()).unwrap();
-            let in_view = in_view.permuted_axes([
-                transpose.perm[0] as usize,
-                transpose.perm[1] as usize,
-                transpose.perm[2] as usize,
-            ]);
-            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+    }
+
+    let mut index = Index {
+        index: vec![0; reduced_num_axes],
+        upper_bound: vec![0; reduced_num_axes],
+        stride: vec![0; reduced_num_axes],
+    };
+
+    for i in 0..reduced_num_axes {
+        index.index[i] = 0;
+        index.upper_bound[i] = out_dims[i];
+        index.stride[i] = new_strides[i];
+    }
+
+    let source = input.data::<f32>();
+    let target = output.data_mut::<f32>();
+    let mut src_idx = 0;
+    if num_elems_in_block == 1 {
+        for i in 0..num_blocks {
+            target[i] = source[src_idx];
+
+            let mut pos = reduced_num_axes - 1;
+            src_idx += index.stride[pos];
+            index.index[pos] += 1;
+            if index.index[pos] < index.upper_bound[pos] {
+                continue;
+            }
+            src_idx -= index.stride[pos] * index.index[pos];
+            index.index[pos] = 0;
+            if pos > 0 {
+                loop {
+                    pos -= 1;
+                    src_idx += index.stride[pos];
+                    index.index[pos] += 1;
+                    if index.index[pos] < index.upper_bound[pos] {
+                        break;
+                    }
+                    src_idx -= index.stride[pos] * index.index[pos];
+                    index.index[pos] = 0;
+                    if pos == 0 {
+                        break;
+                    }
+                }
+            }
         }
-        4 => {
-            let in_view =
-                ArrayView4::from_shape(input.fixed_dims::<4>(), input.data::<f32>()).unwrap();
-            let in_view = in_view.permuted_axes([
-                transpose.perm[0] as usize,
-                transpose.perm[1] as usize,
-                transpose.perm[2] as usize,
-                transpose.perm[3] as usize,
-            ]);
-            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
+    } else if num_blocks == 1 {
+        target.copy_from_slice(source);
+    } else {
+        for i in 0..num_blocks {
+            target[i * num_elems_in_block..(i + 1) * num_elems_in_block]
+                .copy_from_slice(&source[src_idx..src_idx + num_elems_in_block]);
+
+            let mut pos = reduced_num_axes - 1;
+            src_idx += index.stride[pos];
+            index.index[pos] += 1;
+            if index.index[pos] < index.upper_bound[pos] {
+                continue;
+            }
+            src_idx -= index.stride[pos] * index.index[pos];
+            index.index[pos] = 0;
+            if pos > 0 {
+                loop {
+                    pos -= 1;
+                    src_idx += index.stride[pos];
+                    index.index[pos] += 1;
+                    if index.index[pos] < index.upper_bound[pos] {
+                        break;
+                    }
+                    src_idx -= index.stride[pos] * index.index[pos];
+                    index.index[pos] = 0;
+                    if pos == 0 {
+                        break;
+                    }
+                }
+            }
         }
-        5 => {
-            let in_view =
-                ArrayView5::from_shape(input.fixed_dims::<5>(), input.data::<f32>()).unwrap();
-            let in_view = in_view.permuted_axes([
-                transpose.perm[0] as usize,
-                transpose.perm[1] as usize,
-                transpose.perm[2] as usize,
-                transpose.perm[3] as usize,
-                transpose.perm[4] as usize,
-            ]);
-            output.set_raw_vec(in_view.as_standard_layout().to_owned().into_raw_vec());
-        }
-        _ => todo!("Transpose: Unsupported shape."),
     }
 }
 

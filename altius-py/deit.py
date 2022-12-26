@@ -21,17 +21,15 @@ def main():
     feature_extractor = ViTImageProcessor.from_pretrained(
         "facebook/deit-small-patch16-224"
     )
-    inputs = feature_extractor(image, return_tensors="pt").to("mps")
+    inputs = feature_extractor(image, return_tensors="pt")
 
     onnx_path = "../models/deit.onnx"
 
-    model = ViTForImageClassification.from_pretrained(
-        "facebook/deit-small-patch16-224"
-    ).to("mps")
+    model = ViTForImageClassification.from_pretrained("facebook/deit-small-patch16-224")
     if not os.path.exists(onnx_path):
         model = ViTForImageClassification.from_pretrained(
             "facebook/deit-small-patch16-224"
-        ).to("mps")
+        )
         torch.onnx.export(model, torch.randn(1, 3, 224, 224), onnx_path)
         simplified_model, success = onnxsim.simplify(onnx_path)
         assert success
@@ -44,13 +42,8 @@ def main():
 
     with torch.no_grad():
         for i in range(10):
-            start = time.time()
-            # output = model(**inputs).logits
             output = altius_model.run(None, {"input.1": input})
-            print(time.time() - start)
-            # print(output)
             pred = torch.tensor(output).reshape((-1,)).argsort().numpy()[::-1][:5]
-            # pred = output.cpu().reshape((-1,)).argsort().numpy()[::-1][:5]
             top5 = [labels[i].strip() for i in pred]
             print(top5)
 

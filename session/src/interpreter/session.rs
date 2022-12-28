@@ -1414,28 +1414,57 @@ fn compute_concat(concat: &Concat, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input = inputs[Node::TRANSPOSE_IN];
-    let output = &mut outputs[Node::TRANSPOSE_OUT];
-    assert!(input.elem_ty().is_f32());
-
-    // TODO: Refactor!
-
-    let strides = input.strides();
-    let dims = input.dims().to_vec();
-    let out_dims = output.dims();
-    let num_axes = dims.len();
-    let new_strides = transpose
-        .perm
-        .iter()
-        .map(|&axis| strides[axis as usize])
-        .collect::<Vec<_>>();
-
-    #[derive(Default, Debug)]
-    struct Index {
+    struct PermIter {
+        num_axes: usize,
         index: Vec<usize>,
         upper_bound: Vec<usize>,
         stride: Vec<usize>,
     }
+
+    #[inline(always)]
+    fn next_index(perm: &mut PermIter, mut index: usize) -> usize {
+        let mut pos = perm.num_axes - 1;
+        index += perm.stride[pos];
+        perm.index[pos] += 1;
+        if perm.index[pos] < perm.upper_bound[pos] {
+            return index;
+        }
+
+        index -= perm.stride[pos] * perm.index[pos];
+        perm.index[pos] = 0;
+        if pos == 0 {
+            return index;
+        }
+
+        loop {
+            pos -= 1;
+            index += perm.stride[pos];
+            perm.index[pos] += 1;
+            if perm.index[pos] < perm.upper_bound[pos] {
+                break;
+            }
+            index -= perm.stride[pos] * perm.index[pos];
+            perm.index[pos] = 0;
+            if pos == 0 {
+                break;
+            }
+        }
+        index
+    }
+
+    let input = inputs[Node::TRANSPOSE_IN];
+    let output = &mut outputs[Node::TRANSPOSE_OUT];
+    assert!(input.elem_ty().is_f32());
+
+    let in_dims = input.dims();
+    let in_strides = input.strides();
+    let out_dims = output.dims();
+    let num_axes = in_dims.len();
+    let new_strides = transpose
+        .perm
+        .iter()
+        .map(|&axis| in_strides[axis as usize])
+        .collect::<Vec<_>>();
 
     let mut num_blocks = 1;
     let mut num_elems_in_block = 1;
@@ -1445,87 +1474,42 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
     for i in (0..num_axes).rev() {
         let input_axis = transpose.perm[i] as usize;
         if suffix && input_axis == i {
-            num_elems_in_block *= dims[input_axis];
+            num_elems_in_block *= in_dims[input_axis];
         } else {
             suffix = false;
-            num_blocks *= dims[input_axis];
+            num_blocks *= in_dims[input_axis];
             reduced_num_axes += 1;
         }
     }
 
-    let mut index = Index {
+    let mut perm = PermIter {
+        num_axes: reduced_num_axes,
         index: vec![0; reduced_num_axes],
-        upper_bound: vec![0; reduced_num_axes],
-        stride: vec![0; reduced_num_axes],
+        upper_bound: out_dims[0..reduced_num_axes].to_vec(),
+        stride: new_strides[0..reduced_num_axes].to_vec(),
     };
-
-    for i in 0..reduced_num_axes {
-        index.index[i] = 0;
-        index.upper_bound[i] = out_dims[i];
-        index.stride[i] = new_strides[i];
-    }
 
     let source = input.data::<f32>();
     let target = output.data_mut::<f32>();
     let mut src_idx = 0;
+
     if num_elems_in_block == 1 {
         for i in 0..num_blocks {
-            target[i] = source[src_idx];
-
-            let mut pos = reduced_num_axes - 1;
-            src_idx += index.stride[pos];
-            index.index[pos] += 1;
-            if index.index[pos] < index.upper_bound[pos] {
-                continue;
-            }
-            src_idx -= index.stride[pos] * index.index[pos];
-            index.index[pos] = 0;
-            if pos > 0 {
-                loop {
-                    pos -= 1;
-                    src_idx += index.stride[pos];
-                    index.index[pos] += 1;
-                    if index.index[pos] < index.upper_bound[pos] {
-                        break;
-                    }
-                    src_idx -= index.stride[pos] * index.index[pos];
-                    index.index[pos] = 0;
-                    if pos == 0 {
-                        break;
-                    }
-                }
-            }
+            unsafe { *target.get_unchecked_mut(i) = *source.get_unchecked(src_idx) };
+            src_idx = next_index(&mut perm, src_idx);
         }
     } else if num_blocks == 1 {
         target.copy_from_slice(source);
     } else {
         for i in 0..num_blocks {
-            target[i * num_elems_in_block..(i + 1) * num_elems_in_block]
-                .copy_from_slice(&source[src_idx..src_idx + num_elems_in_block]);
-
-            let mut pos = reduced_num_axes - 1;
-            src_idx += index.stride[pos];
-            index.index[pos] += 1;
-            if index.index[pos] < index.upper_bound[pos] {
-                continue;
-            }
-            src_idx -= index.stride[pos] * index.index[pos];
-            index.index[pos] = 0;
-            if pos > 0 {
-                loop {
-                    pos -= 1;
-                    src_idx += index.stride[pos];
-                    index.index[pos] += 1;
-                    if index.index[pos] < index.upper_bound[pos] {
-                        break;
-                    }
-                    src_idx -= index.stride[pos] * index.index[pos];
-                    index.index[pos] = 0;
-                    if pos == 0 {
-                        break;
-                    }
-                }
-            }
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    source.as_ptr().add(src_idx),
+                    target.as_mut_ptr().add(i * num_elems_in_block),
+                    num_elems_in_block,
+                )
+            };
+            src_idx = next_index(&mut perm, src_idx);
         }
     }
 }

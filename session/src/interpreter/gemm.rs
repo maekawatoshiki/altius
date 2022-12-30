@@ -69,7 +69,7 @@ pub fn sgemm2(
     ldc: usize,
 ) {
     #[cfg(not(feature = "cblas"))]
-    todo!();
+    panic!();
     // matrixmultiply::sgemm(
     //     m,
     //     k,

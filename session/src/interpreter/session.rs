@@ -79,7 +79,7 @@ impl<'a> InterpreterSession<'a> {
 
         #[cfg(not(feature = "heavy-log"))]
         for node in &self.execution_plans {
-            self.run_node(&mut profile, values, node.node_id);
+            self.run_node(&mut profile, values, node.node_id)?;
 
             for val in &node.free_vals {
                 values.get_mut(val).unwrap().set_raw_vec::<u8>(Vec::new())
@@ -132,7 +132,7 @@ impl<'a> InterpreterSession<'a> {
         profile: &mut FxHashMap<&'static str, Duration>,
         values: &mut FxHashMap<ValueId, Tensor>,
         node_id: NodeId,
-    ) {
+    ) -> Result<(), SessionError> {
         let node = &self.model.nodes[node_id];
         let inputs = node
             .inputs
@@ -175,7 +175,7 @@ impl<'a> InterpreterSession<'a> {
             Op::Pow => compute_pow(node, &inputs, &mut outputs),
             Op::Sqrt => compute_sqrt(node, &inputs, &mut outputs),
             Op::MaxPool(ref maxpool) => compute_max_pool(maxpool, &inputs, &mut outputs),
-            Op::GlobalAveragePool => compute_gavg_pool(node, &inputs, &mut outputs),
+            Op::GlobalAveragePool => compute_gavg_pool(node, &inputs, &mut outputs)?,
             Op::Reshape => compute_reshape(node, &inputs, &mut outputs),
             Op::Flatten(ref flatten) => compute_flatten(flatten, &inputs, &mut outputs),
             Op::MatMul => compute_mat_mul(node, &inputs, &mut outputs),
@@ -187,18 +187,26 @@ impl<'a> InterpreterSession<'a> {
             Op::Sigmoid => compute_sigmoid(&self.tctx, &inputs, &mut outputs),
             Op::Erf => compute_erf(&inputs, &mut outputs),
             Op::Tanh => compute_tanh(&inputs, &mut outputs),
-            Op::Clip => todo!("clip"),
+            Op::Clip => return Err(SessionError::Message("Clip: Kernel not implemented".into())),
             Op::Where => compute_where(&inputs, &mut outputs),
             Op::Softmax(ref softmax) => compute_softmax(&self.tctx, softmax, &inputs, &mut outputs),
             Op::Resize(ref resize) => compute_resize(&self.tctx, resize, &inputs, &mut outputs),
-            Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs),
+            Op::Concat(ref concat) => compute_concat(concat, &inputs, &mut outputs)?,
             Op::Transpose(ref trans) => compute_transpose(trans, &inputs, &mut outputs),
             Op::Squeeze(ref squeeze) => compute_squeeze(squeeze, &inputs, &mut outputs),
             Op::Unsqueeze(ref unsqueeze) => compute_unsqueeze(unsqueeze, &inputs, &mut outputs),
-            Op::ReduceMin(_) => todo!("reduce min"),
+            Op::ReduceMin(_) => {
+                return Err(SessionError::Message(
+                    "ReduceMin: Kernel not implemented".into(),
+                ))
+            }
             Op::ReduceMean(ref rmean) => compute_reduce_mean(rmean, &inputs, &mut outputs),
-            Op::Round => todo!("round"),
-            Op::Exp => todo!("exp"),
+            Op::Round => {
+                return Err(SessionError::Message(
+                    "Round: Kernel not implemented".into(),
+                ))
+            }
+            Op::Exp => return Err(SessionError::Message("Exp: Kernel not implemented".into())),
             Op::Loop => compute_loop(node, &inputs, &mut outputs),
             Op::Tile => compute_tile(node, &inputs, &mut outputs),
             Op::Cast(ref cast) => compute_cast(cast, &inputs, &mut outputs),
@@ -210,9 +218,21 @@ impl<'a> InterpreterSession<'a> {
             }
             Op::Slice => compute_slice(node, &inputs, &mut outputs),
             Op::Gather(ref gather) => compute_gather(gather, &inputs, &mut outputs),
-            Op::Shape(_) => todo!("shape"),
-            Op::NonMaxSuppression => todo!("nms"),
-            Op::Constant(_) => todo!("constant"),
+            Op::Shape(_) => {
+                return Err(SessionError::Message(
+                    "Shape: Kernel not implemented".into(),
+                ))
+            }
+            Op::NonMaxSuppression => {
+                return Err(SessionError::Message(
+                    "NonMaxSuppression: Kernel not implemented".into(),
+                ))
+            }
+            Op::Constant(_) => {
+                return Err(SessionError::Message(
+                    "Constant: Kernel not implemented".into(),
+                ))
+            }
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -224,18 +244,26 @@ impl<'a> InterpreterSession<'a> {
         for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
             values.insert(val, output);
         }
+
+        Ok(())
     }
 }
 
-fn compute_gavg_pool(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_gavg_pool(
+    _node: &Node,
+    inputs: &[&Tensor],
+    outputs: &mut [Tensor],
+) -> Result<(), SessionError> {
     let input = inputs[Node::GLOBALAVERAGEPOOL_IN];
     let output = &mut outputs[Node::GLOBALAVERAGEPOOL_OUT];
 
     assert!(input.dims().len() == 4);
     assert!(output.dims().len() == 4);
 
-    let Some(&[_, _, h, w]) = input.dims().get(0..4) else { todo!() };
-    let Some([isn, isc, _, _]) = input.strides().get(0..4) else { todo!() };
+    let Some(&[_, _, h, w]) = input.dims().get(0..4) else {
+        return Err(SessionError::Message("Input must be four dimensions".into()))
+    };
+    let Some([isn, isc, _, _]) = input.strides().get(0..4) else { panic!() };
     let area = h * w;
     let osn = output.strides()[0];
     let input = input.data::<f32>();
@@ -247,6 +275,8 @@ fn compute_gavg_pool(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             *o_channel = sum / area as f32;
         }
     }
+
+    Ok(())
 }
 
 fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor]) {
@@ -1378,7 +1408,11 @@ fn compute_resize(tctx: &ThreadCtx, resize: &Resize, inputs: &[&Tensor], outputs
     }
 }
 
-fn compute_concat(concat: &Concat, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+fn compute_concat(
+    concat: &Concat,
+    inputs: &[&Tensor],
+    outputs: &mut [Tensor],
+) -> Result<(), SessionError> {
     // TODO: Stop using ndarray!
     macro_rules! concat {
         ($n:expr) => {{
@@ -1409,8 +1443,14 @@ fn compute_concat(concat: &Concat, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         3 => concat!(3),
         4 => concat!(4),
         5 => concat!(5),
-        _ => todo!("Concat: Unsupported shape."),
+        d => {
+            return Err(SessionError::Message(
+                format!("Transpose: {d} dimensions not supported yet").into(),
+            ))
+        }
     });
+
+    Ok(())
 }
 
 fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [Tensor]) {

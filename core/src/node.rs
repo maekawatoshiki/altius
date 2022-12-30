@@ -1,9 +1,12 @@
+use std::borrow::Cow;
+
 use crate::{
     dim::Dimensions,
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
 };
 use id_arena::{Arena, Id};
+use thiserror::Error;
 
 pub type NodeId = Id<Node>;
 pub type NodeArena = Arena<Node>;
@@ -397,14 +400,21 @@ impl Op {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum ShapeError {
+    #[error("Something went wrong: {0}")]
+    Message(Cow<'static, str>),
+}
+
 /// Computes the output shape for `op`.
 /// `op` could be overwritten. (e.g. paddings given auto_pad)
 pub fn compute_output_shapes(
     op: &mut Op,
     inputs: &[&Tensor],
     opset_version: i64,
-) -> Vec<TypedShape> {
+) -> Result<Vec<TypedShape>, ShapeError> {
     let mut shapes = vec![];
+
     match op {
         Op::Conv2d(conv) => {
             let auto_pad = &conv.auto_pad;
@@ -439,7 +449,9 @@ pub fn compute_output_shapes(
                 pad_h = padding[0] + padding[2];
                 pad_w = padding[1] + padding[3];
             } else {
-                todo!()
+                return Err(ShapeError::Message(
+                    format!("Conv2d: Unknown padding pattern: {padding:?}").into(),
+                ));
             }
 
             let h_in = input[2];
@@ -584,7 +596,7 @@ pub fn compute_output_shapes(
                 //     inputs[Node::RESIZE_IN_X].elem_ty(),
                 // ))
             } else {
-                todo!()
+                return Err(ShapeError::Message("Resize: Unsupported pattern".into()));
             }
         }
         Op::Concat(concat) => {
@@ -703,7 +715,7 @@ pub fn compute_output_shapes(
             assert!(cond[0] == 1);
             let v_initial = inputs[2].data::<i32>();
             assert!(v_initial[0] == 0);
-            todo!()
+            return Err(ShapeError::Message("Loop: Unsupported op".into()));
             // shapes.push(vec![1].into());
             // shapes.push(vec![m[0] as usize].into());
         }
@@ -794,11 +806,11 @@ pub fn compute_output_shapes(
                 shapes.push(TypedShape::new(data.into(), inputs[0].elem_ty()))
             }
         }
-        Op::Shape(_) => {
-            todo!()
-        }
+        Op::Shape(_) => return Err(ShapeError::Message("Shape: Unsupported op".into())),
         Op::NonMaxSuppression => {
-            todo!()
+            return Err(ShapeError::Message(
+                "NonMaxSuppression: Unsupported op".into(),
+            ))
         }
         Op::MatMul => {
             let in_a = &inputs[Node::MATMUL_IN_A].dims();
@@ -858,9 +870,7 @@ pub fn compute_output_shapes(
                 inputs[Node::GEMM_IN_A].elem_ty(),
             ));
         }
-        Op::Constant(_) => {
-            todo!()
-        }
+        Op::Constant(_) => return Err(ShapeError::Message("Constant: Unsupported op".into())),
         // Element-wise operations.
         Op::Sqrt
         | Op::ReLU
@@ -883,5 +893,6 @@ pub fn compute_output_shapes(
             shapes.push(TypedShape::new(input.dims().clone(), cast.to));
         }
     }
-    shapes
+
+    Ok(shapes)
 }

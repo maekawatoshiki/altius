@@ -31,14 +31,16 @@ fn main() {
 
     let i = InterpreterSessionBuilder::new(&model)
         .with_profiling_enabled(opt.profile)
-        .build();
+        .build()
+        .unwrap();
     #[cfg(feature = "cuda")]
     {
-        use altius_session::interpreter::InterpreterSession;
         // First run is slow so ignore it.
-        InterpreterSession::new(&model)
-            .run(vec![(input_value, input.clone())])
+        let i = InterpreterSessionBuilder::new(&model)
+            .with_profiling_enabled(opt.profile)
+            .build()
             .unwrap();
+        i.run(vec![(input_value, input.clone())]).unwrap();
     }
     let out = i.run(vec![(input_value, input)]).expect("Inference failed");
     let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();

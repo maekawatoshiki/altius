@@ -45,7 +45,8 @@ fn main() {
     let sess = InterpreterSessionBuilder::new(&model)
         .with_profiling_enabled(opt.profile)
         .with_intra_op_num_threads(opt.threads)
-        .build();
+        .build()
+        .unwrap();
     log::info!("create session: finished in {:?}", start.elapsed());
 
     let mut inputs = vec![];

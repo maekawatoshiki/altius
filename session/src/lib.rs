@@ -11,7 +11,7 @@ use std::borrow::Cow;
 
 use altius_core::{
     model::Model,
-    node::{compute_output_shapes, NodeId, Op},
+    node::{compute_output_shapes, NodeId, Op, ShapeError},
     tensor::{Tensor, TypedShape},
     value::ValueId,
 };
@@ -26,6 +26,11 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum SessionError {
+    /// Errors arised from shape inference.
+    #[error("Shape: {0}")]
+    Shape(#[from] ShapeError),
+
+    /// General error messages (including TODOs).
     #[error("Something went wrong: {0}")]
     Message(Cow<'static, str>),
 }
@@ -46,7 +51,7 @@ fn infer_shapes(
     model: &Model,
     sorted_nodes: &[NodeId],
     shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
-) {
+) -> Result<(), ShapeError> {
     let mut values = model.inits.clone();
 
     for &val_id in &model.inputs {
@@ -57,8 +62,10 @@ fn infer_shapes(
     }
 
     for &node in sorted_nodes {
-        infer_shape(model, &mut values, shapes, node)
+        infer_shape(model, &mut values, shapes, node)?
     }
+
+    Ok(())
 }
 
 fn infer_shape(
@@ -66,12 +73,12 @@ fn infer_shape(
     values: &mut FxHashMap<ValueId, Tensor>,
     shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     node_id: NodeId,
-) {
+) -> Result<(), ShapeError> {
     let node = &model.nodes[node_id];
     let mut op = node.op.clone();
     let mut inputs = vec![];
     for input in &node.inputs {
-        let Some(input) = values.get(input) else { return };
+        let Some(input) = values.get(input) else { return Ok(()); };
         inputs.push(input);
     }
     let output_shapes = compute_output_shapes(&mut op, &inputs, model.opset_version).unwrap(); // TODO: Remove unwrap().
@@ -83,6 +90,7 @@ fn infer_shape(
         values.insert(val, output);
     }
     shapes.insert(node_id, (op, output_shapes));
+    Ok(())
 }
 
 fn create_execution_plan(model: &Model, sorted_nodes: &[NodeId]) -> Vec<NodeExecutionPlan> {

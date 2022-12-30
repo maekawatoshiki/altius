@@ -2,7 +2,7 @@ use altius_core::{model::Model, tensor::Tensor};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 
-use crate::{create_execution_plan, infer_shapes};
+use crate::{create_execution_plan, infer_shapes, SessionError};
 
 #[cfg(feature = "cuda")]
 use super::session::SafeCudnnContext;
@@ -35,14 +35,14 @@ impl<'a> InterpreterSessionBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> InterpreterSession<'a> {
+    pub fn build(self) -> Result<InterpreterSession<'a>, SessionError> {
         let model = self.model;
         let enable_profiling = self.enable_profiling;
         let intra_op_num_threads = self.intra_op_num_threads;
 
         let sorted_nodes = model.topo_sort_nodes();
         let mut inferred_shapes = FxHashMap::default();
-        infer_shapes(model, &sorted_nodes, &mut inferred_shapes);
+        infer_shapes(model, &sorted_nodes, &mut inferred_shapes)?;
 
         #[cfg(feature = "blis")]
         {
@@ -52,7 +52,7 @@ impl<'a> InterpreterSessionBuilder<'a> {
             unsafe { bli_thread_set_num_threads(intra_op_num_threads) };
         }
 
-        InterpreterSession {
+        Ok(InterpreterSession {
             model,
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
@@ -62,6 +62,6 @@ impl<'a> InterpreterSessionBuilder<'a> {
             values: ThreadLocal::new(),
             dummy_value: Tensor::zeros::<f32>(vec![0].into()),
             tctx: ThreadCtx::new_with_num_threads(intra_op_num_threads),
-        }
+        })
     }
 }

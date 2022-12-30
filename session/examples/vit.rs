@@ -34,15 +34,18 @@ fn main() {
     let i = InterpreterSessionBuilder::new(&model)
         .with_profiling_enabled(opt.profile)
         .with_intra_op_num_threads(1)
-        .build();
+        .build()
+        .unwrap();
     #[cfg(feature = "cuda")]
     {
+        // First run is slow so ignore it.
         InterpreterSessionBuilder::new(&model)
             .with_profiling_enabled(opt.profile)
             .with_intra_op_num_threads(8)
             .build()
+            .unwrap()
             .run(vec![(input_value, input.clone())])
-            .unwrap(); // First run is slow so ignore it.
+            .unwrap();
     }
     let out = i
         .run(vec![(input_value, input.clone())])

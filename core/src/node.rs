@@ -400,7 +400,7 @@ impl Op {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum ShapeError {
     #[error("Something went wrong: {0}")]
     Message(Cow<'static, str>),

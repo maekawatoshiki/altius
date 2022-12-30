@@ -1,6 +1,6 @@
 use prost::Message;
 use rustc_hash::FxHashMap;
-use std::{borrow::Cow, fs, io, path::Path};
+use std::{borrow::Cow, collections::hash_map::Entry, fs, io, path::Path};
 use thiserror::Error;
 
 use crate::{
@@ -20,10 +20,19 @@ include!(concat!(env!("OUT_DIR"), "/onnx.rs"));
 
 #[derive(Error, Debug)]
 pub enum ModelLoadError {
+    #[error("{0}")]
     Io(#[from] io::Error),
+
+    #[error("Model does not contain any graph")]
     NoGraph,
+
+    #[error("Model contains duplicated opsets")]
     DuplicateOpset,
+
+    #[error("Model contains unknown opset")]
     UnknownOpsetVersion,
+
+    #[error("Something went wrong: {0}")]
     Todo(Cow<'static, str>),
 }
 
@@ -40,7 +49,6 @@ pub fn load_onnx_from_buffer(buf: &[u8]) -> Result<Model, ModelLoadError> {
 pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, ModelLoadError> {
     let graph = model_proto.graph.ok_or(ModelLoadError::NoGraph)?;
     let mut model = Model::default();
-
     let mut name_to_val = FxHashMap::default();
 
     let mut opset_version = None;
@@ -59,7 +67,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
 
     // Load initializers.
     for init in graph.initializer.iter() {
-        let tensor = get_tensor(init);
+        let tensor = get_tensor(init)?;
         let val = *name_to_val
             .entry(init.name())
             .or_insert_with(|| model.values.new_val_named(init.name()));
@@ -92,20 +100,16 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             dims.push(*i)
         }
 
-        let input = if is_dynamic_shape {
-            *name_to_val
-                .entry(x.name())
-                .or_insert_with(|| model.values.new_val_named(x.name()))
-        } else {
-            *name_to_val.entry(x.name()).or_insert_with(|| {
-                model.values.new_val_named_and_shaped(
-                    x.name(),
-                    TypedShape::new(
-                        Dimensions::from_i64(&dims),
-                        DataType::from_i32(tensor.elem_type()).unwrap().into(),
-                    ),
-                )
-            })
+        let input = match name_to_val.entry(x.name()) {
+            Entry::Occupied(o) => *o.get(),
+            Entry::Vacant(v) if is_dynamic_shape => *v.insert(model.values.new_val_named(x.name())),
+            Entry::Vacant(v) => *v.insert(model.values.new_val_named_and_shaped(
+                x.name(),
+                TypedShape::new(
+                    Dimensions::from_i64(&dims),
+                    DataType::from_i32(tensor.elem_type()).unwrap().try_into()?,
+                ),
+            )),
         };
 
         model.inputs.push(input);
@@ -262,7 +266,11 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 {
                     DataType::Float => TensorElemType::F32,
                     DataType::Int32 => TensorElemType::I32,
-                    e => todo!("Cast to {:?}", e),
+                    t => {
+                        return Err(ModelLoadError::Todo(
+                            format!("Cast: Unsupported data type: {t:?}").into(),
+                        ))
+                    }
                 };
                 Op::Cast(Cast { to })
             }
@@ -317,9 +325,9 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                         ))
                     },
                     |a| Ok(a.t.as_ref().unwrap()),
-                )?),
+                )?)?,
             }),
-            op => todo!("op: {}", op),
+            op => return Err(ModelLoadError::Todo(format!("Unsupported op: {op}").into())),
         };
 
         model.add_node(
@@ -340,8 +348,8 @@ fn get_attribute<'a>(
     attrs.iter().find(|x| x.name() == name)
 }
 
-fn get_tensor(tensor: &TensorProto) -> Tensor {
-    match DataType::from_i32(tensor.data_type()).unwrap() {
+fn get_tensor(tensor: &TensorProto) -> Result<Tensor, ModelLoadError> {
+    Ok(match DataType::from_i32(tensor.data_type()).unwrap() {
         DataType::Float if tensor.raw_data().is_empty() => Tensor::new(
             Dimensions::from_i64(&tensor.dims),
             tensor.float_data.clone(),
@@ -374,18 +382,26 @@ fn get_tensor(tensor: &TensorProto) -> Tensor {
             TensorElemType::Bool,
             tensor.raw_data().to_vec(),
         ),
-        e => todo!("data type: {e:?}"),
-    }
+        t => {
+            return Err(ModelLoadError::Todo(
+                format!("Unsupported data type for tensor: {t:?}").into(),
+            ))
+        }
+    })
 }
 
-impl From<DataType> for TensorElemType {
-    fn from(ty: DataType) -> Self {
+impl TryFrom<DataType> for TensorElemType {
+    type Error = ModelLoadError;
+
+    fn try_from(ty: DataType) -> Result<Self, Self::Error> {
         match ty {
-            DataType::Bool => TensorElemType::Bool,
-            DataType::Int32 => TensorElemType::I32,
-            DataType::Int64 => TensorElemType::I64,
-            DataType::Float => TensorElemType::F32,
-            _ => todo!("Unsupported tensor element type: {ty:?}"),
+            DataType::Bool => Ok(TensorElemType::Bool),
+            DataType::Int32 => Ok(TensorElemType::I32),
+            DataType::Int64 => Ok(TensorElemType::I64),
+            DataType::Float => Ok(TensorElemType::F32),
+            ty => Err(ModelLoadError::Todo(
+                format!("Unsupported tensor element type: {ty:?}").into(),
+            )),
         }
     }
 }
@@ -393,12 +409,6 @@ impl From<DataType> for TensorElemType {
 pub fn load_onnx_model_proto(path: impl AsRef<Path>) -> Result<ModelProto, io::Error> {
     let model = ModelProto::decode(&*fs::read(path)?)?;
     Ok(model)
-}
-
-impl std::fmt::Display for ModelLoadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
 }
 
 #[test]

@@ -39,7 +39,7 @@ macro_rules! op {
             model.inputs.push(y);
             model.outputs.push(z);
 
-            let sess = InterpreterSessionBuilder::new(&model).build();
+            let sess = InterpreterSessionBuilder::new(&model).build().unwrap();
             let x_val = Tensor::rand::<f32>(shape.to_owned());
             let y_val = Tensor::rand::<f32>(shape);
 

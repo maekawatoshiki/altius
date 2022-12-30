@@ -40,7 +40,8 @@ fn session<'a>(
         InterpreterSessionBuilder::new(model)
             .with_profiling_enabled(enable_profiling)
             .with_intra_op_num_threads(intra_op_num_threads)
-            .build(),
+            .build()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
     ))
 }
 

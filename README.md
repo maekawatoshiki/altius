@@ -36,7 +36,8 @@ Currently, mobilenet v3 runs on web browsers.
 cd wasm
 cargo install wasm-pack
 wasm-pack build --target web
-python -m http.server 8080 
+yarn
+yarn serve
 ```
 
 # Run from Python

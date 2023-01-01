@@ -21,8 +21,6 @@ const App: React.FC = () => {
     }
   }
 
-  init();
-
   function loadImage() {
     const img = document.querySelector<HTMLInputElement>("#img");
     if (!img || !img.files) return;
@@ -93,22 +91,39 @@ const App: React.FC = () => {
           </Box>
         </CardContent>
         <CardActions>
-            <Button size="small" component="label" disabled={image != undefined}>
-              Upload image
-              <input id="img" name="img" type="file" onChange={loadImage} hidden />
-            </Button>
-            <Button size="small" component="label" disabled={model != undefined}>
-              Upload ONNX Model
-              <input id="onnx" name="onnx" type="file" onChange={loadModel} hidden />
-            </Button>
-            <Button style={{marginLeft:"auto"}} size="small" onClick={runInference} disabled={!image || !model}>
-              Run
-            </Button>
+          <Button
+            style={{ marginLeft: "auto", marginRight: "auto" }}
+            size="small"
+            component="label"
+            disabled={image != undefined}
+          >
+            Upload image
+            <input id="img" name="img" type="file" onChange={loadImage} hidden />
+          </Button>
+          <Button
+            style={{ marginLeft: "auto", marginRight: "auto" }}
+            size="small"
+            component="label"
+            disabled={model != undefined}
+          >
+            Upload ONNX Model
+            <input id="onnx" name="onnx" type="file" onChange={loadModel} hidden />
+          </Button>
+          <Button
+            style={{ marginLeft: "auto", marginRight: "auto" }}
+            size="small"
+            onClick={runInference}
+            disabled={!image || !model}
+          >
+            Run
+          </Button>
         </CardActions>
       </Card>
     </div>
   );
 };
+
+init();
 
 const container = document.getElementById('app');
 if (container) {

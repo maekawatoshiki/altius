@@ -11,14 +11,12 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn load_and_run(onnx: &[u8], img: &[u8]) -> String {
+pub fn load_and_run(onnx: &[u8], img: &[u8]) -> Option<String> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     let model = load_onnx_from_buffer(onnx).expect("failed to load onnx");
     let sess = InterpreterSessionBuilder::new(&model).build().unwrap();
-    let input_value = model
-        .lookup_named_value("input")
-        .expect("failed to lookup input value");
+    let input_value = model.inputs.get(0).copied()?;
 
     let image = Reader::new(Cursor::new(img))
         .with_guessed_format()
@@ -38,9 +36,7 @@ pub fn load_and_run(onnx: &[u8], img: &[u8]) -> String {
         image.clone().into_raw_vec().into_iter().collect::<Vec<_>>(),
     );
 
-    let results = sess
-        .run(vec![(input_value, input)])
-        .expect("failed to run inference");
+    let results = sess.run(vec![(input_value, input)]).ok()?;
 
     let mut out = results[0]
         .data::<f32>()
@@ -56,5 +52,5 @@ pub fn load_and_run(onnx: &[u8], img: &[u8]) -> String {
         result_str.push_str(&format!("top{}: {}<br>", i + 1, classes[out[i].0]));
     }
 
-    result_str
+    Some(result_str)
 }

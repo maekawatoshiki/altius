@@ -64,7 +64,7 @@ const App: React.FC = () => {
   function runInference() {
     if (!model || !image) return;
     const msg = load_and_run(model, image);
-    setResultHtml(msg);
+    setResultHtml(msg ?? "Failed to run inference");
   }
 
   return (

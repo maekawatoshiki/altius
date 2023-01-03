@@ -2,14 +2,12 @@ import time
 import logging
 import os
 
-import onnxsim
-import altius_py
 import onnx
+import altius_py
 import torch
-from transformers import ViTImageProcessor, ViTForImageClassification
 
-import numpy as np
 from PIL import Image
+from torchvision import transforms
 
 
 def main():
@@ -18,15 +16,22 @@ def main():
     image = Image.open("../models/cat.png")
     labels = open("../models/imagenet_classes.txt").readlines()
 
-    feature_extractor = ViTImageProcessor.from_pretrained(
-        "facebook/deit-small-patch16-224"
+    preprocess = transforms.Compose(
+        [
+            transforms.Resize(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+        ]
     )
-    inputs = feature_extractor(image, return_tensors="pt")
+    input = preprocess(image)
+    input = input.unsqueeze(0).numpy()
 
     onnx_path = "../models/deit.onnx"
 
-    model = ViTForImageClassification.from_pretrained("facebook/deit-small-patch16-224")
     if not os.path.exists(onnx_path):
+        import onnxsim
+        from transformers import ViTImageProcessor, ViTForImageClassification
+
         model = ViTForImageClassification.from_pretrained(
             "facebook/deit-small-patch16-224"
         )
@@ -38,7 +43,6 @@ def main():
     altius_model = altius_py.InferenceSession(
         onnx_path, intra_op_num_threads=8, enable_profile=True
     )
-    input = inputs["pixel_values"].cpu().detach().numpy().reshape((1, 3, 224, 224))
 
     with torch.no_grad():
         for i in range(10):

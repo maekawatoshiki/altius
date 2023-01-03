@@ -213,6 +213,11 @@ impl<'a> InterpreterSession<'a> {
             Op::BatchNormalization(ref batchnorm) => {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
+            Op::LayerNormalization(ref _ln) => {
+                return Err(SessionError::Message(
+                    "LayerNormalization: Kernel not implemented".into(),
+                ))
+            }
             Op::Split(ref split) => {
                 compute_split(self.model.opset_version, split, &inputs, &mut outputs)
             }

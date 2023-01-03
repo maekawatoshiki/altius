@@ -62,6 +62,7 @@ pub enum Op {
     MatMul,
     Gemm(Gemm),
     BatchNormalization(BatchNormalization),
+    LayerNormalization(LayerNormalization),
     HardSigmoid(HardSigmoid),
     Constant(Constant),
 }
@@ -188,6 +189,14 @@ pub struct BatchNormalization {
     pub epsilon: f32,
     pub momentum: f32,
     pub training_mode: bool,
+}
+
+/// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#LayerNormalization>
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct LayerNormalization {
+    pub axis: i64,
+    pub epsilon: f32,
+    pub stash_type: i64,
 }
 
 /// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Constant>
@@ -394,6 +403,7 @@ impl Op {
             Op::MatMul => "MatMul",
             Op::Gemm(_) => "Gemm",
             Op::BatchNormalization(_) => "BatchNormalization",
+            Op::LayerNormalization(_) => "LayerNormalization",
             Op::HardSigmoid(_) => "HardSigmoid",
             Op::Constant(_) => "Constant",
         }
@@ -886,6 +896,11 @@ pub fn compute_output_shapes(
         | Op::Softmax(_)
         | Op::BatchNormalization(_) => {
             let input = inputs[0];
+            shapes.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
+        }
+        Op::LayerNormalization(ln) => {
+            let input = inputs[0];
+            assert!(ln.stash_type == 1);
             shapes.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
         }
         Op::Cast(cast) => {

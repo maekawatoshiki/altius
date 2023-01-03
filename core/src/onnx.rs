@@ -8,8 +8,8 @@ use crate::{
     model::Model,
     node::{
         BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gather, Gemm, HardSigmoid,
-        LeakyReLU, MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape, Softmax, Split,
-        Squeeze, Transpose, Unsqueeze,
+        LayerNormalization, LeakyReLU, MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape,
+        Softmax, Split, Squeeze, Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
 };
@@ -311,6 +311,11 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 momentum: get_attribute(&node.attribute, "momentum").map_or(1e-5, |a| a.f()),
                 training_mode: get_attribute(&node.attribute, "training_mode")
                     .map_or(false, |a| a.i() != 0),
+            }),
+            "LayerNormalization" => Op::LayerNormalization(LayerNormalization {
+                axis: get_attribute(&node.attribute, "axis").map_or(-1, |a| a.i()),
+                stash_type: get_attribute(&node.attribute, "stash_type").map_or(1, |a| a.i()),
+                epsilon: get_attribute(&node.attribute, "epsilon").map_or(1e-5, |a| a.f()),
             }),
             "Clip" => Op::Clip,
             "Shape" => Op::Shape(Shape {

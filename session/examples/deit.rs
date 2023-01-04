@@ -1,3 +1,5 @@
+use altius_core::optimize::gelu_fusion::fuse_gelu;
+use altius_core::optimize::layer_norm_fusion::fuse_layer_norm;
 use altius_core::{onnx::load_onnx, tensor::Tensor};
 use altius_session::interpreter::InterpreterSessionBuilder;
 use std::cmp::Ordering;
@@ -17,8 +19,10 @@ fn main() {
 
     let opt = Opt::from_args();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
-    let model = load_onnx(root.join("deit.onnx"))
+    let mut model = load_onnx(root.join("deit.onnx"))
         .expect("Failed to load model. Have you run altius-py/deit.py?");
+    fuse_gelu(&mut model);
+    fuse_layer_norm(&mut model);
     let input_value = model.lookup_named_value("input.1").unwrap();
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();

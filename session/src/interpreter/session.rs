@@ -1717,27 +1717,21 @@ fn compute_layer_normalization(
 
     data.chunks(axis_len)
         .zip(tmp.chunks_mut(axis_len))
-        .for_each(|(input, tmp)| {
-            let mean = fast_sum(input) / axis_len as f32;
-            for (i, o) in input.iter().zip(tmp.iter_mut()) {
-                *o = *i - mean;
-            }
-        });
-
-    tmp.chunks(axis_len)
         .zip(output.chunks_mut(axis_len))
-        .for_each(|(tmp, output)| {
-            for (t, o) in tmp.iter().zip(output.iter_mut()) {
-                *o = *t * t;
+        .for_each(|((input, tmp), output)| {
+            let mean = fast_sum(input) / axis_len as f32;
+            for ((i, t), o) in input.iter().zip(tmp.iter_mut()).zip(output.iter_mut()) {
+                *t = *i - mean;
+                *o = *t * *t;
             }
-            let mean = fast_sum(output) / axis_len as f32;
+            let mean = (fast_sum(output) / axis_len as f32 + ln.epsilon).sqrt();
             for (((t, &scale), &bias), o) in tmp
                 .iter()
                 .zip(scale.iter())
                 .zip(bias.iter())
                 .zip(output.iter_mut())
             {
-                *o = (*t / (mean + ln.epsilon).sqrt()).mul_add(scale, bias)
+                *o = (*t / mean).mul_add(scale, bias)
             }
         });
 }

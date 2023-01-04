@@ -10,8 +10,8 @@ use altius_core::{
     model::Model,
     node::{
         compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gather, Gemm,
-        HardSigmoid, LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize, Softmax, Split,
-        Squeeze, Transpose, Unsqueeze,
+        HardSigmoid, LayerNormalization, LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize,
+        Softmax, Split, Squeeze, Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -213,10 +213,8 @@ impl<'a> InterpreterSession<'a> {
             Op::BatchNormalization(ref batchnorm) => {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
-            Op::LayerNormalization(ref _ln) => {
-                return Err(SessionError::Message(
-                    "LayerNormalization: Kernel not implemented".into(),
-                ))
+            Op::LayerNormalization(ref ln) => {
+                compute_layer_normalization(ln, &inputs, &mut outputs)
             }
             Op::Split(ref split) => {
                 compute_split(self.model.opset_version, split, &inputs, &mut outputs)
@@ -1689,6 +1687,59 @@ fn compute_batch_normalization(
             }
         }
     }
+}
+
+fn compute_layer_normalization(
+    ln: &LayerNormalization,
+    inputs: &[&Tensor],
+    outputs: &mut [Tensor],
+) {
+    let data = inputs[0];
+    let scale = inputs[1].data::<f32>();
+    let bias = inputs[2].data::<f32>();
+    let output = &mut outputs[0];
+    let mut tmp = Tensor::uninit::<f32>(output.dims().to_vec().into());
+    let tmp = tmp.data_mut::<f32>();
+
+    assert!(
+        ln.axis == -1 || ln.axis == *data.dims().last().unwrap() as i64,
+        "Axis must be the last dimension."
+    );
+    assert!(ln.stash_type == 1, "Stash type must be 1.");
+    assert!(
+        data.elem_ty() == TensorElemType::F32,
+        "Input data type must be f32."
+    );
+
+    let axis_len = *data.dims().last().unwrap() as usize;
+    let data = data.data::<f32>();
+    let output = output.data_mut::<f32>();
+
+    data.chunks(axis_len)
+        .zip(tmp.chunks_mut(axis_len))
+        .for_each(|(input, tmp)| {
+            let mean = fast_sum(input) / axis_len as f32;
+            for (i, o) in input.iter().zip(tmp.iter_mut()) {
+                *o = *i - mean;
+            }
+        });
+
+    tmp.chunks(axis_len)
+        .zip(output.chunks_mut(axis_len))
+        .for_each(|(tmp, output)| {
+            for (t, o) in tmp.iter().zip(output.iter_mut()) {
+                *o = *t * t;
+            }
+            let mean = fast_sum(output) / axis_len as f32;
+            for (((t, &scale), &bias), o) in tmp
+                .iter()
+                .zip(scale.iter())
+                .zip(bias.iter())
+                .zip(output.iter_mut())
+            {
+                *o = (*t / (mean + ln.epsilon).sqrt()).mul_add(scale, bias)
+            }
+        });
 }
 
 fn compute_split(opset_version: i64, split: &Split, inputs: &[&Tensor], outputs: &mut [Tensor]) {

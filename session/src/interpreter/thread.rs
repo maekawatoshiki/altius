@@ -67,6 +67,7 @@ impl ThreadCtx {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new_with_num_threads(n: usize) -> Self {
+        #[cfg(target_os = "linux")]
         let apicid_to_processor = if let Ok(cpuinfo) = procfs::CpuInfo::new() {
             let mut apicid_to_processor = vec![0; cpuinfo.cpus.len()];
             for (i, cpu) in cpuinfo.cpus.iter().enumerate() {
@@ -75,12 +76,14 @@ impl ThreadCtx {
             }
             apicid_to_processor
         } else {
-            vec![0; n]
+            (0..n).collect::<Vec<_>>()
         };
+        #[cfg(not(target_os = "linux"))]
+        let apicid_to_processor = (0..n).collect::<Vec<_>>();
         let tp = ThreadPool::new(n);
         for id in (0..n).map(|i| apicid_to_processor[i]) {
             tp.execute(move || {
-                assert!(core_affinity::set_for_current(core_affinity::CoreId { id }))
+                core_affinity::set_for_current(core_affinity::CoreId { id });
             })
         }
         tp.join();

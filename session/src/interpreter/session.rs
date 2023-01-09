@@ -214,7 +214,7 @@ impl<'a> InterpreterSession<'a> {
                 compute_batch_normalization(batchnorm, &inputs, &mut outputs)
             }
             Op::LayerNormalization(ref ln) => {
-                compute_layer_normalization(ln, &inputs, &mut outputs)
+                compute_layer_normalization(&self.tctx, ln, &inputs, &mut outputs)
             }
             Op::Split(ref split) => {
                 compute_split(self.model.opset_version, split, &inputs, &mut outputs)
@@ -1690,6 +1690,7 @@ fn compute_batch_normalization(
 }
 
 fn compute_layer_normalization(
+    tctx: &ThreadCtx,
     ln: &LayerNormalization,
     inputs: &[&Tensor],
     outputs: &mut [Tensor],
@@ -1715,25 +1716,38 @@ fn compute_layer_normalization(
     let data = data.data::<f32>();
     let output = output.data_mut::<f32>();
 
-    data.chunks(axis_len)
-        .zip(tmp.chunks_mut(axis_len))
-        .zip(output.chunks_mut(axis_len))
-        .for_each(|((input, tmp), output)| {
-            let mean = fast_sum(input) / axis_len as f32;
-            for ((i, t), o) in input.iter().zip(tmp.iter_mut()).zip(output.iter_mut()) {
-                *t = *i - mean;
-                *o = *t * *t;
-            }
-            let mean = (fast_sum(output) / axis_len as f32 + ln.epsilon).sqrt();
-            for (((t, &scale), &bias), o) in tmp
-                .iter()
-                .zip(scale.iter())
-                .zip(bias.iter())
-                .zip(output.iter_mut())
-            {
-                *o = (*t / mean).mul_add(scale, bias)
-            }
-        });
+    let batch = (data.len() / tctx.num_threads() / axis_len).max(1);
+
+    tctx.scope(|scope| {
+        data.chunks(axis_len * batch)
+            .zip(tmp.chunks_mut(axis_len * batch))
+            .zip(output.chunks_mut(axis_len * batch))
+            .for_each(|((data, tmp), output)| {
+                scope.spawn(move || {
+                    data.chunks(axis_len)
+                        .zip(tmp.chunks_mut(axis_len))
+                        .zip(output.chunks_mut(axis_len))
+                        .for_each(|((input, tmp), output)| {
+                            let mean = fast_sum(input) / axis_len as f32;
+                            for ((i, t), o) in
+                                input.iter().zip(tmp.iter_mut()).zip(output.iter_mut())
+                            {
+                                *t = *i - mean;
+                                *o = *t * *t;
+                            }
+                            let mean = (fast_sum(output) / axis_len as f32 + ln.epsilon).sqrt();
+                            for (((t, &scale), &bias), o) in tmp
+                                .iter()
+                                .zip(scale.iter())
+                                .zip(bias.iter())
+                                .zip(output.iter_mut())
+                            {
+                                *o = (*t / mean).mul_add(scale, bias)
+                            }
+                        });
+                });
+            });
+    });
 }
 
 fn compute_split(opset_version: i64, split: &Split, inputs: &[&Tensor], outputs: &mut [Tensor]) {

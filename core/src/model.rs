@@ -1,8 +1,11 @@
+use std::mem;
+
 use crate::{
     node::{Node, NodeArena, NodeId},
     tensor::Tensor,
     value::{ValueArena, ValueId},
 };
+use id_arena::Arena;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Default, Clone)]
@@ -103,6 +106,26 @@ impl Model {
         }
 
         nodes
+    }
+
+    /// Removes nodes labeled as deleted from the arena.
+    pub fn remove_unnecessary_nodes(&mut self) {
+        let order = self
+            .topo_sort_nodes()
+            .into_iter()
+            .enumerate()
+            .map(|(i, id)| (id, i))
+            .collect::<FxHashMap<NodeId, usize>>();
+        let old_arena = mem::replace(&mut self.nodes, Arena::new());
+        let mut nodes = old_arena
+            .into_iter()
+            .filter(|(_, node)| !node.deleted)
+            .collect::<Vec<_>>();
+        nodes.sort_by(|x, y| order[&x.0].cmp(&order[&y.0]));
+        for (_, old_node) in nodes {
+            assert!(!old_node.deleted);
+            self.nodes.alloc(old_node);
+        }
     }
 }
 

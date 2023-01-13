@@ -88,6 +88,8 @@ pub fn fuse_gelu(model: &mut Model) {
         delete_list.push(mul2_id);
     }
 
+    let count = list.len();
+
     for (start, end) in list {
         let gelu_out = model.values.new_val();
         let gelu = Node::new(Op::Gelu).with_in(start).with_out(gelu_out);
@@ -104,7 +106,9 @@ pub fn fuse_gelu(model: &mut Model) {
         model.nodes[node].deleted = true
     }
 
-    log::info!("fuse_gelu: {:?}", start.elapsed());
+    model.remove_unnecessary_nodes();
+
+    log::info!("fuse_gelu({count}): {:?}", start.elapsed());
 }
 
 fn allclose(x: &[f32], y: &[f32]) -> bool {

@@ -136,5 +136,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
         model.nodes[node].deleted = true
     }
 
+    model.remove_unnecessary_nodes();
+
     log::info!("fuse_layer_norm({count}): {:?}", start.elapsed());
 }

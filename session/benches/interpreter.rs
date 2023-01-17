@@ -16,7 +16,7 @@ fn without_gelu(c: &mut Criterion) {
         .expect("Failed to load model. Have you run altius-py/deit.py?");
 
     let input_value = model.lookup_named_value("input.1").unwrap();
-    let input = Tensor::rand::<f32>(vec![1, 3, 384, 384].into());
+    let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
 
     let sess = InterpreterSessionBuilder::new(&model)
         .with_intra_op_num_threads(THREADS)
@@ -34,7 +34,7 @@ fn with_gelu(c: &mut Criterion) {
     fuse_gelu(&mut model);
 
     let input_value = model.lookup_named_value("input.1").unwrap();
-    let input = Tensor::rand::<f32>(vec![1, 3, 384, 384].into());
+    let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
 
     let sess = InterpreterSessionBuilder::new(&model)
         .with_intra_op_num_threads(THREADS)
@@ -53,7 +53,7 @@ fn with_gelu_ln(c: &mut Criterion) {
     fuse_gelu(&mut model);
 
     let input_value = model.lookup_named_value("input.1").unwrap();
-    let input = Tensor::rand::<f32>(vec![1, 3, 384, 384].into());
+    let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
 
     let sess = InterpreterSessionBuilder::new(&model)
         .with_intra_op_num_threads(THREADS)
@@ -72,7 +72,7 @@ fn with_gelu_ln2(c: &mut Criterion) {
     fuse_layer_norm(&mut model);
 
     let input_value = model.lookup_named_value("input.1").unwrap();
-    let input = Tensor::rand::<f32>(vec![1, 3, 384, 384].into());
+    let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
 
     let sess = InterpreterSessionBuilder::new(&model)
         .with_intra_op_num_threads(THREADS)

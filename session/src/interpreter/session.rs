@@ -1293,31 +1293,65 @@ fn compute_softmax(
     assert!(softmax.axis == -1 || softmax.axis == (input.dims().len() - 1) as i64);
 
     let axis_len = *input.dims().last().unwrap();
+    let m = input.dims().total_elems() / axis_len;
+    let total = input.dims().total_elems();
+    let mut ones = Tensor::uninit::<f32>(vec![axis_len, 1].into());
+    ones.data_mut::<f32>().fill(1.);
+    let mut tmp = Tensor::uninit::<f32>(vec![m, 1].into());
     let input = input.data::<f32>();
     let output = output.data_mut::<f32>();
 
     // let _n = tctx.num_threads();
-    let batch = (output.len() / 100000).max(1); // 100000 is magic number :(
-                                                // I think processing more than 100000 elements for
-                                                // each core is just right.
+    // let batch = (output.len() / 100000).max(1); // 100000 is magic number :(
+    //                                             // I think processing more than 100000 elements for
+    //                                             // each core is just right.
 
+    // tctx.scope(|scope| {
+    //     output
+    //         .chunks_mut(axis_len * batch)
+    //         .zip(input.chunks(axis_len * batch))
+    //         .for_each(|(output, input)| {
+    //             scope.spawn(|| {
+    //                 output
+    //                     .chunks_mut(axis_len)
+    //                     .zip(input.chunks(axis_len))
+    //                     .for_each(|(output, input)| {
+    //                         fast_exp(output, input);
+    //                         let sum = fast_sum(output);
+    //                         output.iter_mut().for_each(|o| *o /= sum);
+    //                     });
+    //             })
+    //         });
+    // });
+
+    // log::info!("{}", total);
+    let n = tctx.num_threads();
     tctx.scope(|scope| {
         output
-            .chunks_mut(axis_len * batch)
-            .zip(input.chunks(axis_len * batch))
-            .for_each(|(output, input)| {
-                scope.spawn(|| {
-                    output
-                        .chunks_mut(axis_len)
-                        .zip(input.chunks(axis_len))
-                        .for_each(|(output, input)| {
-                            fast_exp(output, input);
-                            let sum = fast_sum(output);
-                            output.iter_mut().for_each(|o| *o /= sum);
-                        });
-                })
-            });
+            .chunks_mut(total / n)
+            .zip(input.chunks(total / n))
+            .for_each(|(o, i)| scope.spawn(move || fast_exp(o, i)))
     });
+
+    sgemm(
+        m,
+        axis_len,
+        1,
+        1.,
+        &output,
+        axis_len,
+        ones.data(),
+        1,
+        0.,
+        tmp.data_mut(),
+        1,
+    );
+
+    for (sum, output) in tmp.data::<f32>().iter().zip(output.chunks_mut(axis_len)) {
+        for o in output {
+            *o /= sum;
+        }
+    }
 }
 
 fn fast_sum(mut slice: &[f32]) -> f32 {

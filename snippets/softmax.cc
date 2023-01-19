@@ -51,9 +51,18 @@ std::tuple<std::vector<int8_t>, float> softmax(const std::vector<int8_t> &input,
     // P(r);
     const auto x_b = ((-r) >> 1) + x_0;
     // P(x_b);
-    // exp[i] = x_b << (7 - q);
-    exp[i] = x_b >> q; // TODO
-    // P(exp[i]);
+    exp[i] = x_b >> q;
+#if 0
+    int N = 1;
+    if (N - q > 0) {
+      exp[i] = x_b << (N - q); // TODO
+    } else {
+      exp[i] = x_b >> (q - N); // TODO
+    }
+#endif
+    P(x_b);
+    P(q);
+    P(exp[i]);
     // std::cout << (int)exp[i] << std::endl;
   }
 
@@ -107,24 +116,31 @@ void print(const std::string msg, const std::vector<float> data) {
 }
 
 int main() {
+  const std::vector<float> input = {-1, 0, 1, 2, 3, 4, 5};
+  const float scale = 0.04;
   {
-    const std::vector<float> input = {-2, -1, 0, 1, 2, 5};
-
     print("input", input);
     auto output = softmax(input);
     print("output", output);
   }
   {
-    const std::vector<float> input = {-2, -1, 0, 1, 2, 5};
-    const float scale = 0.05;
-    print("input", quantize(input, scale));
+    print("input", input);
+    print("input(int)", quantize(input, scale));
     print("output", dequantize(quantize(input, scale), scale));
   }
   {
-    const std::vector<float> input = {-2, -1, 0, 1, 2, 5};
-    const float scale = 0.05;
+    std::cout << "# QDQ" << std::endl;
+    const auto output =
+        dequantize(quantize(softmax(dequantize(quantize(input, scale), scale)),
+                            1.f / (1 << 7)),
+                   1.f / (1 << 7));
+    print("input", input);
+    print("output", output);
+  }
+  {
+    std::cout << "# QOp" << std::endl;
     const auto output = softmax(quantize(input, scale), scale);
-    print("input", quantize(input, scale));
+    print("input", input);
     print("output", dequantize(std::get<0>(output), std::get<1>(output)));
   }
 }

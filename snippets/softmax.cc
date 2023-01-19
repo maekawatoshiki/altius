@@ -23,7 +23,7 @@ std::vector<float> dequantize(const std::vector<int8_t> &x, float scale) {
   for (int i = 0; i < x.size(); i++) {
     output[i] = (float)x[i] * scale;
   }
-  return std::move(output);
+  return output;
 }
 
 std::tuple<std::vector<int8_t>, float> softmax(const std::vector<int8_t> &input,
@@ -51,14 +51,15 @@ std::tuple<std::vector<int8_t>, float> softmax(const std::vector<int8_t> &input,
     // P(r);
     const auto x_b = ((-r) >> 1) + x_0;
     // P(x_b);
-    exp[i] = x_b >> q;
 #if 0
-    int N = 1;
+    int N = 0;
     if (N - q > 0) {
       exp[i] = x_b << (N - q); // TODO
     } else {
       exp[i] = x_b >> (q - N); // TODO
     }
+#else
+    exp[i] = x_b >> q;
 #endif
     P(x_b);
     P(q);
@@ -79,7 +80,7 @@ std::tuple<std::vector<int8_t>, float> softmax(const std::vector<int8_t> &input,
     // P(output[i]);
   }
 
-  return std::make_tuple(std::move(output), 1.f / (float)(1 << (8 - 1)));
+  return std::make_tuple(output, 1.f / (float)(1 << (8 - 1)));
 }
 
 std::vector<float> softmax(const std::vector<float> &input) {
@@ -98,7 +99,7 @@ std::vector<float> softmax(const std::vector<float> &input) {
     output[i] /= sum;
   }
 
-  return std::move(output);
+  return output;
 }
 
 void print(const std::string msg, const std::vector<int8_t> data) {

@@ -22,8 +22,12 @@ pub struct PySession(pub InterpreterSession<'static>);
 
 #[pyfunction]
 fn load(path: String) -> PyResult<PyModel> {
-    altius_core::onnx::load_onnx(path).map_or(
-        Err(PyRuntimeError::new_err("Failed to load a ONNX model")),
+    altius_core::onnx::load_onnx(path).map_or_else(
+        |e| {
+            Err(PyRuntimeError::new_err(format!(
+                "Failed to load a ONNX model: {e:?}"
+            )))
+        },
         |m| Ok(PyModel(m)),
     )
 }
@@ -35,6 +39,7 @@ fn session<'a>(
     intra_op_num_threads: usize,
 ) -> PyResult<PySession> {
     let model = unsafe { std::mem::transmute::<&'a mut Model, &'static mut Model>(&mut model.0) };
+    optimize::layer_norm_fusion::fuse_layer_norm(model);
     optimize::gelu_fusion::fuse_gelu(model);
     Ok(PySession(
         InterpreterSessionBuilder::new(model)

@@ -8,8 +8,8 @@ use crate::{
     model::Model,
     node::{
         BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gather, Gemm, HardSigmoid,
-        LayerNormalization, LeakyReLU, MaxPool, Node, Op, ReduceMean, ReduceMin, Resize, Shape,
-        Softmax, Split, Squeeze, Transpose, Unsqueeze,
+        LayerNormalization, LeakyReLU, MaxPool, Node, Op, ReduceMax, ReduceMean, ReduceMin, Resize,
+        Shape, Softmax, Split, Squeeze, Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
 };
@@ -149,6 +149,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             "Sub" => Op::Sub,
             "Mul" => Op::Mul,
             "Div" => Op::Div,
+            "Greater" => Op::Greater,
             "Pow" => Op::Pow,
             "Sqrt" => Op::Sqrt,
             "Relu" => Op::ReLU,
@@ -246,6 +247,10 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             }),
             "ReduceMin" => Op::ReduceMin(ReduceMin {
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
+                keep_dims: get_attribute(&node.attribute, "keepdims").map_or(true, |a| a.i() != 0),
+            }),
+            "ReduceMax" => Op::ReduceMax(ReduceMax {
+                axes: get_attribute(&node.attribute, "axes").map_or(vec![], |a| a.ints.clone()),
                 keep_dims: get_attribute(&node.attribute, "keepdims").map_or(true, |a| a.i() != 0),
             }),
             "ReduceMean" => Op::ReduceMean(ReduceMean {

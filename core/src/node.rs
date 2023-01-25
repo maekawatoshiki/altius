@@ -28,6 +28,7 @@ pub enum Op {
     Mul,
     Div,
     Pow,
+    Greater,
     Sqrt,
     ReLU,
     Gelu,
@@ -49,6 +50,7 @@ pub enum Op {
     Squeeze(Squeeze),
     Unsqueeze(Unsqueeze),
     ReduceMin(ReduceMin),
+    ReduceMax(ReduceMax),
     ReduceMean(ReduceMean),
     Round,
     Exp,
@@ -145,6 +147,13 @@ pub struct Unsqueeze {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ReduceMin {
+    pub axes: Vec<i64>,
+    pub keep_dims: bool,
+}
+
+/// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#ReduceMax>
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ReduceMax {
     pub axes: Vec<i64>,
     pub keep_dims: bool,
 }
@@ -369,6 +378,7 @@ impl Op {
             Op::Mul => "Mul",
             Op::Div => "Div",
             Op::Pow => "Pow",
+            Op::Greater => "Greater",
             Op::Sqrt => "Sqrt",
             Op::ReLU => "ReLU",
             Op::LeakyReLU(_) => "LeakyReLU",
@@ -390,6 +400,7 @@ impl Op {
             Op::Squeeze(_) => "Squeeze",
             Op::Unsqueeze(_) => "Unsqueeze",
             Op::ReduceMin(_) => "ReduceMin",
+            Op::ReduceMax(_) => "ReduceMax",
             Op::ReduceMean(_) => "ReduceMean",
             Op::Round => "Round",
             Op::Exp => "Exp",
@@ -478,7 +489,7 @@ pub fn compute_output_shapes(
                 inputs[Node::CONV2D_IN].elem_ty(),
             ));
         }
-        Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Pow => {
+        Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Pow | Op::Greater => {
             let x = inputs[0].dims();
             let y = inputs[1].dims();
             let shape = x.broadcast(y).unwrap();
@@ -672,6 +683,32 @@ pub fn compute_output_shapes(
             let in_dims = inputs[0].dims();
             let keepdims = if rmin.keep_dims { Some(1) } else { None };
             let axes = rmin
+                .axes
+                .iter()
+                .map(|&axis| {
+                    if axis < 0 {
+                        (in_dims.len() as i64 + axis) as usize
+                    } else {
+                        axis as usize
+                    }
+                })
+                .collect::<Vec<_>>();
+            let mut dims = in_dims
+                .as_slice()
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &d)| if axes.contains(&i) { keepdims } else { Some(d) })
+                .collect::<Vec<_>>();
+            if dims.is_empty() {
+                dims.push(1);
+            }
+            shapes.push(TypedShape::new(dims.into(), inputs[0].elem_ty()))
+        }
+        Op::ReduceMax(rmax) => {
+            assert!(opset_version < 13);
+            let in_dims = inputs[0].dims();
+            let keepdims = if rmax.keep_dims { Some(1) } else { None };
+            let axes = rmax
                 .axes
                 .iter()
                 .map(|&axis| {

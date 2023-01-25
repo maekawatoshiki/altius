@@ -172,6 +172,7 @@ impl<'a> InterpreterSession<'a> {
             Op::Sub => compute_sub(node, &inputs, &mut outputs),
             Op::Mul => compute_mul(node, &inputs, &mut outputs),
             Op::Div => compute_div(&self.tctx, &inputs, &mut outputs),
+            Op::Greater => compute_greater(node, &inputs, &mut outputs),
             Op::Pow => compute_pow(node, &inputs, &mut outputs),
             Op::Sqrt => compute_sqrt(node, &inputs, &mut outputs),
             Op::MaxPool(ref maxpool) => compute_max_pool(maxpool, &inputs, &mut outputs),
@@ -198,6 +199,11 @@ impl<'a> InterpreterSession<'a> {
             Op::ReduceMin(_) => {
                 return Err(SessionError::Message(
                     "ReduceMin: Kernel not implemented".into(),
+                ))
+            }
+            Op::ReduceMax(_) => {
+                return Err(SessionError::Message(
+                    "ReduceMax: Kernel not implemented".into(),
                 ))
             }
             Op::ReduceMean(ref rmean) => compute_reduce_mean(rmean, &inputs, &mut outputs),
@@ -885,6 +891,10 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         input_a.dims(),
         input_b.dims()
     )
+}
+
+fn compute_greater(_node: &Node, _inputs: &[&Tensor], _outputs: &mut [Tensor]) {
+    todo!()
 }
 
 fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

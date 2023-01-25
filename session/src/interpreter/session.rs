@@ -889,8 +889,28 @@ fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     )
 }
 
-fn compute_greater(_node: &Node, _inputs: &[&Tensor], _outputs: &mut [Tensor]) {
-    todo!()
+fn compute_greater(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input_0 = inputs[0];
+    let input_1 = inputs[1];
+    let output = &mut outputs[0];
+
+    if input_1.dims().is_scalar() {
+        let y = input_1.data::<f32>()[0];
+        for (&x, o) in input_0
+            .data::<f32>()
+            .iter()
+            .zip(output.data_mut::<bool>().iter_mut())
+        {
+            *o = if x > y { true } else { false };
+        }
+        return;
+    }
+
+    todo!(
+        "A shape: {:?}, B shape: {:?}",
+        input_0.dims(),
+        input_1.dims()
+    )
 }
 
 fn compute_pow(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {

@@ -489,11 +489,17 @@ pub fn compute_output_shapes(
                 inputs[Node::CONV2D_IN].elem_ty(),
             ));
         }
-        Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Pow | Op::Greater => {
+        Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Pow => {
             let x = inputs[0].dims();
             let y = inputs[1].dims();
             let shape = x.broadcast(y).unwrap();
             shapes.push(TypedShape::new(shape, inputs[0].elem_ty()));
+        }
+        Op::Greater => {
+            let x = inputs[0].dims();
+            let y = inputs[1].dims();
+            let shape = x.broadcast(y).unwrap();
+            shapes.push(TypedShape::new(shape, TensorElemType::Bool));
         }
         Op::Where => {
             let x = inputs[1].dims();

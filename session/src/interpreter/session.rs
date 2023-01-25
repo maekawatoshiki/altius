@@ -10,8 +10,8 @@ use altius_core::{
     model::Model,
     node::{
         compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gather, Gemm,
-        HardSigmoid, LayerNormalization, LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMean, Resize,
-        Softmax, Split, Squeeze, Transpose, Unsqueeze,
+        HardSigmoid, LayerNormalization, LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMax,
+        ReduceMean, Resize, Softmax, Split, Squeeze, Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -201,11 +201,7 @@ impl<'a> InterpreterSession<'a> {
                     "ReduceMin: Kernel not implemented".into(),
                 ))
             }
-            Op::ReduceMax(_) => {
-                return Err(SessionError::Message(
-                    "ReduceMax: Kernel not implemented".into(),
-                ))
-            }
+            Op::ReduceMax(ref rmax) => compute_reduce_max(rmax, &inputs, &mut outputs),
             Op::ReduceMean(ref rmean) => compute_reduce_mean(rmean, &inputs, &mut outputs),
             Op::Round => {
                 return Err(SessionError::Message(
@@ -1576,6 +1572,21 @@ fn compute_unsqueeze(_: &Unsqueeze, inputs: &[&Tensor], outputs: &mut [Tensor]) 
     let input = inputs[0];
     let output = &mut outputs[0];
     output.copy_data_from(input);
+}
+
+fn compute_reduce_max(rmax: &ReduceMax, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input = inputs[0];
+    let output = &mut outputs[0];
+    assert!(rmax.axes.is_empty());
+    assert!(!rmax.keep_dims);
+
+    let input = input.data::<f32>();
+    let output = output.data_mut::<f32>();
+
+    output[0] = *input
+        .iter()
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap();
 }
 
 fn compute_reduce_mean(rmean: &ReduceMean, inputs: &[&Tensor], outputs: &mut [Tensor]) {

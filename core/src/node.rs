@@ -705,20 +705,27 @@ pub fn compute_output_shapes(
             shapes.push(TypedShape::new(dims.into(), inputs[0].elem_ty()))
         }
         Op::ReduceMax(rmax) => {
-            assert!(opset_version < 13);
+            assert!(opset_version <= 13);
             let in_dims = inputs[0].dims();
             let keepdims = if rmax.keep_dims { Some(1) } else { None };
-            let axes = rmax
-                .axes
-                .iter()
-                .map(|&axis| {
-                    if axis < 0 {
-                        (in_dims.len() as i64 + axis) as usize
-                    } else {
-                        axis as usize
-                    }
-                })
-                .collect::<Vec<_>>();
+            let axes = if rmax.axes.is_empty() {
+                in_dims
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| i)
+                    .collect::<Vec<_>>()
+            } else {
+                rmax.axes
+                    .iter()
+                    .map(|&axis| {
+                        if axis < 0 {
+                            (in_dims.len() as i64 + axis) as usize
+                        } else {
+                            axis as usize
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            };
             let mut dims = in_dims
                 .as_slice()
                 .iter()

@@ -1275,6 +1275,18 @@ fn compute_where(inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let y = inputs[2];
     let output = &mut outputs[0];
 
+    // TODO: We should do better handling of broadcasting.
+    if condition.dims() == y.dims() && x.dims().is_scalar() {
+        let output = output.data_mut::<f32>();
+        let x = x.data::<f32>()[0];
+        let y = y.data::<f32>();
+        let condition = condition.data::<bool>();
+        for (&c, (&y, o)) in condition.iter().zip(y.iter().zip(output.iter_mut())) {
+            *o = if c { x } else { y }
+        }
+        return;
+    }
+
     assert!(y.dims().is_scalar());
     assert!(
         x.dims().len() == 4

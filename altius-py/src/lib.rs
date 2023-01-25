@@ -106,7 +106,7 @@ impl PySession {
         for out in self
             .0
             .run(new_inputs)
-            .map_err(|_| PyRuntimeError::new_err("Inference failed".to_string()))?
+            .map_err(|e| PyRuntimeError::new_err(format!("Inference failed: {e}")))?
         {
             let arr =
                 ArrayD::from_shape_vec(out.dims().as_slice().to_vec(), out.data::<f32>().to_vec())

@@ -33,7 +33,7 @@ pub fn load_and_run(onnx: &[u8], img: &[u8]) -> Option<String> {
     });
     let input = Tensor::new(
         vec![1, 3, 224, 224].into(),
-        image.clone().into_raw_vec().into_iter().collect::<Vec<_>>(),
+        image.into_raw_vec().into_iter().collect::<Vec<_>>(),
     );
 
     let results = sess.run(vec![(input_value, input)]).ok()?;

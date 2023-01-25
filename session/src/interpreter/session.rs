@@ -1711,7 +1711,7 @@ fn compute_layer_normalization(
         "Input data type must be f32."
     );
 
-    let axis_len = *data.dims().last().unwrap() as usize;
+    let axis_len = *data.dims().last().unwrap();
     let data = data.data::<f32>();
     let output = output.data_mut::<f32>();
 

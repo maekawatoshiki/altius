@@ -3,7 +3,7 @@
 [![CI](https://github.com/maekawatoshiki/altius/workflows/CI/badge.svg)](https://github.com/maekawatoshiki/altius/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/maekawatoshiki/altius/branch/main/graph/badge.svg)](https://codecov.io/gh/maekawatoshiki/altius)
 
-Small DNN runtime written in Rust
+Small ONNX inference runtime written in Rust
 
 Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) and [discussions](https://github.com/maekawatoshiki/altius/discussions)
 

@@ -18,6 +18,7 @@ pub struct Node {
     pub inputs: Vec<ValueId>,
     pub outputs: Vec<ValueId>,
     pub deleted: bool,
+    pub compiled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -336,6 +337,7 @@ impl Node {
             inputs: Vec::new(),
             outputs: Vec::new(),
             deleted: false,
+            compiled: false,
         }
     }
 

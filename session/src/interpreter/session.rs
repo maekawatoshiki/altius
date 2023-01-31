@@ -158,6 +158,8 @@ impl<'a> InterpreterSession<'a> {
         #[cfg(not(target_arch = "wasm32"))]
         let start = Instant::now();
 
+        assert!(!node.compiled);
+
         // Actual kernel runs here.
         match op {
             Op::Conv2d(ref conv) => conv2d::compute(&mut Conv2dCtx {

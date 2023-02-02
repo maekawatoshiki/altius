@@ -1,0 +1,6 @@
+[build]
+rustflags = ["-Ctarget-cpu=native"]
+
+[env]
+OMP_PLACES = "cores"
+RUST_LOG = "debug"

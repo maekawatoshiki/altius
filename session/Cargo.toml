@@ -29,6 +29,7 @@ opencl3 = { version = "^0.9.1", optional = true }
 procfs = "0.14.2"
 
 [features]
+default = ["blis"]
 cuda = ["cudnn", "cust"]
 matrixmultiply-threading = ["matrixmultiply/threading"]
 openblas = ["blas-src/openblas", "cblas"]

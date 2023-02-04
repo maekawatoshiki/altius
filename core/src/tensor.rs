@@ -1,4 +1,12 @@
-use std::{cell::RefCell, cmp::Ordering, iter::Sum, mem::MaybeUninit, ops::Deref, sync::Arc};
+use std::{
+    cell::RefCell,
+    cmp::Ordering,
+    fmt::{self},
+    iter::Sum,
+    mem::MaybeUninit,
+    ops::Deref,
+    sync::Arc,
+};
 
 use crate::dim::{Dimension, Dimensions};
 use rand::{
@@ -477,6 +485,54 @@ fn compute_strides(dims: &Dimensions) -> Dimensions {
     }
     strides.into()
 }
+
+impl fmt::Display for Tensor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn dump<T: TensorElemTypeExt + fmt::Debug>(
+            f: &mut fmt::Formatter<'_>,
+            data: &[T],
+        ) -> fmt::Result {
+            const MAX_ELEMS: usize = 10;
+            if data.len() > MAX_ELEMS {
+                write!(f, "[")?;
+                for e in data[0..MAX_ELEMS / 2].iter() {
+                    write!(f, "{e:?}, ")?;
+                }
+                write!(f, "...")?;
+                for e in data[data.len() - MAX_ELEMS / 2 - 1..].iter() {
+                    write!(f, ", {e:?}")?;
+                }
+                write!(f, "]")
+            } else {
+                write!(f, "{:?}", data)
+            }
+        }
+
+        write!(f, "Tensor({:?}, {:?}, ", self.dims, self.elem_ty)?;
+        match self.elem_ty {
+            TensorElemType::F32 => dump(f, self.data::<f32>())?,
+            TensorElemType::I32 => dump(f, self.data::<i32>())?,
+            TensorElemType::I64 => dump(f, self.data::<i64>())?,
+            TensorElemType::Bool => dump(f, self.data::<bool>())?,
+        }
+        write!(f, ")")
+    }
+}
+
+macro_rules! dump_tensor {
+    ($ty:ident, $name:ident) => {
+        #[test]
+        fn $name() {
+            let t = Tensor::zeros::<$ty>(vec![2, 3, 4].into());
+            insta::assert_display_snapshot!(t);
+        }
+    };
+}
+
+dump_tensor!(f32, dump_f32_tensor);
+dump_tensor!(i32, dump_i32_tensor);
+dump_tensor!(i64, dump_i64_tensor);
+dump_tensor!(bool, dump_bool_tensor);
 
 #[test]
 fn create_tensors() {

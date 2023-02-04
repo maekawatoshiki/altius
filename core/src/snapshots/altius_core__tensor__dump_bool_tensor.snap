@@ -1,0 +1,6 @@
+---
+source: core/src/tensor.rs
+assertion_line: 535
+expression: t
+---
+Tensor([2, 3, 4], Bool, [false, false, false, false, false, ..., false, false, false, false, false, false])

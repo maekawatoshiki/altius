@@ -1,0 +1,6 @@
+---
+source: core/src/tensor.rs
+assertion_line: 532
+expression: t
+---
+Tensor([2, 3, 4], F32, [0.0, 0.0, 0.0, 0.0, 0.0, ..., 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])

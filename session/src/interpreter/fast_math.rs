@@ -96,8 +96,9 @@ use std::{
 // }
 
 pub fn fast_sum_exp(output: &mut [f32], input: &[f32]) -> f32 {
-    const LOWER_RANGE: f32 = -103.9720840454f32;
-    const UPPER_RANGE: f32 = 88.7762626647950f32;
+    // const LOWER_RANGE: f32 = -103.9720840454f32;
+    // const UPPER_RANGE: f32 = 88.7762626647950f32;
+    const LOWER_RANGE_2: f32 = -88.37626f32;
     const ROUNDING_BIAS: f32 = 12582912.0f32;
     const LOG2RECIPROCAL: f32 = 1.44269504088896341f32;
     const LOG2HIGH: f32 = -6.93145752e-1f32;
@@ -119,11 +120,11 @@ pub fn fast_sum_exp(output: &mut [f32], input: &[f32]) -> f32 {
     let mut output = output;
     let mut len = output.len();
     let mut sum = Simd::<f32, SIMD_LEN>::splat(0f32);
-    let max = 0.; // TODO
+    let max = input.iter().fold(0.0 / 0.0, |m, v| v.max(m));
 
     while len >= SIMD_LEN {
         let vals = Simd::<_, SIMD_LEN>::from_slice(input) - Simd::splat(max);
-        let vals = vals.simd_clamp(Simd::splat(LOWER_RANGE), Simd::splat(UPPER_RANGE));
+        let vals = vals.simd_max(Simd::splat(LOWER_RANGE_2));
 
         let biased = vals.mul_add(Simd::splat(LOG2RECIPROCAL), Simd::splat(ROUNDING_BIAS));
         let m = biased - Simd::splat(ROUNDING_BIAS);
@@ -153,7 +154,7 @@ pub fn fast_sum_exp(output: &mut [f32], input: &[f32]) -> f32 {
     let mut sum = sum.reduce_sum();
 
     for (&val, out) in input.iter().zip(output.iter_mut()) {
-        let val = (val - max).clamp(LOWER_RANGE, UPPER_RANGE);
+        let val = (val - max).max(LOWER_RANGE_2);
 
         let biased = val.mul_add(LOG2RECIPROCAL, ROUNDING_BIAS);
         let m = biased - ROUNDING_BIAS;

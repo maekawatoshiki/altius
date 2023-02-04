@@ -17,7 +17,12 @@ from torch.nn import functional as F
 logging.basicConfig(level=logging.INFO)
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-sess = altius_py.InferenceSession("../models/gpt2.onnx", intra_op_num_threads=16)
+sess = altius_py.InferenceSession(
+    "../models/gpt2.onnx", intra_op_num_threads=16, enable_profile=True
+)
+# sess = ort.InferenceSession("../models/gpt2.onnx", providers=["CPUExecutionProvider"])
+
+torch.manual_seed(42)
 
 max_tokens = 100
 text = "Rust is a multi-paradigm, general-purpose programming language. Rust emphasizes performance,"

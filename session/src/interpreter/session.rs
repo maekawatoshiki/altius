@@ -146,8 +146,13 @@ impl<'a> InterpreterSession<'a> {
                 .cloned()
                 .unwrap_or_else(|| {
                     let mut op = node.op.clone();
-                    let output_shapes =
-                        compute_output_shapes(&mut op, &inputs, self.model.opset_version).unwrap(); // TODO: Remove unwrap().
+                    let output_shapes = compute_output_shapes(
+                        &mut op,
+                        &inputs,
+                        node.outputs.len(),
+                        self.model.opset_version,
+                    )
+                    .unwrap(); // TODO: Remove unwrap().
                     (op, output_shapes)
                 });
         let mut outputs = output_shapes

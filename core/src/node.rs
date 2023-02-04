@@ -432,6 +432,7 @@ pub enum ShapeError {
 pub fn compute_output_shapes(
     op: &mut Op,
     inputs: &[&Tensor],
+    num_outputs: usize,
     opset_version: i64,
 ) -> Result<Vec<TypedShape>, ShapeError> {
     let mut shapes = vec![];
@@ -535,7 +536,6 @@ pub fn compute_output_shapes(
                 (h_in + (padding[0] + padding[2]) - (kernel[0] - 1) - 1) / stride[0] + 1,
                 (w_in + (padding[1] + padding[3]) - (kernel[1] - 1) - 1) / stride[1] + 1,
             ];
-            // shapes.push(output_shape.into());
             shapes.push(TypedShape::new(
                 output_shape.into(),
                 inputs[Node::MAXPOOL_IN].elem_ty(),
@@ -949,6 +949,7 @@ pub fn compute_output_shapes(
             shapes.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
         }
         Op::LayerNormalization(ln) => {
+            assert!(num_outputs == 1);
             let input = inputs[0];
             assert!(ln.stash_type == 1);
             shapes.push(TypedShape::new(input.dims().clone(), input.elem_ty()));

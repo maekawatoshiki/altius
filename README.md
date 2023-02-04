@@ -24,8 +24,8 @@ Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) an
 ./run.sh vit # You can specify the number of threads in ./session/examples/vit.rs
 
 # On macOS, you can use 'accelerate' library.
-RUSTFLAGS="-C target-cpu=native" \
-    cargo run --release --example mobilenet --features accelerate
+# Replace `blis` default feature in `session/Cargo.toml` with `accelerate`.
+cargo run --release --example mobielnet
 ```
 
 # Run from WebAssembly

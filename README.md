@@ -21,11 +21,11 @@ Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) an
 # {mnist, mobilenet, vit} are available.
 ./run.sh mnist
 ./run.sh mobilenet
+./run.sh deit
 ./run.sh vit # You can specify the number of threads in ./session/examples/vit.rs
 
 # On macOS, you can use 'accelerate' library.
-# Replace `blis` default feature in `session/Cargo.toml` with `accelerate`.
-cargo run --release --example mobielnet
+cargo run --release --features accelerate --example mobilenet
 ```
 
 # Run from WebAssembly

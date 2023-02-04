@@ -13,7 +13,7 @@ fi
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 if [ ${1:-nobuild} = "build" ]; then
-  if [[ -z "${GITHUB_ACTIONS}" ]]; then
+  if [[ ! -v "${GITHUB_ACTIONS}" ]]; then
     maturin develop -r --target-dir ./target --features blis
   else
     maturin develop -r --features blis

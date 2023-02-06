@@ -11,8 +11,8 @@ use std::borrow::Cow;
 
 use altius_core::{
     model::Model,
-    node::{compute_output_shapes, NodeId, ShapeError},
-    op::Op,
+    node::NodeId,
+    op::{compute_output_shapes, Op, ShapeError},
     tensor::{Tensor, TypedShape},
     value::ValueId,
 };

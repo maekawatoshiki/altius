@@ -8,11 +8,11 @@ use super::{
 use crate::{interpreter::fast_math::fast_sum_exp, NodeExecutionPlan, SessionError};
 use altius_core::{
     model::Model,
-    node::{compute_output_shapes, Node, NodeId},
+    node::{Node, NodeId},
     op::{
-        BatchNormalization, Cast, Concat, Flatten, Gather, Gemm, HardSigmoid, LayerNormalization,
-        LeakyReLU, MaxPool, Op, ReduceMax, ReduceMean, Resize, Softmax, Split, Squeeze, Transpose,
-        Unsqueeze,
+        compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gather, Gemm,
+        HardSigmoid, LayerNormalization, LeakyReLU, MaxPool, Op, ReduceMax, ReduceMean, Resize,
+        Softmax, Split, Squeeze, Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -265,8 +265,8 @@ fn compute_gavg_pool(
     inputs: &[&Tensor],
     outputs: &mut [Tensor],
 ) -> Result<(), SessionError> {
-    let input = inputs[Node::GLOBALAVERAGEPOOL_IN];
-    let output = &mut outputs[Node::GLOBALAVERAGEPOOL_OUT];
+    let input = inputs[Op::GLOBALAVERAGEPOOL_IN];
+    let output = &mut outputs[Op::GLOBALAVERAGEPOOL_OUT];
 
     assert!(input.dims().len() == 4);
     assert!(output.dims().len() == 4);
@@ -291,8 +291,8 @@ fn compute_gavg_pool(
 }
 
 fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input = inputs[Node::MAXPOOL_IN];
-    let output = &mut outputs[Node::MAXPOOL_OUT];
+    let input = inputs[Op::MAXPOOL_IN];
+    let output = &mut outputs[Op::MAXPOOL_OUT];
 
     let kernel = &maxpool.kernel_shape;
     let stride = &maxpool.strides;
@@ -350,9 +350,9 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
 }
 
 fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Node::ADD_IN_A];
-    let input_b = inputs[Node::ADD_IN_B];
-    let output = &mut outputs[Node::ADD_OUT];
+    let input_a = inputs[Op::ADD_IN_A];
+    let input_b = inputs[Op::ADD_IN_B];
+    let output = &mut outputs[Op::ADD_OUT];
 
     let adims = input_a.dims();
     let bdims = input_b.dims();
@@ -602,9 +602,9 @@ fn compute_general_add(input_a: &Tensor, input_b: &Tensor, output: &mut Tensor) 
 }
 
 fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Node::SUB_IN_A];
-    let input_b = inputs[Node::SUB_IN_B];
-    let output = &mut outputs[Node::SUB_OUT];
+    let input_a = inputs[Op::SUB_IN_A];
+    let input_b = inputs[Op::SUB_IN_B];
+    let output = &mut outputs[Op::SUB_OUT];
     const SIMD_LEN: usize = 8;
 
     if input_a.dims() == input_b.dims() {
@@ -686,9 +686,9 @@ fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Node::MUL_IN_A];
-    let input_b = inputs[Node::MUL_IN_B];
-    let output = &mut outputs[Node::MUL_OUT];
+    let input_a = inputs[Op::MUL_IN_A];
+    let input_b = inputs[Op::MUL_IN_B];
+    let output = &mut outputs[Op::MUL_OUT];
 
     let adims = input_a.dims();
     let bdims = input_b.dims();
@@ -786,9 +786,9 @@ fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Node::MUL_IN_A];
-    let input_b = inputs[Node::MUL_IN_B];
-    let output = &mut outputs[Node::MUL_OUT];
+    let input_a = inputs[Op::MUL_IN_A];
+    let input_b = inputs[Op::MUL_IN_B];
+    let output = &mut outputs[Op::MUL_OUT];
 
     const SIMD_LEN: usize = 8;
 
@@ -975,9 +975,9 @@ fn compute_sqrt(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Node::MATMUL_IN_A];
-    let input_b = inputs[Node::MATMUL_IN_B];
-    let output = &mut outputs[Node::MATMUL_OUT];
+    let input_a = inputs[Op::MATMUL_IN_A];
+    let input_b = inputs[Op::MATMUL_IN_B];
+    let output = &mut outputs[Op::MATMUL_OUT];
 
     let adim = input_a.dims();
     let bdim = input_b.dims();
@@ -1038,10 +1038,10 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Node::GEMM_IN_A];
-    let input_b = inputs[Node::GEMM_IN_B];
-    let input_c = inputs[Node::GEMM_IN_C];
-    let output = &mut outputs[Node::GEMM_OUT];
+    let input_a = inputs[Op::GEMM_IN_A];
+    let input_b = inputs[Op::GEMM_IN_B];
+    let input_c = inputs[Op::GEMM_IN_C];
+    let output = &mut outputs[Op::GEMM_OUT];
 
     assert!(input_a.dims().len() == 2);
     assert!(input_b.dims().len() == 2);
@@ -1123,8 +1123,8 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_relu(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input: &[f32] = inputs[Node::RELU_IN].data();
-    let output: &mut [f32] = outputs[Node::RELU_OUT].data_mut();
+    let input: &[f32] = inputs[Op::RELU_IN].data();
+    let output: &mut [f32] = outputs[Op::RELU_OUT].data_mut();
 
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = i.max(0.0);
@@ -1132,8 +1132,8 @@ fn compute_relu(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_hard_sigmoid(hs: &HardSigmoid, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input: &[f32] = inputs[Node::HARDSIGMOID_IN].data();
-    let output: &mut [f32] = outputs[Node::HARDSIGMOID_OUT].data_mut();
+    let input: &[f32] = inputs[Op::HARDSIGMOID_IN].data();
+    let output: &mut [f32] = outputs[Op::HARDSIGMOID_OUT].data_mut();
 
     for (&i, o) in input.iter().zip(output.iter_mut()) {
         *o = hs.alpha.mul_add(i, hs.beta).clamp(0.0, 1.0)
@@ -1241,8 +1241,8 @@ fn tanh(mut data: &mut [f32]) {
 }
 
 fn compute_sigmoid(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input: &[f32] = inputs[Node::SIGMOID_IN].data();
-    let output: &mut [f32] = outputs[Node::SIGMOID_OUT].data_mut();
+    let input: &[f32] = inputs[Op::SIGMOID_IN].data();
+    let output: &mut [f32] = outputs[Op::SIGMOID_OUT].data_mut();
 
     let threshold = 512;
     let chunk_size = output.len() / tctx.num_threads();
@@ -1380,9 +1380,9 @@ fn fast_sum(mut slice: &[f32]) -> f32 {
 fn compute_resize(tctx: &ThreadCtx, resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     assert!(matches!(inputs.len(), 3 | 4));
 
-    let input = inputs[Node::RESIZE_IN_X];
-    // let sizes = inputs[Node::RESIZE_IN_SIZES];
-    let output = &mut outputs[Node::RESIZE_OUT];
+    let input = inputs[Op::RESIZE_IN_X];
+    // let sizes = inputs[Op::RESIZE_IN_SIZES];
+    let output = &mut outputs[Op::RESIZE_OUT];
 
     let batch_size = input.dims()[0];
     let input_c = input.dims()[1];
@@ -1480,7 +1480,7 @@ fn compute_concat(
         }};
     }
 
-    let output = &mut outputs[Node::CONCAT_OUT];
+    let output = &mut outputs[Op::CONCAT_OUT];
     let d = output.dims().len();
 
     output.set_raw_vec(match d {
@@ -1538,8 +1538,8 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
         index
     }
 
-    let input = inputs[Node::TRANSPOSE_IN];
-    let output = &mut outputs[Node::TRANSPOSE_OUT];
+    let input = inputs[Op::TRANSPOSE_IN];
+    let output = &mut outputs[Op::TRANSPOSE_OUT];
     assert!(input.elem_ty().is_f32());
 
     let in_dims = input.dims();
@@ -1601,8 +1601,8 @@ fn compute_transpose(transpose: &Transpose, inputs: &[&Tensor], outputs: &mut [T
 }
 
 fn compute_squeeze(_squeeze: &Squeeze, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input = inputs[Node::SQUEEZE_IN];
-    let output = &mut outputs[Node::SQUEEZE_OUT];
+    let input = inputs[Op::SQUEEZE_IN];
+    let output = &mut outputs[Op::SQUEEZE_OUT];
     output.copy_data_from(input);
 }
 
@@ -1671,8 +1671,8 @@ fn compute_tile(_node: &Node, _inputs: &[&Tensor], _outputs: &mut [Tensor]) {
 }
 
 fn compute_cast(cast: &Cast, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input = inputs[Node::CAST_IN];
-    let output = &mut outputs[Node::CAST_OUT];
+    let input = inputs[Op::CAST_IN];
+    let output = &mut outputs[Op::CAST_OUT];
     if input.elem_ty().is_i32() && cast.to.is_f32() {
         *output = Tensor::new(
             output.dims().clone(),
@@ -1699,12 +1699,12 @@ fn compute_batch_normalization(
     inputs: &[&Tensor],
     outputs: &mut [Tensor],
 ) {
-    let data = inputs[Node::BATCHNORM_IN_X];
-    let scale = inputs[Node::BATCHNORM_IN_SCALE];
-    let bias = inputs[Node::BATCHNORM_IN_B];
-    let input_mean = inputs[Node::BATCHNORM_IN_INPUT_MEAN];
-    let input_var = inputs[Node::BATCHNORM_IN_INPUT_VAR];
-    let output = &mut outputs[Node::BATCHNORM_OUT_Y];
+    let data = inputs[Op::BATCHNORM_IN_X];
+    let scale = inputs[Op::BATCHNORM_IN_SCALE];
+    let bias = inputs[Op::BATCHNORM_IN_B];
+    let input_mean = inputs[Op::BATCHNORM_IN_INPUT_MEAN];
+    let input_var = inputs[Op::BATCHNORM_IN_INPUT_VAR];
+    let output = &mut outputs[Op::BATCHNORM_OUT_Y];
 
     assert!(!batchnorm.training_mode, "Training mode is not supported.");
     assert!(
@@ -1835,11 +1835,11 @@ fn compute_split(opset_version: i64, split: &Split, inputs: &[&Tensor], outputs:
 }
 
 fn compute_slice(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let data = inputs[Node::SLICE_IN_DATA];
-    let starts = inputs[Node::SLICE_IN_STARTS].data::<i64>();
-    let ends = inputs[Node::SLICE_IN_ENDS].data::<i64>();
-    let axes = inputs[Node::SLICE_IN_AXES].data::<i64>();
-    let output = &mut outputs[Node::SLICE_OUT];
+    let data = inputs[Op::SLICE_IN_DATA];
+    let starts = inputs[Op::SLICE_IN_STARTS].data::<i64>();
+    let ends = inputs[Op::SLICE_IN_ENDS].data::<i64>();
+    let axes = inputs[Op::SLICE_IN_AXES].data::<i64>();
+    let output = &mut outputs[Op::SLICE_OUT];
 
     assert_eq!(data.dims().len(), 3);
 
@@ -1856,7 +1856,7 @@ fn compute_slice(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     let ones = vec![1i64; axes.len()];
     let steps = inputs
-        .get(Node::SLICE_IN_STEPS)
+        .get(Op::SLICE_IN_STEPS)
         .map_or(ones.as_slice(), |s| s.data::<i64>());
 
     assert!(starts.iter().all(|&x| x >= 0));
@@ -1922,13 +1922,13 @@ fn compute_gather(gather: &Gather, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_reshape(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input = inputs[Node::RESHAPE_IN];
-    let output = &mut outputs[Node::RESHAPE_OUT];
+    let input = inputs[Op::RESHAPE_IN];
+    let output = &mut outputs[Op::RESHAPE_OUT];
     output.copy_data_from(input)
 }
 
 fn compute_flatten(_flatten: &Flatten, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input = inputs[Node::FLATTEN_IN];
-    let output = &mut outputs[Node::FLATTEN_OUT];
+    let input = inputs[Op::FLATTEN_IN];
+    let output = &mut outputs[Op::FLATTEN_OUT];
     output.copy_data_from(input);
 }

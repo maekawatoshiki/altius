@@ -1,4 +1,4 @@
-use altius_core::{node::Node, op::Conv2d, tensor::Tensor};
+use altius_core::{op::Conv2d, op::Op, tensor::Tensor};
 
 #[cfg(feature = "cuda")]
 use super::session::SafeCudnnContext;
@@ -22,8 +22,8 @@ pub struct Conv2dCtx<'a> {
 
 #[cfg(not(feature = "cuda"))]
 pub fn compute(ctx: &mut Conv2dCtx) {
-    let input = &ctx.inputs[Node::CONV2D_IN];
-    let weight = &ctx.inputs[Node::CONV2D_WEIGHT];
+    let input = &ctx.inputs[Op::CONV2D_IN];
+    let weight = &ctx.inputs[Op::CONV2D_WEIGHT];
     let output = &mut ctx.outputs[0];
 
     let kernel = &ctx.op.kernel_shape;
@@ -57,7 +57,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     let _pad_b = padding[2];
     let _pad_r = padding[3];
 
-    if let Some(bias) = ctx.inputs.get(Node::CONV2D_BIAS) {
+    if let Some(bias) = ctx.inputs.get(Op::CONV2D_BIAS) {
         let mut output_ptr = output.data_mut::<f32>().as_mut_ptr();
         let bias_ptr_ = bias.data::<f32>().as_ptr();
         for _ in 0..batch_size {
@@ -328,9 +328,9 @@ fn im2col_with_dilation(
 #[cfg(feature = "cuda")]
 pub fn compute(ctx: &mut Conv2dCtx) {
     let conv = ctx.op;
-    let input = &ctx.inputs[Node::CONV2D_IN];
-    let weight = &ctx.inputs[Node::CONV2D_WEIGHT];
-    let bias = ctx.inputs.get(Node::CONV2D_BIAS).map_or(
+    let input = &ctx.inputs[Op::CONV2D_IN];
+    let weight = &ctx.inputs[Op::CONV2D_WEIGHT];
+    let bias = ctx.inputs.get(Op::CONV2D_BIAS).map_or(
         Tensor::zeros::<f32>(vec![weight.dims()[0]].into()),
         |&bias| bias.clone(),
     );

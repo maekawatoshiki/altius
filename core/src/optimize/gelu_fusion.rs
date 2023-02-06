@@ -1,9 +1,6 @@
 use std::time::Instant;
 
-use crate::{
-    model::Model,
-    node::{Node, Op},
-};
+use crate::{model::Model, node::Node, op::Op};
 
 pub fn fuse_gelu(model: &mut Model) {
     let start = Instant::now();

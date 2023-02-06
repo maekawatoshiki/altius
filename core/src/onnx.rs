@@ -6,9 +6,10 @@ use thiserror::Error;
 use crate::{
     dim::Dimensions,
     model::Model,
-    node::{
+    node::Node,
+    op::{
         BatchNormalization, Cast, Concat, Constant, Conv2d, Flatten, Gather, Gemm, HardSigmoid,
-        LayerNormalization, LeakyReLU, MaxPool, Node, Op, ReduceMax, ReduceMean, ReduceMin, Resize,
+        LayerNormalization, LeakyReLU, MaxPool, Op, ReduceMax, ReduceMean, ReduceMin, Resize,
         Shape, Softmax, Split, Squeeze, Transpose, Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},

@@ -8,10 +8,11 @@ use super::{
 use crate::{interpreter::fast_math::fast_sum_exp, NodeExecutionPlan, SessionError};
 use altius_core::{
     model::Model,
-    node::{
-        compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gather, Gemm,
-        HardSigmoid, LayerNormalization, LeakyReLU, MaxPool, Node, NodeId, Op, ReduceMax,
-        ReduceMean, Resize, Softmax, Split, Squeeze, Transpose, Unsqueeze,
+    node::{compute_output_shapes, Node, NodeId},
+    op::{
+        BatchNormalization, Cast, Concat, Flatten, Gather, Gemm, HardSigmoid, LayerNormalization,
+        LeakyReLU, MaxPool, Op, ReduceMax, ReduceMean, Resize, Softmax, Split, Squeeze, Transpose,
+        Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,

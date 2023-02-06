@@ -131,7 +131,10 @@ impl Model {
 
 #[test]
 fn mnist_model() {
-    use crate::node::{Conv2d, MaxPool, Node, Op};
+    use crate::{
+        node::Node,
+        op::{Conv2d, MaxPool, Op},
+    };
 
     let mut m = Model::default();
 

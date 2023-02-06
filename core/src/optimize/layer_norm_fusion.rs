@@ -2,7 +2,8 @@ use std::time::Instant;
 
 use crate::{
     model::Model,
-    node::{LayerNormalization, Node, Op},
+    node::Node,
+    op::{LayerNormalization, Op},
 };
 
 // From ONNX Runtime:

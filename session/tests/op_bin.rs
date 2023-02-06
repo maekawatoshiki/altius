@@ -1,9 +1,4 @@
-use altius_core::{
-    dim::Dimensions,
-    model::Model,
-    node::{Node, Op},
-    tensor::Tensor,
-};
+use altius_core::{dim::Dimensions, model::Model, node::Node, op::Op, tensor::Tensor};
 use altius_session::interpreter::InterpreterSessionBuilder;
 
 macro_rules! test_op {

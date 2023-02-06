@@ -1,7 +1,4 @@
-use altius_core::{
-    node::{Conv2d, Node},
-    tensor::Tensor,
-};
+use altius_core::{node::Node, op::Conv2d, tensor::Tensor};
 
 #[cfg(feature = "cuda")]
 use super::session::SafeCudnnContext;

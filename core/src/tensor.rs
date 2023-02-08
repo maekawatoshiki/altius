@@ -1,12 +1,4 @@
-use std::{
-    cell::RefCell,
-    cmp::Ordering,
-    fmt::{self},
-    iter::Sum,
-    mem::MaybeUninit,
-    ops::Deref,
-    sync::Arc,
-};
+use std::{cell::RefCell, cmp::Ordering, fmt, iter::Sum, mem::MaybeUninit, ops::Deref, sync::Arc};
 
 use crate::dim::{Dimension, Dimensions};
 use rand::{
@@ -504,7 +496,7 @@ impl fmt::Display for Tensor {
                 }
                 write!(f, "]")
             } else {
-                write!(f, "{:?}", data)
+                write!(f, "{data:?}")
             }
         }
 

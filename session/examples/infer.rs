@@ -56,7 +56,7 @@ fn main() {
         }
 
         let input = &model.values.inner()[input_id];
-        let name = input.name.as_ref().map(String::as_str).unwrap_or("");
+        let name = input.name.as_deref().unwrap_or("");
         let Some(shape) = input.shape.as_ref() else {
             log::error!("failed to feed input({i}, name={name}): unknown shape (or dynamic shape?)");
             exit(1);
@@ -85,9 +85,7 @@ fn main() {
 
     for (i, (output, output_id)) in outputs.iter().zip(model.outputs.iter()).enumerate() {
         let name = model.values.inner()[*output_id]
-            .name
-            .as_ref()
-            .map(String::as_str)
+            .name.as_deref()
             .unwrap_or("");
         // TODO: Dirty.
         let stat = match output.elem_ty() {

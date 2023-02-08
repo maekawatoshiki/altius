@@ -120,7 +120,7 @@ pub fn fast_sum_exp(output: &mut [f32], input: &[f32]) -> f32 {
     let mut output = output;
     let mut len = output.len();
     let mut sum = Simd::<f32, SIMD_LEN>::splat(0f32);
-    let max = input.iter().fold(0.0 / 0.0, |m, v| v.max(m));
+    let max = input.iter().fold(f32::NAN, |m, v| v.max(m));
 
     while len >= SIMD_LEN {
         let vals = Simd::<_, SIMD_LEN>::from_slice(input) - Simd::splat(max);

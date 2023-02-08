@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use altius_core::{op::Conv2d, op::Op, tensor::Tensor};
 
 #[cfg(feature = "cuda")]

@@ -909,7 +909,7 @@ fn compute_greater(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             .iter()
             .zip(output.data_mut::<bool>().iter_mut())
         {
-            *o = if x > y { true } else { false };
+            *o = x > y;
         }
         return;
     }

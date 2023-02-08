@@ -56,7 +56,7 @@ fn main() {
         .sum();
 
     let end = start.elapsed();
-    println!("elapsed: {:?}", end);
+    println!("elapsed: {end:?}");
     println!("fps: {:?}", (validation_count as f64) / end.as_secs_f64());
 
     // for (_expected, input) in &inputs {

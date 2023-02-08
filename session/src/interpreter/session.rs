@@ -1,7 +1,9 @@
+#[cfg(feature = "cblas")]
+use super::gemm::sgemm2;
 use super::{
     conv2d::{self, Conv2dCtx},
     fast_math::fast_sigmoid,
-    gemm::{sgemm, sgemm2},
+    gemm::sgemm,
     thread::ThreadCtx,
 };
 

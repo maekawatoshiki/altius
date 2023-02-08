@@ -261,7 +261,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             "Loop" => {
                 // TODO
                 let _body = get_attribute(&node.attribute, "body").unwrap();
-                log::debug!("Ignore loop body!");
+                log::warn!("Ignore loop body!");
                 Op::Loop
             }
             "Cast" => {

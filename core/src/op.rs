@@ -499,7 +499,15 @@ pub fn compute_output_shapes(
         Op::Expand => {
             let _input = inputs[0];
             let shape = inputs[1];
-            shapes.push(TypedShape::new(shape.dims().clone(), shape.elem_ty()));
+            shapes.push(TypedShape::new(
+                shape
+                    .data::<i64>()
+                    .iter()
+                    .map(|&x| x as usize)
+                    .collect::<Vec<_>>()
+                    .into(),
+                shape.elem_ty(),
+            ));
         }
         Op::Reshape => {
             let shape = inputs[Op::RESHAPE_SHAPE]

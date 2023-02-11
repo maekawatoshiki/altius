@@ -273,6 +273,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 {
                     DataType::Float => TensorElemType::F32,
                     DataType::Int32 => TensorElemType::I32,
+                    DataType::Bool => TensorElemType::Bool,
                     t => {
                         return Err(ModelLoadError::Todo(
                             format!("Cast: Unsupported data type: {t:?}").into(),

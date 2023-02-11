@@ -185,11 +185,7 @@ impl<'a> InterpreterSession<'a> {
             Op::Sqrt => compute_sqrt(node, &inputs, &mut outputs),
             Op::MaxPool(ref maxpool) => compute_max_pool(maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => compute_gavg_pool(node, &inputs, &mut outputs)?,
-            Op::Expand => {
-                return Err(SessionError::Message(
-                    "Expand: Kernel not implemented".into(),
-                ))
-            }
+            Op::Expand => compute_expand(&inputs, &mut outputs)?,
             Op::Reshape => compute_reshape(node, &inputs, &mut outputs),
             Op::Flatten(ref flatten) => compute_flatten(flatten, &inputs, &mut outputs),
             Op::MatMul => compute_mat_mul(node, &inputs, &mut outputs),
@@ -293,6 +289,32 @@ fn compute_gavg_pool(
             *o_channel = sum / area as f32;
         }
     }
+
+    Ok(())
+}
+
+fn compute_expand(inputs: &[&Tensor], outputs: &mut [Tensor]) -> Result<(), SessionError> {
+    let input = inputs[0];
+    // let shape = inputs[1]
+    //     .data::<i64>()
+    //     .iter()
+    //     .map(|&x| x as usize)
+    //     .collect::<Vec<_>>();
+    let output = &mut outputs[0];
+
+    assert!(input.dims().len() == 4);
+    assert!(input.dims()[0..3] == [1, 1, 1]);
+    assert!(output.dims().len() == 4);
+    assert!(input.dims()[0..2] == [1, 1]);
+    assert!(input.elem_ty().is_i64());
+
+    let chunk = input.dims()[3];
+    let input = input.data::<i64>();
+    let output = output.data_mut::<i64>();
+
+    output.chunks_mut(chunk).for_each(|o| {
+        o.copy_from_slice(input);
+    });
 
     Ok(())
 }
@@ -1696,8 +1718,14 @@ fn compute_cast(cast: &Cast, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         for (i, o) in input.iter().zip(output.iter_mut()) {
             *o = *i as f32;
         }
+    } else if input.elem_ty().is_f32() && cast.to.is_bool() {
+        let input = input.data::<f32>();
+        let output = output.data_mut::<bool>();
+        for (i, o) in input.iter().zip(output.iter_mut()) {
+            *o = *i != 0.0;
+        }
     } else {
-        todo!()
+        todo!("cast {:?} -> {:?}", input.elem_ty(), cast.to)
     }
 }
 

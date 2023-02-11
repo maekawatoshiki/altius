@@ -497,7 +497,7 @@ pub fn compute_output_shapes(
             ));
         }
         Op::Expand => {
-            let _input = inputs[0];
+            let input = inputs[0];
             let shape = inputs[1];
             shapes.push(TypedShape::new(
                 shape
@@ -506,7 +506,7 @@ pub fn compute_output_shapes(
                     .map(|&x| x as usize)
                     .collect::<Vec<_>>()
                     .into(),
-                shape.elem_ty(),
+                input.elem_ty(),
             ));
         }
         Op::Reshape => {

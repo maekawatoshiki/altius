@@ -122,7 +122,11 @@ pub fn fuse_layer_norm(model: &mut Model) {
         .with_out(ln_out);
         let _ln_id = model.add_node(ln);
 
-        let Some(users) = value_users.get(&end) else { continue };
+        let Some(users) = value_users.get(&end) else {
+            let idx = model.outputs.iter().position(|&i| i == end).unwrap();
+            model.outputs[idx] = ln_out;
+            continue
+        };
         for user_id in users {
             let user = &mut model.nodes[*user_id];
             let idx = user.inputs.iter().position(|&i| i == end).unwrap();

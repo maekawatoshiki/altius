@@ -163,6 +163,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             }),
             "Round" => Op::Round,
             "Exp" => Op::Exp,
+            "Expand" => Op::Expand,
             "Tile" => Op::Tile,
             "Split" => Op::Split(Split {
                 axis: get_attribute(&node.attribute, "axis").map_or(0, |a| a.i()),

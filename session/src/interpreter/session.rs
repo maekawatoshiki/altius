@@ -185,6 +185,11 @@ impl<'a> InterpreterSession<'a> {
             Op::Sqrt => compute_sqrt(node, &inputs, &mut outputs),
             Op::MaxPool(ref maxpool) => compute_max_pool(maxpool, &inputs, &mut outputs),
             Op::GlobalAveragePool => compute_gavg_pool(node, &inputs, &mut outputs)?,
+            Op::Expand => {
+                return Err(SessionError::Message(
+                    "Expand: Kernel not implemented".into(),
+                ))
+            }
             Op::Reshape => compute_reshape(node, &inputs, &mut outputs),
             Op::Flatten(ref flatten) => compute_flatten(flatten, &inputs, &mut outputs),
             Op::MatMul => compute_mat_mul(node, &inputs, &mut outputs),

@@ -40,6 +40,7 @@ pub enum Op {
     ReduceMean(ReduceMean),
     Round,
     Exp,
+    Expand,
     Loop,
     Tile,
     Split(Split),
@@ -349,6 +350,7 @@ impl Op {
             Op::ReduceMean(_) => "ReduceMean",
             Op::Round => "Round",
             Op::Exp => "Exp",
+            Op::Expand => "Expand",
             Op::Loop => "Loop",
             Op::Tile => "Tile",
             Op::Split(_) => "Split",
@@ -493,6 +495,11 @@ pub fn compute_output_shapes(
                 vec![input[0], input[1], 1, 1].into(),
                 inputs[Op::GLOBALAVERAGEPOOL_IN].elem_ty(),
             ));
+        }
+        Op::Expand => {
+            let _input = inputs[0];
+            let shape = inputs[1];
+            shapes.push(TypedShape::new(shape.dims().clone(), shape.elem_ty()));
         }
         Op::Reshape => {
             let shape = inputs[Op::RESHAPE_SHAPE]

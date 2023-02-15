@@ -35,8 +35,10 @@ jobs:
             rustup component add llvm-tools-preview && \
             cargo install grcov && \
             cargo test --release --features blis && \
+            (cd altius-py && source .env/bin/activate && python deit.py) && \
             cargo run --release --features blis --example mnist && \
             cargo run --release --features blis --example mobilenet && \
+            cargo run --release --features blis --example deit && \
             cargo run --release --features blis --example vit && \
             cargo run --release --features blis --example infer -- ./models/mnist-8.onnx && \
             mkdir -p /tmp/cov/ && \

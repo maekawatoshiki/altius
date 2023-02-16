@@ -81,10 +81,12 @@ impl ThreadCtx {
         #[cfg(not(target_os = "linux"))]
         let apicid_to_processor = (0..n).collect::<Vec<_>>();
         let tp = ThreadPool::new(n);
-        for id in (0..n).map(|i| apicid_to_processor[i]) {
-            tp.execute(move || {
-                core_affinity::set_for_current(core_affinity::CoreId { id });
-            })
+        if apicid_to_processor.len() >= n {
+            for &id in &apicid_to_processor[0..n] {
+                tp.execute(move || {
+                    core_affinity::set_for_current(core_affinity::CoreId { id });
+                })
+            }
         }
         tp.join();
         Self { tp, num_threads: n }

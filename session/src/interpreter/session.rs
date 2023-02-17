@@ -21,6 +21,10 @@ use altius_core::{
 };
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
+#[cfg(feature = "x64-fusion")]
+use dynasm::dynasm;
+#[cfg(feature = "x64-fusion")]
+use dynasmrt::{x64::Assembler, DynasmApi};
 use ndarray::{s, ArrayView, ArrayView3, Axis, Dim, Ix};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
@@ -379,6 +383,30 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
 }
 
 fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    #[cfg(feature = "x64-fusion")]
+    let mut ops = Assembler::new().unwrap();
+
+    #[cfg(feature = "x64-fusion")]
+    let entry = ops.offset();
+    #[cfg(feature = "x64-fusion")]
+    dynasm!(ops
+        // rdi = input.0 addr (*const f32)
+        // rsi = input.0 addr (*const f32)
+        // rdx = output.0 addr (*mut f32)
+        // rcx = len (u64)
+        ; .arch x64
+        ; vmovups ymm0, [rdi]
+        ; vmovups ymm1, [rsi]
+        ; vaddps ymm0, ymm0, ymm1
+        ; vmovups [rdx], ymm0
+        ; ret
+    );
+    #[cfg(feature = "x64-fusion")]
+    let buf = ops.finalize().unwrap();
+    #[cfg(feature = "x64-fusion")]
+    let entry_fn: extern "C" fn(*const f32, *const f32, *mut f32, u64) -> f32 =
+        unsafe { std::mem::transmute(buf.ptr(entry)) };
+
     let input_a = inputs[Op::ADD_IN_A];
     let input_b = inputs[Op::ADD_IN_B];
     let output = &mut outputs[Op::ADD_OUT];
@@ -409,6 +437,14 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                         while len >= SIMD_LEN {
                             let a = Simd::<_, SIMD_LEN>::from_slice(input_a);
                             let b = Simd::<_, SIMD_LEN>::from_slice(input_b);
+                            #[cfg(feature = "x64-fusion")]
+                            entry_fn(
+                                a.as_array().as_ptr(),
+                                b.as_array().as_ptr(),
+                                output.as_mut_ptr(),
+                                0,
+                            );
+                            #[cfg(not(feature = "x64-fusion"))]
                             output[0..SIMD_LEN].copy_from_slice((a + b).as_ref());
                             (input_a, input_b, output) = (
                                 &input_a[SIMD_LEN..],
@@ -457,7 +493,7 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let output = output.data_mut::<f32>();
 
         for i in 0..max {
-            output[i] = input_a[i] - input_b[i / n];
+            output[i] = input_a[i] + input_b[i / n];
         }
 
         return;

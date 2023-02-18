@@ -58,7 +58,35 @@ pub struct InterpreterSession {
     pub(super) values: ThreadLocal<RefCell<FxHashMap<ValueId, Tensor>>>,
     pub(super) dummy_value: Tensor,
     pub(super) tctx: ThreadCtx,
+    #[cfg(feature = "x64-fusion")]
+    asm_ops: Assmembler,
 }
+
+// TODO: Snippets for x64 codegen.
+//
+// #[cfg(feature = "x64-fusion")]
+// let mut ops = Assembler::new().unwrap();
+//
+// #[cfg(feature = "x64-fusion")]
+// let entry = ops.offset();
+// #[cfg(feature = "x64-fusion")]
+// dynasm!(ops
+//     // rdi = input.0 addr (*const f32)
+//     // rsi = input.0 addr (*const f32)
+//     // rdx = output.0 addr (*mut f32)
+//     // rcx = len (u64)
+//     ; .arch x64
+//     ; vmovups ymm0, [rdi]
+//     ; vmovups ymm1, [rsi]
+//     ; vaddps ymm0, ymm0, ymm1
+//     ; vmovups [rdx], ymm0
+//     ; ret
+// );
+// #[cfg(feature = "x64-fusion")]
+// let buf = ops.finalize().unwrap();
+// #[cfg(feature = "x64-fusion")]
+// let entry_fn: extern "C" fn(*const f32, *const f32, *mut f32, u64) -> f32 =
+//     unsafe { std::mem::transmute(buf.ptr(entry)) };
 
 impl InterpreterSession {
     pub fn model(&self) -> &Model {
@@ -383,38 +411,12 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
 }
 
 fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    #[cfg(feature = "x64-fusion")]
-    let mut ops = Assembler::new().unwrap();
-
-    #[cfg(feature = "x64-fusion")]
-    let entry = ops.offset();
-    #[cfg(feature = "x64-fusion")]
-    dynasm!(ops
-        // rdi = input.0 addr (*const f32)
-        // rsi = input.0 addr (*const f32)
-        // rdx = output.0 addr (*mut f32)
-        // rcx = len (u64)
-        ; .arch x64
-        ; vmovups ymm0, [rdi]
-        ; vmovups ymm1, [rsi]
-        ; vaddps ymm0, ymm0, ymm1
-        ; vmovups [rdx], ymm0
-        ; ret
-    );
-    #[cfg(feature = "x64-fusion")]
-    let buf = ops.finalize().unwrap();
-    #[cfg(feature = "x64-fusion")]
-    let entry_fn: extern "C" fn(*const f32, *const f32, *mut f32, u64) -> f32 =
-        unsafe { std::mem::transmute(buf.ptr(entry)) };
-
     let input_a = inputs[Op::ADD_IN_A];
     let input_b = inputs[Op::ADD_IN_B];
     let output = &mut outputs[Op::ADD_OUT];
 
     let adims = input_a.dims();
     let bdims = input_b.dims();
-
-    const SIMD_LEN: usize = 8;
 
     if adims == bdims {
         let input_a = input_a.data::<f32>();
@@ -429,33 +431,9 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
                 .zip(output.chunks_mut(chunk))
                 .for_each(|((input_a, input_b), output)| {
                     scope.spawn(move || {
-                        let mut input_a = input_a;
-                        let mut input_b = input_b;
-                        let mut output = output;
-                        let mut len = output.len();
-
-                        while len >= SIMD_LEN {
-                            let a = Simd::<_, SIMD_LEN>::from_slice(input_a);
-                            let b = Simd::<_, SIMD_LEN>::from_slice(input_b);
-                            #[cfg(feature = "x64-fusion")]
-                            entry_fn(
-                                a.as_array().as_ptr(),
-                                b.as_array().as_ptr(),
-                                output.as_mut_ptr(),
-                                0,
-                            );
-                            #[cfg(not(feature = "x64-fusion"))]
-                            output[0..SIMD_LEN].copy_from_slice((a + b).as_ref());
-                            (input_a, input_b, output) = (
-                                &input_a[SIMD_LEN..],
-                                &input_b[SIMD_LEN..],
-                                &mut output[SIMD_LEN..],
-                            );
-                            len -= SIMD_LEN;
-                        }
-
                         for ((a, b), o) in input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
                         {
+                            // Auto-vectorized by LLVM
                             *o = a + b;
                         }
                     });
@@ -540,26 +518,11 @@ fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             .for_each(|(input_a, output)| {
                 scope.spawn(move || {
                     input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
-                        |(input_a, output)| {
-                            let mut input_a = input_a;
-                            let mut input_b = input_b;
-                            let mut output = output;
-                            let mut len = output.len();
-
-                            while len >= SIMD_LEN {
-                                let a = Simd::<_, SIMD_LEN>::from_slice(input_a);
-                                let b = Simd::<_, SIMD_LEN>::from_slice(input_b);
-                                let c = a + b;
-                                output[0..SIMD_LEN].copy_from_slice(c.as_ref());
-                                input_a = &input_a[SIMD_LEN..];
-                                input_b = &input_b[SIMD_LEN..];
-                                output = &mut output[SIMD_LEN..];
-                                len -= SIMD_LEN
-                            }
-
+                        move |(input_a, output)| {
                             for ((a, b), o) in
                                 input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
                             {
+                                // Auto-vectorized by LLVM
                                 *o = a + b;
                             }
                         },

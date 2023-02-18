@@ -40,7 +40,7 @@ cblas = ["cblas-sys"]
 opencl = ["opencl3"]
 wgpu-backend = ["wgpu"]
 heavy-log = []
-x64-fusion = []
+x64-codegen = []
 
 [dev-dependencies]
 env_logger = "0.9.0"

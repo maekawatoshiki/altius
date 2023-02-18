@@ -35,7 +35,7 @@ fn main() {
 
     let validation_count = 10000;
     let input_value = mnist.lookup_named_value("Input3").unwrap();
-    let sess = InterpreterSessionBuilder::new(&mnist).build().unwrap();
+    let sess = InterpreterSessionBuilder::new(mnist).build().unwrap();
 
     let correct: i32 = inputs
         .iter()

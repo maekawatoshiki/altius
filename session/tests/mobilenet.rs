@@ -37,16 +37,10 @@ fn mobilenet() {
             .collect::<Vec<_>>(),
     );
 
-    let i = InterpreterSessionBuilder::new(&model)
+    let i = InterpreterSessionBuilder::new(model)
         .with_profiling_enabled(true)
         .build()
         .unwrap();
-    #[cfg(feature = "cuda")]
-    {
-        // First run is slow so ignore it.
-        let i = InterpreterSessionBuilder::new(&model).build().unwrap();
-        i.run(vec![(input_value, input.clone())]).unwrap();
-    }
     let out = i.run(vec![(input_value, input)]).expect("Inference failed");
     let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
     out[0..1000].sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));

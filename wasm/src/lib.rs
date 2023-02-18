@@ -15,8 +15,8 @@ pub fn load_and_run(onnx: &[u8], img: &[u8]) -> Option<String> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     let model = load_onnx_from_buffer(onnx).expect("failed to load onnx");
-    let sess = InterpreterSessionBuilder::new(&model).build().unwrap();
-    let input_value = model.inputs.get(0).copied()?;
+    let sess = InterpreterSessionBuilder::new(model).build().unwrap();
+    let input_value = sess.model().inputs.get(0).copied()?;
 
     let image = Reader::new(Cursor::new(img))
         .with_guessed_format()

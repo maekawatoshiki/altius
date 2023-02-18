@@ -18,7 +18,7 @@ fn without_gelu(c: &mut Criterion) {
     let input_value = model.lookup_named_value("input.1").unwrap();
     let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
 
-    let sess = InterpreterSessionBuilder::new(&model)
+    let sess = InterpreterSessionBuilder::new(model)
         .with_intra_op_num_threads(THREADS)
         .build()
         .unwrap();
@@ -36,7 +36,7 @@ fn with_gelu(c: &mut Criterion) {
     let input_value = model.lookup_named_value("input.1").unwrap();
     let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
 
-    let sess = InterpreterSessionBuilder::new(&model)
+    let sess = InterpreterSessionBuilder::new(model)
         .with_intra_op_num_threads(THREADS)
         .build()
         .unwrap();
@@ -55,7 +55,7 @@ fn with_gelu_ln(c: &mut Criterion) {
     let input_value = model.lookup_named_value("input.1").unwrap();
     let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
 
-    let sess = InterpreterSessionBuilder::new(&model)
+    let sess = InterpreterSessionBuilder::new(model)
         .with_intra_op_num_threads(THREADS)
         .build()
         .unwrap();
@@ -74,7 +74,7 @@ fn with_gelu_ln2(c: &mut Criterion) {
     let input_value = model.lookup_named_value("input.1").unwrap();
     let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
 
-    let sess = InterpreterSessionBuilder::new(&model)
+    let sess = InterpreterSessionBuilder::new(model)
         .with_intra_op_num_threads(THREADS)
         .build()
         .unwrap();

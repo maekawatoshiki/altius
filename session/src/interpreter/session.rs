@@ -48,8 +48,8 @@ mod cuda {
 #[cfg(feature = "cuda")]
 pub(super) use cuda::*;
 
-pub struct InterpreterSession<'a> {
-    pub(super) model: &'a Model,
+pub struct InterpreterSession {
+    pub(super) model: Model,
     #[cfg(feature = "cuda")]
     pub(super) cudnn_ctx: SafeCudnnContext,
     pub(super) execution_plans: Vec<NodeExecutionPlan>,
@@ -60,9 +60,9 @@ pub struct InterpreterSession<'a> {
     pub(super) tctx: ThreadCtx,
 }
 
-impl<'a> InterpreterSession<'a> {
+impl InterpreterSession {
     pub fn model(&self) -> &Model {
-        self.model
+        &self.model
     }
 
     pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {

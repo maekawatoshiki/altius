@@ -42,7 +42,7 @@ fn main() {
         opt.threads
     );
     let start = Instant::now();
-    let sess = InterpreterSessionBuilder::new(&model)
+    let sess = InterpreterSessionBuilder::new(model)
         .with_profiling_enabled(opt.profile)
         .with_intra_op_num_threads(opt.threads)
         .build()
@@ -50,12 +50,12 @@ fn main() {
     log::info!("create session: finished in {:?}", start.elapsed());
 
     let mut inputs = vec![];
-    for (i, &input_id) in model.inputs.iter().enumerate() {
-        if model.inits.contains_key(&input_id) {
+    for (i, &input_id) in sess.model().inputs.iter().enumerate() {
+        if sess.model().inits.contains_key(&input_id) {
             continue;
         }
 
-        let input = &model.values.inner()[input_id];
+        let input = &sess.model().values.inner()[input_id];
         let name = input.name.as_deref().unwrap_or("");
         let Some(shape) = input.shape.as_ref() else {
             log::error!("failed to feed input({i}, name={name}): unknown shape (or dynamic shape?)");
@@ -83,9 +83,10 @@ fn main() {
         }
     };
 
-    for (i, (output, output_id)) in outputs.iter().zip(model.outputs.iter()).enumerate() {
-        let name = model.values.inner()[*output_id]
-            .name.as_deref()
+    for (i, (output, output_id)) in outputs.iter().zip(sess.model().outputs.iter()).enumerate() {
+        let name = sess.model().values.inner()[*output_id]
+            .name
+            .as_deref()
             .unwrap_or("");
         // TODO: Dirty.
         let stat = match output.elem_ty() {

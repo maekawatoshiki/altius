@@ -18,7 +18,7 @@ pub struct PyModel(pub Model);
 
 #[pyclass]
 #[repr(transparent)]
-pub struct PySession(pub InterpreterSession<'static>);
+pub struct PySession(pub InterpreterSession);
 
 #[pyfunction]
 fn load(path: String) -> PyResult<PyModel> {
@@ -33,14 +33,14 @@ fn load(path: String) -> PyResult<PyModel> {
 }
 
 #[pyfunction(enable_profiling = false, intra_op_num_threads = 1)]
-fn session<'a>(
-    model: &'a mut PyModel,
+fn session(
+    model: PyModel,
     enable_profiling: bool,
     intra_op_num_threads: usize,
 ) -> PyResult<PySession> {
-    let model = unsafe { std::mem::transmute::<&'a mut Model, &'static mut Model>(&mut model.0) };
-    optimize::layer_norm_fusion::fuse_layer_norm(model);
-    optimize::gelu_fusion::fuse_gelu(model);
+    let mut model = model.0;
+    optimize::layer_norm_fusion::fuse_layer_norm(&mut model);
+    optimize::gelu_fusion::fuse_gelu(&mut model);
     Ok(PySession(
         InterpreterSessionBuilder::new(model)
             .with_profiling_enabled(enable_profiling)

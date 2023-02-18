@@ -10,14 +10,14 @@ use super::{session::InterpreterSession, thread::ThreadCtx};
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
 
-pub struct InterpreterSessionBuilder<'a> {
-    model: &'a Model,
+pub struct InterpreterSessionBuilder {
+    model: Model,
     intra_op_num_threads: usize,
     enable_profiling: bool,
 }
 
-impl<'a> InterpreterSessionBuilder<'a> {
-    pub const fn new(model: &'a Model) -> Self {
+impl<'a> InterpreterSessionBuilder {
+    pub const fn new(model: Model) -> Self {
         Self {
             model,
             intra_op_num_threads: 1,
@@ -35,14 +35,14 @@ impl<'a> InterpreterSessionBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> Result<InterpreterSession<'a>, SessionError> {
+    pub fn build(self) -> Result<InterpreterSession, SessionError> {
         let model = self.model;
         let enable_profiling = self.enable_profiling;
         let intra_op_num_threads = self.intra_op_num_threads;
 
         let sorted_nodes = model.topo_sort_nodes();
         let mut inferred_shapes = FxHashMap::default();
-        infer_shapes(model, &sorted_nodes, &mut inferred_shapes)?;
+        infer_shapes(&model, &sorted_nodes, &mut inferred_shapes)?;
 
         #[cfg(feature = "blis")]
         {
@@ -53,10 +53,10 @@ impl<'a> InterpreterSessionBuilder<'a> {
         }
 
         Ok(InterpreterSession {
-            model,
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
-            execution_plans: create_execution_plan(model, &sorted_nodes),
+            execution_plans: create_execution_plan(&model, &sorted_nodes),
+            model,
             inferred_shapes,
             enable_profiling,
             values: ThreadLocal::new(),

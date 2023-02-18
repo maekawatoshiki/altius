@@ -34,19 +34,10 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
 
-    let i = InterpreterSessionBuilder::new(&model)
+    let i = InterpreterSessionBuilder::new(model)
         .with_profiling_enabled(opt.profile)
         .build()
         .unwrap();
-    #[cfg(feature = "cuda")]
-    {
-        // First run is slow so ignore it.
-        let i = InterpreterSessionBuilder::new(&model)
-            .with_profiling_enabled(opt.profile)
-            .build()
-            .unwrap();
-        i.run(vec![(input_value, input.clone())]).unwrap();
-    }
     let out = i.run(vec![(input_value, input)]).expect("Inference failed");
     let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
     out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));

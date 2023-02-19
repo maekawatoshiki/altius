@@ -138,5 +138,5 @@ impl From<TensorElemType> for DataType {
 fn test_save_onnx() {
     use super::load::load_onnx;
     let model = load_onnx("../models/mobilenetv3.onnx").unwrap();
-    let _ = save_onnx(&model, "/tmp/test.onnx"); // .unwrap();
+    let _ = save_onnx(&model, "/tmp/test.onnx").unwrap();
 }

@@ -1,0 +1,140 @@
+---
+source: core/src/onnx/save.rs
+assertion_line: 142
+expression: "load_onnx_model_proto(\"/tmp/test.onnx\").unwrap()"
+---
+ModelProto {
+    ir_version: None,
+    opset_import: [],
+    producer_name: None,
+    producer_version: None,
+    domain: None,
+    model_version: None,
+    doc_string: None,
+    graph: Some(
+        GraphProto {
+            node: [],
+            name: None,
+            initializer: [],
+            sparse_initializer: [],
+            doc_string: None,
+            input: [
+                ValueInfoProto {
+                    name: Some(
+                        "input",
+                    ),
+                    r#type: Some(
+                        TypeProto {
+                            denotation: Some(
+                                "TENSOR",
+                            ),
+                            value: Some(
+                                TensorType(
+                                    Tensor {
+                                        elem_type: Some(
+                                            1,
+                                        ),
+                                        shape: Some(
+                                            TensorShapeProto {
+                                                dim: [
+                                                    Dimension {
+                                                        denotation: None,
+                                                        value: Some(
+                                                            DimValue(
+                                                                1,
+                                                            ),
+                                                        ),
+                                                    },
+                                                    Dimension {
+                                                        denotation: None,
+                                                        value: Some(
+                                                            DimValue(
+                                                                3,
+                                                            ),
+                                                        ),
+                                                    },
+                                                    Dimension {
+                                                        denotation: None,
+                                                        value: Some(
+                                                            DimValue(
+                                                                224,
+                                                            ),
+                                                        ),
+                                                    },
+                                                    Dimension {
+                                                        denotation: None,
+                                                        value: Some(
+                                                            DimValue(
+                                                                224,
+                                                            ),
+                                                        ),
+                                                    },
+                                                ],
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                    doc_string: Some(
+                        "",
+                    ),
+                },
+            ],
+            output: [
+                ValueInfoProto {
+                    name: Some(
+                        "output",
+                    ),
+                    r#type: Some(
+                        TypeProto {
+                            denotation: Some(
+                                "TENSOR",
+                            ),
+                            value: Some(
+                                TensorType(
+                                    Tensor {
+                                        elem_type: Some(
+                                            1,
+                                        ),
+                                        shape: Some(
+                                            TensorShapeProto {
+                                                dim: [
+                                                    Dimension {
+                                                        denotation: None,
+                                                        value: Some(
+                                                            DimValue(
+                                                                1,
+                                                            ),
+                                                        ),
+                                                    },
+                                                    Dimension {
+                                                        denotation: None,
+                                                        value: Some(
+                                                            DimValue(
+                                                                1000,
+                                                            ),
+                                                        ),
+                                                    },
+                                                ],
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                    doc_string: Some(
+                        "",
+                    ),
+                },
+            ],
+            value_info: [],
+            quantization_annotation: [],
+        },
+    ),
+    metadata_props: [],
+    training_info: [],
+    functions: [],
+}

@@ -428,8 +428,6 @@ pub fn save_onnx(_model: &Model, path: impl AsRef<Path>) {
     let mut model_proto = ModelProto::default();
     let mut buf = Vec::new();
     let mut graph_proto = GraphProto::default();
-    graph_proto.node = vec![NodeProto::default()];
-    #[allow(dead_code)]
     fn f<T>(x: T, f: impl FnOnce(&mut T)) -> T {
         let mut x = x;
         f(&mut x);
@@ -440,14 +438,26 @@ pub fn save_onnx(_model: &Model, path: impl AsRef<Path>) {
         r#type: {
             let mut t = TypeProto::default();
             t.denotation = Some("TENSOR".to_string());
-            // t.value = type_proto::Value::TensorType(type_proto::Tensor {
-            //     elem_type: Some(DataType::Float as i32),
-            //     shape: Some(TensorShapeProto { dim: vec![] }),
-            // });
+            t.value = Some(type_proto::Value::TensorType(type_proto::Tensor {
+                elem_type: Some(DataType::Float as i32),
+                shape: Some(TensorShapeProto {
+                    dim: vec![tensor_shape_proto::Dimension {
+                        denotation: None,
+                        value: Some(tensor_shape_proto::dimension::Value::DimValue(1)),
+                    }],
+                }),
+            }));
             Some(t)
         },
         doc_string: "".to_string().into(),
     });
+    graph_proto.node = vec![f(NodeProto::default(), |x| {
+        x.name = "Add.0".to_string().into();
+        x.op_type = "Add".to_string().into();
+        x.input.push("input".to_string().into());
+        x.input.push("input".to_string().into());
+        x.output.push("output".to_string().into());
+    })];
     model_proto.graph = Some(graph_proto);
     model_proto.encode(&mut buf).unwrap();
     println!("buf: {:?}", buf);

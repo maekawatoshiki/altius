@@ -424,6 +424,41 @@ pub fn load_onnx_model_proto(path: impl AsRef<Path>) -> Result<ModelProto, io::E
     Ok(model)
 }
 
+pub fn save_onnx(_model: &Model, path: impl AsRef<Path>) {
+    let mut model_proto = ModelProto::default();
+    let mut buf = Vec::new();
+    let mut graph_proto = GraphProto::default();
+    graph_proto.node = vec![NodeProto::default()];
+    #[allow(dead_code)]
+    fn f<T>(x: T, f: impl FnOnce(&mut T)) -> T {
+        let mut x = x;
+        f(&mut x);
+        x
+    }
+    graph_proto.input.push(ValueInfoProto {
+        name: "input".to_string().into(),
+        r#type: {
+            let mut t = TypeProto::default();
+            t.denotation = Some("TENSOR".to_string());
+            // t.value = type_proto::Value::TensorType(type_proto::Tensor {
+            //     elem_type: Some(DataType::Float as i32),
+            //     shape: Some(TensorShapeProto { dim: vec![] }),
+            // });
+            Some(t)
+        },
+        doc_string: "".to_string().into(),
+    });
+    model_proto.graph = Some(graph_proto);
+    model_proto.encode(&mut buf).unwrap();
+    println!("buf: {:?}", buf);
+    fs::write(path, buf).unwrap();
+}
+
+#[test]
+fn test_save_onnx() {
+    save_onnx(&Model::default(), "/tmp/test.onnx");
+}
+
 #[test]
 fn load_mnist_proto() {
     let model_path = Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -1,6 +1,6 @@
 ---
 source: core/src/onnx/save.rs
-assertion_line: 142
+assertion_line: 172
 expression: "load_onnx_model_proto(\"/tmp/test.onnx\").unwrap()"
 ---
 ModelProto {
@@ -13,7 +13,2912 @@ ModelProto {
     doc_string: None,
     graph: Some(
         GraphProto {
-            node: [],
+            node: [
+                NodeProto {
+                    input: [
+                        "input",
+                        "onnx::Conv_521",
+                        "onnx::Conv_522",
+                    ],
+                    output: [
+                        "input.4",
+                    ],
+                    name: Some(
+                        "Conv_0",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.4",
+                    ],
+                    output: [
+                        "onnx::Mul_315",
+                    ],
+                    name: Some(
+                        "HardSigmoid_1",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.4",
+                        "onnx::Mul_315",
+                    ],
+                    output: [
+                        "onnx::Conv_316",
+                    ],
+                    name: Some(
+                        "Mul_2",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_316",
+                        "onnx::Conv_524",
+                        "onnx::Conv_525",
+                    ],
+                    output: [
+                        "input.12",
+                    ],
+                    name: Some(
+                        "Conv_3",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.12",
+                    ],
+                    output: [
+                        "onnx::Conv_319",
+                    ],
+                    name: Some(
+                        "Relu_4",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_319",
+                        "onnx::Conv_527",
+                        "onnx::Conv_528",
+                    ],
+                    output: [
+                        "onnx::Add_526",
+                    ],
+                    name: Some(
+                        "Conv_5",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_526",
+                        "onnx::Conv_316",
+                    ],
+                    output: [
+                        "onnx::Conv_322",
+                    ],
+                    name: Some(
+                        "Add_6",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_322",
+                        "onnx::Conv_530",
+                        "onnx::Conv_531",
+                    ],
+                    output: [
+                        "input.24",
+                    ],
+                    name: Some(
+                        "Conv_7",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.24",
+                    ],
+                    output: [
+                        "onnx::Conv_325",
+                    ],
+                    name: Some(
+                        "Relu_8",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_325",
+                        "onnx::Conv_533",
+                        "onnx::Conv_534",
+                    ],
+                    output: [
+                        "input.32",
+                    ],
+                    name: Some(
+                        "Conv_9",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.32",
+                    ],
+                    output: [
+                        "onnx::Conv_328",
+                    ],
+                    name: Some(
+                        "Relu_10",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_328",
+                        "onnx::Conv_536",
+                        "onnx::Conv_537",
+                    ],
+                    output: [
+                        "input.40",
+                    ],
+                    name: Some(
+                        "Conv_11",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.40",
+                        "onnx::Conv_539",
+                        "onnx::Conv_540",
+                    ],
+                    output: [
+                        "input.48",
+                    ],
+                    name: Some(
+                        "Conv_12",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.48",
+                    ],
+                    output: [
+                        "onnx::Conv_333",
+                    ],
+                    name: Some(
+                        "Relu_13",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_333",
+                        "onnx::Conv_542",
+                        "onnx::Conv_543",
+                    ],
+                    output: [
+                        "input.56",
+                    ],
+                    name: Some(
+                        "Conv_14",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.56",
+                    ],
+                    output: [
+                        "onnx::Conv_336",
+                    ],
+                    name: Some(
+                        "Relu_15",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_336",
+                        "onnx::Conv_545",
+                        "onnx::Conv_546",
+                    ],
+                    output: [
+                        "onnx::Add_544",
+                    ],
+                    name: Some(
+                        "Conv_16",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_544",
+                        "input.40",
+                    ],
+                    output: [
+                        "onnx::Conv_339",
+                    ],
+                    name: Some(
+                        "Add_17",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_339",
+                        "onnx::Conv_548",
+                        "onnx::Conv_549",
+                    ],
+                    output: [
+                        "input.68",
+                    ],
+                    name: Some(
+                        "Conv_18",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.68",
+                    ],
+                    output: [
+                        "onnx::Conv_342",
+                    ],
+                    name: Some(
+                        "Relu_19",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_342",
+                        "onnx::Conv_551",
+                        "onnx::Conv_552",
+                    ],
+                    output: [
+                        "input.76",
+                    ],
+                    name: Some(
+                        "Conv_20",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.76",
+                    ],
+                    output: [
+                        "onnx::GlobalAveragePool_345",
+                    ],
+                    name: Some(
+                        "Relu_21",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::GlobalAveragePool_345",
+                    ],
+                    output: [
+                        "input.80",
+                    ],
+                    name: Some(
+                        "GlobalAveragePool_22",
+                    ),
+                    op_type: Some(
+                        "GlobalAveragePool",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.80",
+                        "features.4.block.2.fc1.weight",
+                        "features.4.block.2.fc1.bias",
+                    ],
+                    output: [
+                        "input.84",
+                    ],
+                    name: Some(
+                        "Conv_23",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.84",
+                    ],
+                    output: [
+                        "input.88",
+                    ],
+                    name: Some(
+                        "Relu_24",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.88",
+                        "features.4.block.2.fc2.weight",
+                        "features.4.block.2.fc2.bias",
+                    ],
+                    output: [
+                        "input.92",
+                    ],
+                    name: Some(
+                        "Conv_25",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.92",
+                    ],
+                    output: [
+                        "onnx::Mul_350",
+                    ],
+                    name: Some(
+                        "HardSigmoid_26",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Mul_350",
+                        "onnx::GlobalAveragePool_345",
+                    ],
+                    output: [
+                        "input.96",
+                    ],
+                    name: Some(
+                        "Mul_27",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.96",
+                        "onnx::Conv_554",
+                        "onnx::Conv_555",
+                    ],
+                    output: [
+                        "input.104",
+                    ],
+                    name: Some(
+                        "Conv_28",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.104",
+                        "onnx::Conv_557",
+                        "onnx::Conv_558",
+                    ],
+                    output: [
+                        "input.112",
+                    ],
+                    name: Some(
+                        "Conv_29",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.112",
+                    ],
+                    output: [
+                        "onnx::Conv_356",
+                    ],
+                    name: Some(
+                        "Relu_30",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_356",
+                        "onnx::Conv_560",
+                        "onnx::Conv_561",
+                    ],
+                    output: [
+                        "input.120",
+                    ],
+                    name: Some(
+                        "Conv_31",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.120",
+                    ],
+                    output: [
+                        "onnx::GlobalAveragePool_359",
+                    ],
+                    name: Some(
+                        "Relu_32",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::GlobalAveragePool_359",
+                    ],
+                    output: [
+                        "input.124",
+                    ],
+                    name: Some(
+                        "GlobalAveragePool_33",
+                    ),
+                    op_type: Some(
+                        "GlobalAveragePool",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.124",
+                        "features.5.block.2.fc1.weight",
+                        "features.5.block.2.fc1.bias",
+                    ],
+                    output: [
+                        "input.128",
+                    ],
+                    name: Some(
+                        "Conv_34",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.128",
+                    ],
+                    output: [
+                        "input.132",
+                    ],
+                    name: Some(
+                        "Relu_35",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.132",
+                        "features.5.block.2.fc2.weight",
+                        "features.5.block.2.fc2.bias",
+                    ],
+                    output: [
+                        "input.136",
+                    ],
+                    name: Some(
+                        "Conv_36",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.136",
+                    ],
+                    output: [
+                        "onnx::Mul_364",
+                    ],
+                    name: Some(
+                        "HardSigmoid_37",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Mul_364",
+                        "onnx::GlobalAveragePool_359",
+                    ],
+                    output: [
+                        "input.140",
+                    ],
+                    name: Some(
+                        "Mul_38",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.140",
+                        "onnx::Conv_563",
+                        "onnx::Conv_564",
+                    ],
+                    output: [
+                        "onnx::Add_562",
+                    ],
+                    name: Some(
+                        "Conv_39",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_562",
+                        "input.104",
+                    ],
+                    output: [
+                        "onnx::Conv_368",
+                    ],
+                    name: Some(
+                        "Add_40",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_368",
+                        "onnx::Conv_566",
+                        "onnx::Conv_567",
+                    ],
+                    output: [
+                        "input.152",
+                    ],
+                    name: Some(
+                        "Conv_41",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.152",
+                    ],
+                    output: [
+                        "onnx::Conv_371",
+                    ],
+                    name: Some(
+                        "Relu_42",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_371",
+                        "onnx::Conv_569",
+                        "onnx::Conv_570",
+                    ],
+                    output: [
+                        "input.160",
+                    ],
+                    name: Some(
+                        "Conv_43",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.160",
+                    ],
+                    output: [
+                        "onnx::GlobalAveragePool_374",
+                    ],
+                    name: Some(
+                        "Relu_44",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::GlobalAveragePool_374",
+                    ],
+                    output: [
+                        "input.164",
+                    ],
+                    name: Some(
+                        "GlobalAveragePool_45",
+                    ),
+                    op_type: Some(
+                        "GlobalAveragePool",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.164",
+                        "features.6.block.2.fc1.weight",
+                        "features.6.block.2.fc1.bias",
+                    ],
+                    output: [
+                        "input.168",
+                    ],
+                    name: Some(
+                        "Conv_46",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.168",
+                    ],
+                    output: [
+                        "input.172",
+                    ],
+                    name: Some(
+                        "Relu_47",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.172",
+                        "features.6.block.2.fc2.weight",
+                        "features.6.block.2.fc2.bias",
+                    ],
+                    output: [
+                        "input.176",
+                    ],
+                    name: Some(
+                        "Conv_48",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.176",
+                    ],
+                    output: [
+                        "onnx::Mul_379",
+                    ],
+                    name: Some(
+                        "HardSigmoid_49",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Mul_379",
+                        "onnx::GlobalAveragePool_374",
+                    ],
+                    output: [
+                        "input.180",
+                    ],
+                    name: Some(
+                        "Mul_50",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.180",
+                        "onnx::Conv_572",
+                        "onnx::Conv_573",
+                    ],
+                    output: [
+                        "onnx::Add_571",
+                    ],
+                    name: Some(
+                        "Conv_51",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_571",
+                        "onnx::Conv_368",
+                    ],
+                    output: [
+                        "onnx::Conv_383",
+                    ],
+                    name: Some(
+                        "Add_52",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_383",
+                        "onnx::Conv_575",
+                        "onnx::Conv_576",
+                    ],
+                    output: [
+                        "input.192",
+                    ],
+                    name: Some(
+                        "Conv_53",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.192",
+                    ],
+                    output: [
+                        "onnx::Mul_386",
+                    ],
+                    name: Some(
+                        "HardSigmoid_54",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.192",
+                        "onnx::Mul_386",
+                    ],
+                    output: [
+                        "onnx::Conv_387",
+                    ],
+                    name: Some(
+                        "Mul_55",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_387",
+                        "onnx::Conv_578",
+                        "onnx::Conv_579",
+                    ],
+                    output: [
+                        "input.200",
+                    ],
+                    name: Some(
+                        "Conv_56",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.200",
+                    ],
+                    output: [
+                        "onnx::Mul_390",
+                    ],
+                    name: Some(
+                        "HardSigmoid_57",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.200",
+                        "onnx::Mul_390",
+                    ],
+                    output: [
+                        "onnx::Conv_391",
+                    ],
+                    name: Some(
+                        "Mul_58",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_391",
+                        "onnx::Conv_581",
+                        "onnx::Conv_582",
+                    ],
+                    output: [
+                        "input.208",
+                    ],
+                    name: Some(
+                        "Conv_59",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.208",
+                        "onnx::Conv_584",
+                        "onnx::Conv_585",
+                    ],
+                    output: [
+                        "input.216",
+                    ],
+                    name: Some(
+                        "Conv_60",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.216",
+                    ],
+                    output: [
+                        "onnx::Mul_396",
+                    ],
+                    name: Some(
+                        "HardSigmoid_61",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.216",
+                        "onnx::Mul_396",
+                    ],
+                    output: [
+                        "onnx::Conv_397",
+                    ],
+                    name: Some(
+                        "Mul_62",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_397",
+                        "onnx::Conv_587",
+                        "onnx::Conv_588",
+                    ],
+                    output: [
+                        "input.224",
+                    ],
+                    name: Some(
+                        "Conv_63",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.224",
+                    ],
+                    output: [
+                        "onnx::Mul_400",
+                    ],
+                    name: Some(
+                        "HardSigmoid_64",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.224",
+                        "onnx::Mul_400",
+                    ],
+                    output: [
+                        "onnx::Conv_401",
+                    ],
+                    name: Some(
+                        "Mul_65",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_401",
+                        "onnx::Conv_590",
+                        "onnx::Conv_591",
+                    ],
+                    output: [
+                        "onnx::Add_589",
+                    ],
+                    name: Some(
+                        "Conv_66",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_589",
+                        "input.208",
+                    ],
+                    output: [
+                        "onnx::Conv_404",
+                    ],
+                    name: Some(
+                        "Add_67",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_404",
+                        "onnx::Conv_593",
+                        "onnx::Conv_594",
+                    ],
+                    output: [
+                        "input.236",
+                    ],
+                    name: Some(
+                        "Conv_68",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.236",
+                    ],
+                    output: [
+                        "onnx::Mul_407",
+                    ],
+                    name: Some(
+                        "HardSigmoid_69",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.236",
+                        "onnx::Mul_407",
+                    ],
+                    output: [
+                        "onnx::Conv_408",
+                    ],
+                    name: Some(
+                        "Mul_70",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_408",
+                        "onnx::Conv_596",
+                        "onnx::Conv_597",
+                    ],
+                    output: [
+                        "input.244",
+                    ],
+                    name: Some(
+                        "Conv_71",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.244",
+                    ],
+                    output: [
+                        "onnx::Mul_411",
+                    ],
+                    name: Some(
+                        "HardSigmoid_72",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.244",
+                        "onnx::Mul_411",
+                    ],
+                    output: [
+                        "onnx::Conv_412",
+                    ],
+                    name: Some(
+                        "Mul_73",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_412",
+                        "onnx::Conv_599",
+                        "onnx::Conv_600",
+                    ],
+                    output: [
+                        "onnx::Add_598",
+                    ],
+                    name: Some(
+                        "Conv_74",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_598",
+                        "onnx::Conv_404",
+                    ],
+                    output: [
+                        "onnx::Conv_415",
+                    ],
+                    name: Some(
+                        "Add_75",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_415",
+                        "onnx::Conv_602",
+                        "onnx::Conv_603",
+                    ],
+                    output: [
+                        "input.256",
+                    ],
+                    name: Some(
+                        "Conv_76",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.256",
+                    ],
+                    output: [
+                        "onnx::Mul_418",
+                    ],
+                    name: Some(
+                        "HardSigmoid_77",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.256",
+                        "onnx::Mul_418",
+                    ],
+                    output: [
+                        "onnx::Conv_419",
+                    ],
+                    name: Some(
+                        "Mul_78",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_419",
+                        "onnx::Conv_605",
+                        "onnx::Conv_606",
+                    ],
+                    output: [
+                        "input.264",
+                    ],
+                    name: Some(
+                        "Conv_79",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.264",
+                    ],
+                    output: [
+                        "onnx::Mul_422",
+                    ],
+                    name: Some(
+                        "HardSigmoid_80",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.264",
+                        "onnx::Mul_422",
+                    ],
+                    output: [
+                        "onnx::Conv_423",
+                    ],
+                    name: Some(
+                        "Mul_81",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_423",
+                        "onnx::Conv_608",
+                        "onnx::Conv_609",
+                    ],
+                    output: [
+                        "onnx::Add_607",
+                    ],
+                    name: Some(
+                        "Conv_82",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_607",
+                        "onnx::Conv_415",
+                    ],
+                    output: [
+                        "onnx::Conv_426",
+                    ],
+                    name: Some(
+                        "Add_83",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_426",
+                        "onnx::Conv_611",
+                        "onnx::Conv_612",
+                    ],
+                    output: [
+                        "input.276",
+                    ],
+                    name: Some(
+                        "Conv_84",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.276",
+                    ],
+                    output: [
+                        "onnx::Mul_429",
+                    ],
+                    name: Some(
+                        "HardSigmoid_85",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.276",
+                        "onnx::Mul_429",
+                    ],
+                    output: [
+                        "onnx::Conv_430",
+                    ],
+                    name: Some(
+                        "Mul_86",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_430",
+                        "onnx::Conv_614",
+                        "onnx::Conv_615",
+                    ],
+                    output: [
+                        "input.284",
+                    ],
+                    name: Some(
+                        "Conv_87",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.284",
+                    ],
+                    output: [
+                        "onnx::Mul_433",
+                    ],
+                    name: Some(
+                        "HardSigmoid_88",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.284",
+                        "onnx::Mul_433",
+                    ],
+                    output: [
+                        "onnx::GlobalAveragePool_434",
+                    ],
+                    name: Some(
+                        "Mul_89",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::GlobalAveragePool_434",
+                    ],
+                    output: [
+                        "input.288",
+                    ],
+                    name: Some(
+                        "GlobalAveragePool_90",
+                    ),
+                    op_type: Some(
+                        "GlobalAveragePool",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.288",
+                        "features.11.block.2.fc1.weight",
+                        "features.11.block.2.fc1.bias",
+                    ],
+                    output: [
+                        "input.292",
+                    ],
+                    name: Some(
+                        "Conv_91",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.292",
+                    ],
+                    output: [
+                        "input.296",
+                    ],
+                    name: Some(
+                        "Relu_92",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.296",
+                        "features.11.block.2.fc2.weight",
+                        "features.11.block.2.fc2.bias",
+                    ],
+                    output: [
+                        "input.300",
+                    ],
+                    name: Some(
+                        "Conv_93",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.300",
+                    ],
+                    output: [
+                        "onnx::Mul_439",
+                    ],
+                    name: Some(
+                        "HardSigmoid_94",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Mul_439",
+                        "onnx::GlobalAveragePool_434",
+                    ],
+                    output: [
+                        "input.304",
+                    ],
+                    name: Some(
+                        "Mul_95",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.304",
+                        "onnx::Conv_617",
+                        "onnx::Conv_618",
+                    ],
+                    output: [
+                        "input.312",
+                    ],
+                    name: Some(
+                        "Conv_96",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.312",
+                        "onnx::Conv_620",
+                        "onnx::Conv_621",
+                    ],
+                    output: [
+                        "input.320",
+                    ],
+                    name: Some(
+                        "Conv_97",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.320",
+                    ],
+                    output: [
+                        "onnx::Mul_445",
+                    ],
+                    name: Some(
+                        "HardSigmoid_98",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.320",
+                        "onnx::Mul_445",
+                    ],
+                    output: [
+                        "onnx::Conv_446",
+                    ],
+                    name: Some(
+                        "Mul_99",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_446",
+                        "onnx::Conv_623",
+                        "onnx::Conv_624",
+                    ],
+                    output: [
+                        "input.328",
+                    ],
+                    name: Some(
+                        "Conv_100",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.328",
+                    ],
+                    output: [
+                        "onnx::Mul_449",
+                    ],
+                    name: Some(
+                        "HardSigmoid_101",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.328",
+                        "onnx::Mul_449",
+                    ],
+                    output: [
+                        "onnx::GlobalAveragePool_450",
+                    ],
+                    name: Some(
+                        "Mul_102",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::GlobalAveragePool_450",
+                    ],
+                    output: [
+                        "input.332",
+                    ],
+                    name: Some(
+                        "GlobalAveragePool_103",
+                    ),
+                    op_type: Some(
+                        "GlobalAveragePool",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.332",
+                        "features.12.block.2.fc1.weight",
+                        "features.12.block.2.fc1.bias",
+                    ],
+                    output: [
+                        "input.336",
+                    ],
+                    name: Some(
+                        "Conv_104",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.336",
+                    ],
+                    output: [
+                        "input.340",
+                    ],
+                    name: Some(
+                        "Relu_105",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.340",
+                        "features.12.block.2.fc2.weight",
+                        "features.12.block.2.fc2.bias",
+                    ],
+                    output: [
+                        "input.344",
+                    ],
+                    name: Some(
+                        "Conv_106",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.344",
+                    ],
+                    output: [
+                        "onnx::Mul_455",
+                    ],
+                    name: Some(
+                        "HardSigmoid_107",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Mul_455",
+                        "onnx::GlobalAveragePool_450",
+                    ],
+                    output: [
+                        "input.348",
+                    ],
+                    name: Some(
+                        "Mul_108",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.348",
+                        "onnx::Conv_626",
+                        "onnx::Conv_627",
+                    ],
+                    output: [
+                        "onnx::Add_625",
+                    ],
+                    name: Some(
+                        "Conv_109",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_625",
+                        "input.312",
+                    ],
+                    output: [
+                        "onnx::Conv_459",
+                    ],
+                    name: Some(
+                        "Add_110",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_459",
+                        "onnx::Conv_629",
+                        "onnx::Conv_630",
+                    ],
+                    output: [
+                        "input.360",
+                    ],
+                    name: Some(
+                        "Conv_111",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.360",
+                    ],
+                    output: [
+                        "onnx::Mul_462",
+                    ],
+                    name: Some(
+                        "HardSigmoid_112",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.360",
+                        "onnx::Mul_462",
+                    ],
+                    output: [
+                        "onnx::Conv_463",
+                    ],
+                    name: Some(
+                        "Mul_113",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_463",
+                        "onnx::Conv_632",
+                        "onnx::Conv_633",
+                    ],
+                    output: [
+                        "input.368",
+                    ],
+                    name: Some(
+                        "Conv_114",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.368",
+                    ],
+                    output: [
+                        "onnx::Mul_466",
+                    ],
+                    name: Some(
+                        "HardSigmoid_115",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.368",
+                        "onnx::Mul_466",
+                    ],
+                    output: [
+                        "onnx::GlobalAveragePool_467",
+                    ],
+                    name: Some(
+                        "Mul_116",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::GlobalAveragePool_467",
+                    ],
+                    output: [
+                        "input.372",
+                    ],
+                    name: Some(
+                        "GlobalAveragePool_117",
+                    ),
+                    op_type: Some(
+                        "GlobalAveragePool",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.372",
+                        "features.13.block.2.fc1.weight",
+                        "features.13.block.2.fc1.bias",
+                    ],
+                    output: [
+                        "input.376",
+                    ],
+                    name: Some(
+                        "Conv_118",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.376",
+                    ],
+                    output: [
+                        "input.380",
+                    ],
+                    name: Some(
+                        "Relu_119",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.380",
+                        "features.13.block.2.fc2.weight",
+                        "features.13.block.2.fc2.bias",
+                    ],
+                    output: [
+                        "input.384",
+                    ],
+                    name: Some(
+                        "Conv_120",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.384",
+                    ],
+                    output: [
+                        "onnx::Mul_472",
+                    ],
+                    name: Some(
+                        "HardSigmoid_121",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Mul_472",
+                        "onnx::GlobalAveragePool_467",
+                    ],
+                    output: [
+                        "input.388",
+                    ],
+                    name: Some(
+                        "Mul_122",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.388",
+                        "onnx::Conv_635",
+                        "onnx::Conv_636",
+                    ],
+                    output: [
+                        "input.396",
+                    ],
+                    name: Some(
+                        "Conv_123",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.396",
+                        "onnx::Conv_638",
+                        "onnx::Conv_639",
+                    ],
+                    output: [
+                        "input.404",
+                    ],
+                    name: Some(
+                        "Conv_124",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.404",
+                    ],
+                    output: [
+                        "onnx::Mul_478",
+                    ],
+                    name: Some(
+                        "HardSigmoid_125",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.404",
+                        "onnx::Mul_478",
+                    ],
+                    output: [
+                        "onnx::Conv_479",
+                    ],
+                    name: Some(
+                        "Mul_126",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_479",
+                        "onnx::Conv_641",
+                        "onnx::Conv_642",
+                    ],
+                    output: [
+                        "input.412",
+                    ],
+                    name: Some(
+                        "Conv_127",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.412",
+                    ],
+                    output: [
+                        "onnx::Mul_482",
+                    ],
+                    name: Some(
+                        "HardSigmoid_128",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.412",
+                        "onnx::Mul_482",
+                    ],
+                    output: [
+                        "onnx::GlobalAveragePool_483",
+                    ],
+                    name: Some(
+                        "Mul_129",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::GlobalAveragePool_483",
+                    ],
+                    output: [
+                        "input.416",
+                    ],
+                    name: Some(
+                        "GlobalAveragePool_130",
+                    ),
+                    op_type: Some(
+                        "GlobalAveragePool",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.416",
+                        "features.14.block.2.fc1.weight",
+                        "features.14.block.2.fc1.bias",
+                    ],
+                    output: [
+                        "input.420",
+                    ],
+                    name: Some(
+                        "Conv_131",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.420",
+                    ],
+                    output: [
+                        "input.424",
+                    ],
+                    name: Some(
+                        "Relu_132",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.424",
+                        "features.14.block.2.fc2.weight",
+                        "features.14.block.2.fc2.bias",
+                    ],
+                    output: [
+                        "input.428",
+                    ],
+                    name: Some(
+                        "Conv_133",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.428",
+                    ],
+                    output: [
+                        "onnx::Mul_488",
+                    ],
+                    name: Some(
+                        "HardSigmoid_134",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Mul_488",
+                        "onnx::GlobalAveragePool_483",
+                    ],
+                    output: [
+                        "input.432",
+                    ],
+                    name: Some(
+                        "Mul_135",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.432",
+                        "onnx::Conv_644",
+                        "onnx::Conv_645",
+                    ],
+                    output: [
+                        "onnx::Add_643",
+                    ],
+                    name: Some(
+                        "Conv_136",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_643",
+                        "input.396",
+                    ],
+                    output: [
+                        "onnx::Conv_492",
+                    ],
+                    name: Some(
+                        "Add_137",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_492",
+                        "onnx::Conv_647",
+                        "onnx::Conv_648",
+                    ],
+                    output: [
+                        "input.444",
+                    ],
+                    name: Some(
+                        "Conv_138",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.444",
+                    ],
+                    output: [
+                        "onnx::Mul_495",
+                    ],
+                    name: Some(
+                        "HardSigmoid_139",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.444",
+                        "onnx::Mul_495",
+                    ],
+                    output: [
+                        "onnx::Conv_496",
+                    ],
+                    name: Some(
+                        "Mul_140",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_496",
+                        "onnx::Conv_650",
+                        "onnx::Conv_651",
+                    ],
+                    output: [
+                        "input.452",
+                    ],
+                    name: Some(
+                        "Conv_141",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.452",
+                    ],
+                    output: [
+                        "onnx::Mul_499",
+                    ],
+                    name: Some(
+                        "HardSigmoid_142",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.452",
+                        "onnx::Mul_499",
+                    ],
+                    output: [
+                        "onnx::GlobalAveragePool_500",
+                    ],
+                    name: Some(
+                        "Mul_143",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::GlobalAveragePool_500",
+                    ],
+                    output: [
+                        "input.456",
+                    ],
+                    name: Some(
+                        "GlobalAveragePool_144",
+                    ),
+                    op_type: Some(
+                        "GlobalAveragePool",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.456",
+                        "features.15.block.2.fc1.weight",
+                        "features.15.block.2.fc1.bias",
+                    ],
+                    output: [
+                        "input.460",
+                    ],
+                    name: Some(
+                        "Conv_145",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.460",
+                    ],
+                    output: [
+                        "input.464",
+                    ],
+                    name: Some(
+                        "Relu_146",
+                    ),
+                    op_type: Some(
+                        "ReLU",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.464",
+                        "features.15.block.2.fc2.weight",
+                        "features.15.block.2.fc2.bias",
+                    ],
+                    output: [
+                        "input.468",
+                    ],
+                    name: Some(
+                        "Conv_147",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.468",
+                    ],
+                    output: [
+                        "onnx::Mul_505",
+                    ],
+                    name: Some(
+                        "HardSigmoid_148",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Mul_505",
+                        "onnx::GlobalAveragePool_500",
+                    ],
+                    output: [
+                        "input.472",
+                    ],
+                    name: Some(
+                        "Mul_149",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.472",
+                        "onnx::Conv_653",
+                        "onnx::Conv_654",
+                    ],
+                    output: [
+                        "onnx::Add_652",
+                    ],
+                    name: Some(
+                        "Conv_150",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Add_652",
+                        "onnx::Conv_492",
+                    ],
+                    output: [
+                        "onnx::Conv_509",
+                    ],
+                    name: Some(
+                        "Add_151",
+                    ),
+                    op_type: Some(
+                        "Add",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Conv_509",
+                        "onnx::Conv_656",
+                        "onnx::Conv_657",
+                    ],
+                    output: [
+                        "input.484",
+                    ],
+                    name: Some(
+                        "Conv_152",
+                    ),
+                    op_type: Some(
+                        "Conv2d",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.484",
+                    ],
+                    output: [
+                        "onnx::Mul_512",
+                    ],
+                    name: Some(
+                        "HardSigmoid_153",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.484",
+                        "onnx::Mul_512",
+                    ],
+                    output: [
+                        "onnx::GlobalAveragePool_513",
+                    ],
+                    name: Some(
+                        "Mul_154",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::GlobalAveragePool_513",
+                    ],
+                    output: [
+                        "onnx::Flatten_514",
+                    ],
+                    name: Some(
+                        "GlobalAveragePool_155",
+                    ),
+                    op_type: Some(
+                        "GlobalAveragePool",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Flatten_514",
+                    ],
+                    output: [
+                        "onnx::Gemm_515",
+                    ],
+                    name: Some(
+                        "Flatten_156",
+                    ),
+                    op_type: Some(
+                        "Flatten",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Gemm_515",
+                        "classifier.0.weight",
+                        "classifier.0.bias",
+                    ],
+                    output: [
+                        "input.488",
+                    ],
+                    name: Some(
+                        "Gemm_157",
+                    ),
+                    op_type: Some(
+                        "Gemm",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.488",
+                    ],
+                    output: [
+                        "onnx::Mul_517",
+                    ],
+                    name: Some(
+                        "HardSigmoid_158",
+                    ),
+                    op_type: Some(
+                        "HardSigmoid",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "input.488",
+                        "onnx::Mul_517",
+                    ],
+                    output: [
+                        "onnx::Gemm_518",
+                    ],
+                    name: Some(
+                        "Mul_159",
+                    ),
+                    op_type: Some(
+                        "Mul",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+                NodeProto {
+                    input: [
+                        "onnx::Gemm_518",
+                        "classifier.3.weight",
+                        "classifier.3.bias",
+                    ],
+                    output: [
+                        "output",
+                    ],
+                    name: Some(
+                        "Gemm_160",
+                    ),
+                    op_type: Some(
+                        "Gemm",
+                    ),
+                    domain: None,
+                    attribute: [],
+                    doc_string: None,
+                },
+            ],
             name: None,
             initializer: [],
             sparse_initializer: [],

@@ -30,11 +30,17 @@ pub enum ModelSaveError {
     //
     // #[error("Something went wrong: {0}")]
     // Todo(Cow<'static, str>),
-    #[error("Input shape is not provided")]
-    NoInputShape,
+    #[error("Graph input shape is not provided")]
+    NoGraphInputShape,
 
-    #[error("Output shape is not provided")]
-    NoOutputShape,
+    #[error("Graph output shape is not provided")]
+    NoGraphOutputShape,
+
+    #[error("Node input name is not provided")]
+    NoNodeInputName,
+
+    #[error("Node output name is not provided")]
+    NoNodeOutputName,
 }
 
 pub fn save_onnx(model: &Model, path: impl AsRef<Path>) -> Result<(), ModelSaveError> {
@@ -56,7 +62,7 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
     for &input_id in &model.inputs {
         let input = &model.values.inner()[input_id];
         let Some(TypedShape { dims, elem_ty }) =
-            &input.shape else { return Err(ModelSaveError::NoInputShape) };
+            &input.shape else { return Err(ModelSaveError::NoGraphInputShape) };
 
         let mut ty = TypeProto::default();
         ty.denotation = Some("TENSOR".to_string());
@@ -83,7 +89,7 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
     for &output_id in &model.outputs {
         let output = &model.values.inner()[output_id];
         let Some(TypedShape { dims, elem_ty }) =
-            &output.shape else { return Err(ModelSaveError::NoOutputShape) };
+            &output.shape else { return Err(ModelSaveError::NoGraphOutputShape) };
 
         let mut ty = TypeProto::default();
         ty.denotation = Some("TENSOR".to_string());
@@ -107,18 +113,29 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
         });
     }
 
-    // fn f<T>(x: T, f: impl FnOnce(&mut T)) -> T {
-    //     let mut x = x;
-    //     f(&mut x);
-    //     x
-    // }
-    // graph_proto.node = vec![f(NodeProto::default(), |x| {
-    //     x.name = "Add.0".to_string().into();
-    //     x.op_type = "Add".to_string().into();
-    //     x.input.push("input".to_string().into());
-    //     x.input.push("input".to_string().into());
-    //     x.output.push("output".to_string().into());
-    // })];
+    for &node_id in &model.topo_sort_nodes() {
+        let node = &model.nodes[node_id];
+        let mut node_proto = NodeProto::default();
+
+        node_proto.name = node.name.clone();
+        node_proto.op_type = node.op.name().to_string().into();
+
+        for &input_id in &node.inputs {
+            let input = &model.values.inner()[input_id];
+            let Some(name) = &input.name
+                else { return Err(ModelSaveError::NoNodeInputName); };
+            node_proto.input.push(name.clone());
+        }
+
+        for &output_id in &node.outputs {
+            let output = &model.values.inner()[output_id];
+            let Some(name) = &output.name
+                else { return Err(ModelSaveError::NoNodeOutputName); };
+            node_proto.output.push(name.clone());
+        }
+
+        graph_proto.node.push(node_proto);
+    }
 
     Ok(graph_proto)
 }

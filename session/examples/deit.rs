@@ -12,6 +12,9 @@ use structopt::StructOpt;
 pub struct Opt {
     #[structopt(long = "profile", help = "Enable profiling")]
     pub profile: bool,
+
+    #[structopt(long = "iters", help = "The number of iterations", default_value = "1")]
+    pub iters: usize,
 }
 
 fn main() {
@@ -38,12 +41,16 @@ fn main() {
         .with_profiling_enabled(opt.profile)
         .build()
         .unwrap();
-    let out = i.run(vec![(input_value, input)]).expect("Inference failed");
-    let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
-    out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+    for _ in 0..opt.iters {
+        let out = i
+            .run(vec![(input_value, input.clone())])
+            .expect("Inference failed");
+        let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
+        out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 
-    let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
-    let classes = classes.split('\n').collect::<Vec<_>>();
-    println!("inferred: {}", classes[out[0].0]);
-    println!("top5: {:?}", &out[..5]);
+        let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
+        let classes = classes.split('\n').collect::<Vec<_>>();
+        println!("inferred: {}", classes[out[0].0]);
+        println!("top5: {:?}", &out[..5]);
+    }
 }

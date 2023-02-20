@@ -50,7 +50,6 @@ pub fn save_onnx(model: &Model, path: impl AsRef<Path>) -> Result<(), ModelSaveE
     model_proto.graph = encode_graph(model)?.into();
     model_proto.encode(&mut buf).unwrap();
 
-    println!("buf: {:?}", buf);
     fs::write(path, buf).unwrap();
 
     Ok(())
@@ -59,60 +58,41 @@ pub fn save_onnx(model: &Model, path: impl AsRef<Path>) -> Result<(), ModelSaveE
 fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
     let mut graph_proto = GraphProto::default();
 
-    for &input_id in &model.inputs {
-        let input = &model.values.inner()[input_id];
-        let Some(TypedShape { dims, elem_ty }) =
-            &input.shape else { return Err(ModelSaveError::NoGraphInputShape) };
+    // Encode graph inputs and outputs.
+    for (vals, proto) in vec![
+        (&model.inputs, &mut graph_proto.input),
+        (&model.outputs, &mut graph_proto.output),
+    ] {
+        for &id in vals {
+            let val = &model.values.inner()[id];
+            let Some(TypedShape { dims, elem_ty }) =
+                &val.shape else { return Err(ModelSaveError::NoGraphInputShape) };
+            let elem_ty: DataType = (*elem_ty).into();
 
-        let mut ty = TypeProto::default();
-        ty.denotation = Some("TENSOR".to_string());
-        ty.value = Some(TensorType(type_proto::Tensor {
-            elem_type: Some((*elem_ty).into(): DataType as i32),
-            shape: Some(TensorShapeProto {
-                dim: dims
-                    .iter()
-                    .map(|d| Dimension {
-                        denotation: None,
-                        value: Some(DimValue::DimValue(*d as i64)),
-                    })
-                    .collect::<Vec<_>>(),
-            }),
-        }));
+            let mut ty = TypeProto::default();
+            ty.denotation = Some("TENSOR".to_string());
+            ty.value = Some(TensorType(type_proto::Tensor {
+                elem_type: Some(elem_ty as i32),
+                shape: Some(TensorShapeProto {
+                    dim: dims
+                        .iter()
+                        .map(|d| Dimension {
+                            denotation: None,
+                            value: Some(DimValue::DimValue(*d as i64)),
+                        })
+                        .collect::<Vec<_>>(),
+                }),
+            }));
 
-        graph_proto.input.push(ValueInfoProto {
-            name: input.name.clone(),
-            r#type: ty.into(),
-            doc_string: "".to_string().into(),
-        });
+            proto.push(ValueInfoProto {
+                name: val.name.clone(),
+                r#type: ty.into(),
+                doc_string: "".to_string().into(),
+            });
+        }
     }
 
-    for &output_id in &model.outputs {
-        let output = &model.values.inner()[output_id];
-        let Some(TypedShape { dims, elem_ty }) =
-            &output.shape else { return Err(ModelSaveError::NoGraphOutputShape) };
-
-        let mut ty = TypeProto::default();
-        ty.denotation = Some("TENSOR".to_string());
-        ty.value = Some(TensorType(type_proto::Tensor {
-            elem_type: Some((*elem_ty).into(): DataType as i32),
-            shape: Some(TensorShapeProto {
-                dim: dims
-                    .iter()
-                    .map(|d| Dimension {
-                        denotation: None,
-                        value: Some(DimValue::DimValue(*d as i64)),
-                    })
-                    .collect::<Vec<_>>(),
-            }),
-        }));
-
-        graph_proto.output.push(ValueInfoProto {
-            name: output.name.clone(),
-            r#type: ty.into(),
-            doc_string: "".to_string().into(),
-        });
-    }
-
+    // Encode nodes.
     for &node_id in &model.topo_sort_nodes() {
         let node = &model.nodes[node_id];
         let mut node_proto = NodeProto::default();

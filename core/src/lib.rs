@@ -1,5 +1,4 @@
 #![allow(clippy::excessive_precision)]
-#![feature(type_ascription)]
 
 pub mod dim;
 pub mod model;

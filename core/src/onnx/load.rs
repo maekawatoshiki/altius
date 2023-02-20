@@ -76,85 +76,51 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
     }
 
     // Load inputs.
-    for x in graph.input.iter() {
-        let val = x.r#type.as_ref().unwrap().value.as_ref().unwrap();
-        let mut dims = vec![];
-        let mut is_dynamic_shape = false;
-        let type_proto::Value::TensorType(tensor) = val else {
+    for (vals, vec) in vec![
+        (&graph.input, &mut model.inputs),
+        (&graph.output, &mut model.outputs),
+    ] {
+        for x in vals {
+            let val = x.r#type.as_ref().unwrap().value.as_ref().unwrap();
+            let mut dims = vec![];
+            let mut is_dynamic_shape = false;
+            let type_proto::Value::TensorType(tensor) = val else {
             return Err(ModelLoadError::Todo(
                 "Graph input must be tensor type".into(),
             ));
         };
 
-        for d in tensor
-            .shape
-            .as_ref()
-            .unwrap()
-            .dim
-            .iter()
-            .map(|d| d.value.as_ref().unwrap())
-        {
-            let tensor_shape_proto::dimension::Value::DimValue(i) = d else {
+            for d in tensor
+                .shape
+                .as_ref()
+                .unwrap()
+                .dim
+                .iter()
+                .map(|d| d.value.as_ref().unwrap())
+            {
+                let tensor_shape_proto::dimension::Value::DimValue(i) = d else {
                 is_dynamic_shape = true;
                 break
             };
-            dims.push(*i)
-        }
+                dims.push(*i)
+            }
 
-        let input = match name_to_val.entry(x.name()) {
-            Entry::Occupied(o) => *o.get(),
-            Entry::Vacant(v) if is_dynamic_shape => *v.insert(model.values.new_val_named(x.name())),
-            Entry::Vacant(v) => *v.insert(model.values.new_val_named_and_shaped(
-                x.name(),
-                TypedShape::new(
-                    Dimensions::from_i64(&dims),
-                    DataType::from_i32(tensor.elem_type()).unwrap().try_into()?,
-                ),
-            )),
-        };
-
-        model.inputs.push(input);
-    }
-
-    // Load outputs.
-    for x in graph.output.iter() {
-        let val = x.r#type.as_ref().unwrap().value.as_ref().unwrap();
-        let mut dims = vec![];
-        let mut is_dynamic_shape = false;
-        let type_proto::Value::TensorType(tensor) = val else {
-            return Err(ModelLoadError::Todo(
-                "Graph output must be tensor type".into(),
-            ));
-        };
-
-        for d in tensor
-            .shape
-            .as_ref()
-            .unwrap()
-            .dim
-            .iter()
-            .map(|d| d.value.as_ref().unwrap())
-        {
-            let tensor_shape_proto::dimension::Value::DimValue(i) = d else {
-                is_dynamic_shape = true;
-                break
+            let input = match name_to_val.entry(x.name()) {
+                Entry::Occupied(o) => *o.get(),
+                Entry::Vacant(v) if is_dynamic_shape => {
+                    *v.insert(model.values.new_val_named(x.name()))
+                }
+                Entry::Vacant(v) => *v.insert(model.values.new_val_named_and_shaped(
+                    x.name(),
+                    TypedShape::new(
+                        Dimensions::from_i64(&dims),
+                        DataType::from_i32(tensor.elem_type()).unwrap().try_into()?,
+                    ),
+                )),
             };
-            dims.push(*i)
+
+            vec.push(input);
         }
-
-        let output = match name_to_val.entry(x.name()) {
-            Entry::Occupied(o) => *o.get(),
-            Entry::Vacant(v) if is_dynamic_shape => *v.insert(model.values.new_val_named(x.name())),
-            Entry::Vacant(v) => *v.insert(model.values.new_val_named_and_shaped(
-                x.name(),
-                TypedShape::new(
-                    Dimensions::from_i64(&dims),
-                    DataType::from_i32(tensor.elem_type()).unwrap().try_into()?,
-                ),
-            )),
-        };
-
-        model.outputs.push(output);
     }
 
     // Load nodes.

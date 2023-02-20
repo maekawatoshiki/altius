@@ -35,12 +35,6 @@ pub enum ModelSaveError {
 
     #[error("Graph output shape is not provided")]
     NoGraphOutputShape,
-
-    #[error("Node input name is not provided")]
-    NoNodeInputName,
-
-    #[error("Node output name is not provided")]
-    NoNodeOutputName,
 }
 
 pub fn save_onnx(model: &Model, path: impl AsRef<Path>) -> Result<(), ModelSaveError> {
@@ -102,16 +96,20 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
 
         for &input_id in &node.inputs {
             let input = &model.values.inner()[input_id];
-            let Some(name) = &input.name
-                else { return Err(ModelSaveError::NoNodeInputName); };
-            node_proto.input.push(name.clone());
+            let name = input
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("value.{}", input_id.index()));
+            node_proto.input.push(name);
         }
 
         for &output_id in &node.outputs {
             let output = &model.values.inner()[output_id];
-            let Some(name) = &output.name
-                else { return Err(ModelSaveError::NoNodeOutputName); };
-            node_proto.output.push(name.clone());
+            let name = output
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("value.{}", output_id.index()));
+            node_proto.output.push(name);
         }
 
         graph_proto.node.push(node_proto);

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ '*' ]
   pull_request:
     branches: [ '*' ]
 
@@ -19,29 +19,43 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
-    - name: Install dependencies
-      run: |
-        sudo apt install -y git-lfs # mesa-common-dev libvulkan1 mesa-vulkan-drivers vulkan-utils libpocl2 ocl-icd-opencl-dev
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Download large files
+      working-directory: ./models
+      run: ./download.sh
+    - name: Add llvm-tools-preview
+      run: rustup component add llvm-tools-preview
+    - name: Install grcov
+      run: cargo install grcov
+    - name: Test
       run: |
-        git lfs install && \
-        git lfs pull && \
-        cd models && \
-        ./download.sh
-    - name: Coverage
+        cargo test --release --features blis
+      env:
+        RUSTFLAGS: -Cinstrument-coverage
+        LLVM_PROFILE_FILE: coverage-%p-%m.profraw
+    - name: Run examples
       run: |
-            export RUSTFLAGS="-Cinstrument-coverage" && \
-            export LLVM_PROFILE_FILE="coverage-%p-%m.profraw" && \
-            rustup component add llvm-tools-preview && \
-            cargo install grcov && \
-            cargo test --release --features blis && \
-            (cd altius-py && source .env/bin/activate && python deit.py) && \
-            cargo run --release --features blis --example mnist && \
-            cargo run --release --features blis --example mobilenet && \
-            cargo run --release --features blis --example deit && \
-            cargo run --release --features blis --example vit && \
-            cargo run --release --features blis --example infer -- ./models/mnist-8.onnx && \
-            mkdir -p /tmp/cov/ && \
-            cp -rf ./target/release/* /tmp/cov/ && \
-            grcov . --binary-path /tmp/cov/ -s . -t cobertura --branch --ignore-not-existing --ignore "*cargo*" -o coverage.xml && \
-            bash <(curl -s https://codecov.io/bash)
+        (cd altius-py && source .env/bin/activate && python deit.py)
+        cargo run --release --features blis --example mnist
+        cargo run --release --features blis --example mobilenet
+        cargo run --release --features blis --example deit
+        cargo run --release --features blis --example vit
+        cargo run --release --features blis --example infer -- ./models/mnist-8.onnx
+      env:
+        RUSTFLAGS: -Cinstrument-coverage
+        LLVM_PROFILE_FILE: coverage-%p-%m.profraw
+    - name: Submit coverage
+      run: |
+        mkdir -p /tmp/cov/
+        cp -rf ./target/release/* /tmp/cov/
+        grcov . --binary-path /tmp/cov/ -s . -t cobertura --branch --ignore-not-existing --ignore "*cargo*" -o coverage.xml
+        bash <(curl -s https://codecov.io/bash)
+      env:
+        RUSTFLAGS: -Cinstrument-coverage
+        LLVM_PROFILE_FILE: coverage-%p-%m.profraw

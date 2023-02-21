@@ -41,11 +41,11 @@ def main():
         onnx.save(simplified_model, onnx_path)
 
     altius_model = altius_py.InferenceSession(
-        onnx_path, intra_op_num_threads=8, enable_profile=True
+        onnx_path, intra_op_num_threads=1, enable_profile=True
     )
 
     with torch.no_grad():
-        for i in range(10):
+        for i in range(1):
             output = altius_model.run(None, {"input.1": input})
             pred = torch.tensor(output).reshape((-1,)).argsort().numpy()[::-1][:5]
             top5 = [labels[i].strip() for i in pred]

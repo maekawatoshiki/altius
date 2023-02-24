@@ -467,15 +467,20 @@ macro_rules! op_bin_elemwise {
 
             if adims.len() == bdims.len() && bdims[bdims.len() - 1] == 1 {
                 let dims = adims;
-                let max = dims.total_elems();
-                let n = dims.0.last().unwrap();
+                let chunk = *dims.0.last().unwrap();
                 let input_a = input_a.data::<f32>();
                 let input_b = input_b.data::<f32>();
                 let output = output.data_mut::<f32>();
 
-                for i in 0..max {
-                    output[i] = input_a[i] $op input_b[i / n];
-                }
+                input_a
+                    .chunks(chunk)
+                    .zip(input_b.iter())
+                    .zip(output.chunks_mut(chunk))
+                    .for_each(|((a, b), o)| {
+                        for (a, o) in a.iter().zip(o.iter_mut()) {
+                            *o = a $op b;
+                        }
+                    });
 
                 return;
             }
@@ -485,6 +490,17 @@ macro_rules! op_bin_elemwise {
                 let output = output.data_mut::<f32>();
 
                 for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
+                    *o = a $op b;
+                }
+
+                return;
+            }
+
+            if adims.is_scalar() {
+                let a = input_a.data::<f32>()[0];
+                let output = output.data_mut::<f32>();
+
+                for (b, o) in input_b.data::<f32>().iter().zip(output.iter_mut()) {
                     *o = a $op b;
                 }
 
@@ -513,26 +529,46 @@ macro_rules! op_bin_elemwise {
             let output = output.data_mut::<f32>();
             let blen = *bdims.as_slice().last().unwrap();
             let batch = (100000 / blen).max(1);
+            let chunk = blen * batch;
+            let no_parallelism = output.len() / chunk == 0;
 
-            tctx.scope(|scope| {
+            if no_parallelism {
                 input_a
-                    .chunks(blen * batch)
-                    .zip(output.chunks_mut(blen * batch))
+                    .chunks(chunk)
+                    .zip(output.chunks_mut(chunk))
                     .for_each(|(input_a, output)| {
-                        scope.spawn(move || {
-                            input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
-                                move |(input_a, output)| {
-                                    for ((a, b), o) in
-                                        input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
-                                    {
-                                        // Auto-vectorized by LLVM
-                                        *o = a $op b;
-                                    }
-                                },
-                            );
-                        })
+                        input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
+                            move |(input_a, output)| {
+                                for ((a, b), o) in
+                                    input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
+                                {
+                                    // Auto-vectorized by LLVM
+                                    *o = a $op b;
+                                }
+                            },
+                        );
                     });
-            });
+            } else {
+                tctx.scope(|scope| {
+                    input_a
+                        .chunks(chunk)
+                        .zip(output.chunks_mut(chunk))
+                        .for_each(|(input_a, output)| {
+                            scope.spawn(move || {
+                                input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
+                                    move |(input_a, output)| {
+                                        for ((a, b), o) in
+                                            input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
+                                        {
+                                            // Auto-vectorized by LLVM
+                                            *o = a $op b;
+                                        }
+                                    },
+                                );
+                            })
+                        });
+                });
+            }
         }
 
         fn [< $name _general >](input_a: &Tensor, input_b: &Tensor, output: &mut Tensor) {

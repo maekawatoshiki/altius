@@ -209,8 +209,8 @@ impl InterpreterSession {
                 tctx: &self.tctx,
             }),
             Op::Add => compute_add(&self.tctx, &inputs, &mut outputs),
-            Op::Sub => compute_sub(node, &inputs, &mut outputs),
-            Op::Mul => compute_mul(node, &inputs, &mut outputs),
+            Op::Sub => compute_sub(&self.tctx, &inputs, &mut outputs),
+            Op::Mul => compute_mul(&self.tctx, &inputs, &mut outputs),
             Op::Div => compute_div(&self.tctx, &inputs, &mut outputs),
             Op::Greater => compute_greater(node, &inputs, &mut outputs),
             Op::Pow => compute_pow(node, &inputs, &mut outputs),
@@ -410,518 +410,234 @@ fn compute_max_pool(maxpool: &MaxPool, inputs: &[&Tensor], outputs: &mut [Tensor
     }
 }
 
-fn compute_add(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Op::ADD_IN_A];
-    let input_b = inputs[Op::ADD_IN_B];
-    let output = &mut outputs[Op::ADD_OUT];
+macro_rules! op_bin_elemwise {
+    ($name:ident, $op:tt) => { paste::item! {
+        fn $name(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
+            let input_a = inputs[0];
+            let input_b = inputs[1];
+            let output = &mut outputs[0];
 
-    let adims = input_a.dims();
-    let bdims = input_b.dims();
+            let adims = input_a.dims();
+            let bdims = input_b.dims();
 
-    if adims == bdims {
-        let input_a = input_a.data::<f32>();
-        let input_b = input_b.data::<f32>();
-        let output = output.data_mut::<f32>();
-        let chunk = 100000;
+            if adims == bdims {
+                let input_a = input_a.data::<f32>();
+                let input_b = input_b.data::<f32>();
+                let output = output.data_mut::<f32>();
+                let chunk = 100000;
 
-        tctx.scope(|scope| {
-            input_a
-                .chunks(chunk)
-                .zip(input_b.chunks(chunk))
-                .zip(output.chunks_mut(chunk))
-                .for_each(|((input_a, input_b), output)| {
-                    scope.spawn(move || {
-                        for ((a, b), o) in input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
-                        {
-                            // Auto-vectorized by LLVM
-                            *o = a + b;
-                        }
-                    });
+                tctx.scope(|scope| {
+                    input_a
+                        .chunks(chunk)
+                        .zip(input_b.chunks(chunk))
+                        .zip(output.chunks_mut(chunk))
+                        .for_each(|((input_a, input_b), output)| {
+                            scope.spawn(move || {
+                                for ((a, b), o) in
+                                    input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
+                                {
+                                    // Auto-vectorized by LLVM
+                                    *o = a $op b;
+                                }
+                            });
+                        });
                 });
-        });
 
-        return;
-    }
-
-    if adims.len() == 4 && bdims.len() == 3 {
-        assert!(adims[1] == bdims[0]);
-        assert!(bdims[1] == 1);
-        assert!(bdims[2] == 1);
-
-        for n in 0..adims[0] {
-            for z in 0..adims[1] {
-                for x in 0..adims[2] {
-                    for y in 0..adims[3] {
-                        *output.at_4d_mut(n, z, x, y) =
-                            input_a.at_4d(n, z, x, y) + input_b.at_3d(z, 0, 0);
-                    }
-                }
+                return;
             }
-        }
 
-        return;
-    }
+            if adims.len() == 4 && bdims.len() == 3 {
+                assert!(adims[1] == bdims[0]);
+                assert!(bdims[1] == 1);
+                assert!(bdims[2] == 1);
 
-    if adims.len() == bdims.len() && bdims[bdims.len() - 1] == 1 {
-        let dims = adims;
-        let max = dims.total_elems();
-        let n = dims.0.last().unwrap();
-        let input_a = input_a.data::<f32>();
-        let input_b = input_b.data::<f32>();
-        let output = output.data_mut::<f32>();
-
-        for i in 0..max {
-            output[i] = input_a[i] + input_b[i / n];
-        }
-
-        return;
-    }
-
-    if bdims.is_scalar() {
-        let b = input_b.data::<f32>()[0];
-        let output = output.data_mut::<f32>();
-
-        for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
-            *o = a + b;
-        }
-
-        return;
-    }
-
-    let (_adims, bdims, input_a, input_b) =
-        if bdims.len() == 1 && adims[adims.len() - 1] == bdims[0] {
-            (adims, bdims, input_a, input_b)
-        } else if adims.len() == 1 && bdims[bdims.len() - 1] == adims[0] {
-            (bdims, adims, input_b, input_a)
-        } else if bdims.as_slice()[0..bdims.len() - 1].iter().all(|&d| d == 1)
-            && adims.as_slice().last().unwrap() == bdims.as_slice().last().unwrap()
-        {
-            // e.g.
-            //   a: [1, 12, 9, 9]
-            //   b: [1,  1, 1, 9]
-            (adims, bdims, input_a, input_b)
-        } else {
-            compute_general_add(input_a, input_b, output);
-            return;
-        };
-
-    let input_a = input_a.data::<f32>();
-    let input_b = input_b.data::<f32>();
-    let output = output.data_mut::<f32>();
-    let blen = *bdims.as_slice().last().unwrap();
-    let batch = (100000 / blen).max(1);
-
-    tctx.scope(|scope| {
-        input_a
-            .chunks(blen * batch)
-            .zip(output.chunks_mut(blen * batch))
-            .for_each(|(input_a, output)| {
-                scope.spawn(move || {
-                    input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
-                        move |(input_a, output)| {
-                            for ((a, b), o) in
-                                input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
-                            {
-                                // Auto-vectorized by LLVM
-                                *o = a + b;
+                for n in 0..adims[0] {
+                    for z in 0..adims[1] {
+                        for x in 0..adims[2] {
+                            for y in 0..adims[3] {
+                                *output.at_4d_mut(n, z, x, y) =
+                                    input_a.at_4d(n, z, x, y) $op input_b.at_3d(z, 0, 0);
                             }
-                        },
-                    );
-                })
-            });
-    });
-}
-
-fn compute_general_add(input_a: &Tensor, input_b: &Tensor, output: &mut Tensor) {
-    if output.dims().len() == 4 {
-        let [odim0, odim1, odim2, odim3] = output.fixed_dims::<4>();
-        let out_shape = output.dims().as_slice().to_vec();
-        let [astr0, astr1, astr2, astr3] = input_a
-            .strides_for_broadcasting(&out_shape)
-            .unwrap()
-            .to_fixed_dims::<4>();
-        let [bstr0, bstr1, bstr2, bstr3] = input_b
-            .strides_for_broadcasting(&out_shape)
-            .unwrap()
-            .to_fixed_dims::<4>();
-
-        let mut input_a0 = input_a.data::<f32>().as_ptr();
-        let mut input_b0 = input_b.data::<f32>().as_ptr();
-        let mut output = output.data_mut::<f32>().as_mut_ptr();
-
-        for _ in 0..odim0 {
-            let (mut input_a1, mut input_b1) = (input_a0, input_b0);
-            for _ in 0..odim1 {
-                let (mut input_a2, mut input_b2) = (input_a1, input_b1);
-                for _ in 0..odim2 {
-                    let (mut input_a3, mut input_b3) = (input_a2, input_b2);
-                    for _ in 0..odim3 {
-                        unsafe { *output = *input_a3 + *input_b3 };
-                        (output, input_a3, input_b3) =
-                            unsafe { (output.add(1), input_a3.add(astr3), input_b3.add(bstr3)) };
-                    }
-                    (input_a2, input_b2) = unsafe { (input_a2.add(astr2), input_b2.add(bstr2)) };
-                }
-                (input_a1, input_b1) = unsafe { (input_a1.add(astr1), input_b1.add(bstr1)) };
-            }
-            (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
-        }
-        return;
-    }
-
-    if output.dims().len() == 3 {
-        let [odim0, odim1, odim2] = output.fixed_dims::<3>();
-        let out_shape = output.dims().as_slice().to_vec();
-        let [astr0, astr1, astr2] = input_a
-            .strides_for_broadcasting(&out_shape)
-            .unwrap()
-            .to_fixed_dims::<3>();
-        let [bstr0, bstr1, bstr2] = input_b
-            .strides_for_broadcasting(&out_shape)
-            .unwrap()
-            .to_fixed_dims::<3>();
-
-        let mut input_a0 = input_a.data::<f32>().as_ptr();
-        let mut input_b0 = input_b.data::<f32>().as_ptr();
-        let mut output = output.data_mut::<f32>().as_mut_ptr();
-
-        for _ in 0..odim0 {
-            let (mut input_a1, mut input_b1) = (input_a0, input_b0);
-            for _ in 0..odim1 {
-                let (mut input_a2, mut input_b2) = (input_a1, input_b1);
-                for _ in 0..odim2 {
-                    unsafe { *output = *input_a2 + *input_b2 };
-                    (output, input_a2, input_b2) =
-                        unsafe { (output.add(1), input_a2.add(astr2), input_b2.add(bstr2)) };
-                }
-                (input_a1, input_b1) = unsafe { (input_a1.add(astr1), input_b1.add(bstr1)) };
-            }
-            (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
-        }
-        return;
-    }
-
-    if output.dims().len() == 2 {
-        let [odim0, odim1] = output.fixed_dims::<2>();
-        let out_shape = output.dims().as_slice().to_vec();
-        let [astr0, astr1] = input_a
-            .strides_for_broadcasting(&out_shape)
-            .unwrap()
-            .to_fixed_dims::<2>();
-        let [bstr0, bstr1] = input_b
-            .strides_for_broadcasting(&out_shape)
-            .unwrap()
-            .to_fixed_dims::<2>();
-
-        let mut input_a0 = input_a.data::<f32>().as_ptr();
-        let mut input_b0 = input_b.data::<f32>().as_ptr();
-        let mut output = output.data_mut::<f32>().as_mut_ptr();
-
-        for _ in 0..odim0 {
-            let (mut input_a1, mut input_b1) = (input_a0, input_b0);
-            for _ in 0..odim1 {
-                unsafe { *output = *input_a1 + *input_b1 };
-                (output, input_a1, input_b1) =
-                    unsafe { (output.add(1), input_a1.add(astr1), input_b1.add(bstr1)) };
-            }
-            (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
-        }
-    }
-}
-
-fn compute_sub(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Op::SUB_IN_A];
-    let input_b = inputs[Op::SUB_IN_B];
-    let output = &mut outputs[Op::SUB_OUT];
-    const SIMD_LEN: usize = 8;
-
-    if input_a.dims() == input_b.dims() {
-        let mut input_a = input_a.data::<f32>();
-        let mut input_b = input_b.data::<f32>();
-        let mut output = output.data_mut::<f32>();
-        let mut len = output.len();
-
-        while len >= SIMD_LEN {
-            let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
-            let b = Simd::<f32, SIMD_LEN>::from_slice(&input_b[0..SIMD_LEN]);
-            let c = a - b;
-            output[0..SIMD_LEN].copy_from_slice(c.as_array());
-            input_a = &input_a[SIMD_LEN..];
-            input_b = &input_b[SIMD_LEN..];
-            output = &mut output[SIMD_LEN..];
-            len -= SIMD_LEN
-        }
-
-        for (i, (a, b)) in input_a.iter().zip(input_b.iter()).enumerate() {
-            output[i] = a - b;
-        }
-
-        return;
-    }
-
-    if input_a.dims().is_scalar() {
-        let input_a = input_a.data::<f32>()[0];
-        let mut input_b = input_b.data::<f32>();
-        let mut output = output.data_mut::<f32>();
-
-        let mut len = output.len();
-
-        while len >= SIMD_LEN {
-            let a = Simd::splat(input_a);
-            let b = Simd::<_, SIMD_LEN>::from_slice(input_b);
-            output[0..SIMD_LEN].copy_from_slice((a - b).as_ref());
-            (input_b, output) = (&input_b[SIMD_LEN..], &mut output[SIMD_LEN..]);
-            len -= SIMD_LEN;
-        }
-
-        for (b, o) in input_b.iter().zip(output.iter_mut()) {
-            *o = input_a - b;
-        }
-
-        return;
-    }
-
-    // TODO: We need multidirectional broadcast!
-
-    if input_a.dims().len() == 3
-        && input_b.dims().len() == 3
-        && input_b.dims()[input_b.dims().len() - 1] == 1
-    {
-        let dims = input_a.dims();
-        let n = *dims.0.last().unwrap();
-        let input_a = input_a.data::<f32>();
-        let input_b = input_b.data::<f32>();
-        let output = output.data_mut::<f32>();
-
-        input_a
-            .chunks(n)
-            .zip(input_b.iter())
-            .zip(output.chunks_mut(n))
-            .for_each(|((a, b), o)| {
-                for (a, o) in a.iter().zip(o.iter_mut()) {
-                    *o = a - b;
-                }
-            });
-
-        return;
-    }
-
-    todo!(
-        "A shape: {:?}, B shape: {:?}",
-        input_a.dims(),
-        input_b.dims()
-    )
-}
-
-fn compute_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Op::MUL_IN_A];
-    let input_b = inputs[Op::MUL_IN_B];
-    let output = &mut outputs[Op::MUL_OUT];
-
-    let adims = input_a.dims();
-    let bdims = input_b.dims();
-
-    if adims == bdims {
-        let output = output.data_mut::<f32>();
-        for (i, (a, b)) in input_a
-            .data::<f32>()
-            .iter()
-            .zip(input_b.data::<f32>().iter())
-            .enumerate()
-        {
-            output[i] = a * b;
-        }
-
-        return;
-    }
-
-    // TODO: We need multidirectional broadcast!
-
-    let in_a = adims;
-    let in_b = bdims;
-    if in_a.len() == 4
-        && in_b.len() == 4
-        && in_a[0] == in_b[0]
-        && in_a[1] == in_b[1]
-        && in_a[2] == 1
-        && in_a[3] == 1
-    {
-        let input_a_strides = input_a.strides();
-        let output_strides = output.strides().to_vec();
-        let n = in_a[0];
-        let z = in_a[1];
-        let b_x = in_b[2];
-        let b_y = in_b[3];
-        let input_a = input_a.data::<f32>();
-        let input_b = input_b.data::<f32>();
-        let output = output.data_mut::<f32>();
-
-        for n in 0..n {
-            let o_s_n = n * output_strides[0];
-            let ia_s_n = n * input_a_strides[0];
-            for z in 0..z {
-                let o_s_z = o_s_n + z * output_strides[1];
-                let ia_s_z = ia_s_n + z * input_a_strides[1];
-                let d = input_a[ia_s_z];
-                for x in 0..b_x {
-                    let o_s_x = o_s_z + x * output_strides[2];
-                    for y in 0..b_y {
-                        let o_s_y = o_s_x + y;
-                        output[o_s_y] = d * input_b[o_s_y];
+                        }
                     }
                 }
+
+                return;
             }
-        }
 
-        return;
-    }
+            if adims.len() == bdims.len() && bdims[bdims.len() - 1] == 1 {
+                let dims = adims;
+                let max = dims.total_elems();
+                let n = dims.0.last().unwrap();
+                let input_a = input_a.data::<f32>();
+                let input_b = input_b.data::<f32>();
+                let output = output.data_mut::<f32>();
 
-    if bdims.is_scalar() {
-        let b = input_b.data::<f32>()[0];
-        let output = output.data_mut::<f32>();
+                for i in 0..max {
+                    output[i] = input_a[i] $op input_b[i / n];
+                }
 
-        for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
-            *o = a * b;
-        }
+                return;
+            }
 
-        return;
-    }
+            if bdims.is_scalar() {
+                let b = input_b.data::<f32>()[0];
+                let output = output.data_mut::<f32>();
 
-    let (adims, bdims, input_a, input_b) = if bdims.len() == 1 && adims[adims.len() - 1] == bdims[0]
-    {
-        (adims, bdims, input_a, input_b)
-    } else if adims.len() == 1 && bdims[bdims.len() - 1] == adims[0] {
-        (bdims, adims, input_b, input_a)
-    } else {
-        todo!("A shape: {:?}, B shape: {:?}", adims, bdims)
-    };
+                for (a, o) in input_a.data::<f32>().iter().zip(output.iter_mut()) {
+                    *o = a $op b;
+                }
 
-    let total = adims.total_elems();
-    let part = bdims[0];
-    let b = input_b.data::<f32>().as_ptr();
-    let mut a = input_a.data::<f32>().as_ptr();
-    let mut output = output.data_mut::<f32>().as_mut_ptr();
+                return;
+            }
 
-    for _ in 0..total / part {
-        let mut b = b;
-        for _ in 0..part {
-            unsafe { *output = *a * *b };
-            a = unsafe { a.add(1) };
-            b = unsafe { b.add(1) };
-            output = unsafe { output.add(1) };
-        }
-    }
-}
+            let (_adims, bdims, input_a, input_b) =
+                if bdims.len() == 1 && adims[adims.len() - 1] == bdims[0] {
+                    (adims, bdims, input_a, input_b)
+                } else if adims.len() == 1 && bdims[bdims.len() - 1] == adims[0] {
+                    (bdims, adims, input_b, input_a)
+                } else if bdims.as_slice()[0..bdims.len() - 1].iter().all(|&d| d == 1)
+                    && adims.as_slice().last().unwrap() == bdims.as_slice().last().unwrap()
+                {
+                    // e.g.
+                    //   a: [1, 12, 9, 9]
+                    //   b: [1,  1, 1, 9]
+                    (adims, bdims, input_a, input_b)
+                } else {
+                    [< $name _general >](input_a, input_b, output);
+                    return;
+                };
 
-fn compute_div(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Op::MUL_IN_A];
-    let input_b = inputs[Op::MUL_IN_B];
-    let output = &mut outputs[Op::MUL_OUT];
+            let input_a = input_a.data::<f32>();
+            let input_b = input_b.data::<f32>();
+            let output = output.data_mut::<f32>();
+            let blen = *bdims.as_slice().last().unwrap();
+            let batch = (100000 / blen).max(1);
 
-    const SIMD_LEN: usize = 8;
-
-    if input_a.dims() == input_b.dims() {
-        let mut input_a = input_a.data::<f32>();
-        let mut input_b = input_b.data::<f32>();
-        let mut output = output.data_mut::<f32>();
-
-        let mut len = input_a.len();
-
-        while len >= SIMD_LEN {
-            let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
-            let b = Simd::<f32, SIMD_LEN>::from_slice(&input_b[0..SIMD_LEN]).recip();
-            output[0..SIMD_LEN].copy_from_slice((a * b).as_ref());
-            input_a = &input_a[SIMD_LEN..];
-            input_b = &input_b[SIMD_LEN..];
-            output = &mut output[SIMD_LEN..];
-            len -= SIMD_LEN
-        }
-
-        for ((a, b), o) in input_a.iter().zip(input_b.iter()).zip(output.iter_mut()) {
-            *o = a / b;
-        }
-        return;
-    }
-
-    // TODO: We need multidirectional broadcast!
-
-    if input_a.dims().len() == 3
-        && input_b.dims().len() == 3
-        && input_b.dims()[input_b.dims().len() - 1] == 1
-    {
-        let dims = input_a.dims();
-        let n = *dims.0.last().unwrap();
-        let input_a = input_a.data::<f32>();
-        let input_b = input_b.data::<f32>();
-        let output = output.data_mut::<f32>();
-
-        if n < 100000 {
-            input_a
-                .chunks(n)
-                .zip(input_b.iter())
-                .zip(output.chunks_mut(n))
-                .for_each(|((mut a, &b), mut o)| {
-                    let mut len = a.len();
-                    let b_ = Simd::<f32, SIMD_LEN>::splat(b).recip();
-
-                    while len >= SIMD_LEN {
-                        let a_ = Simd::<f32, SIMD_LEN>::from_slice(&a[0..SIMD_LEN]);
-                        o[0..SIMD_LEN].copy_from_slice((a_ * b_).as_ref());
-                        a = &a[SIMD_LEN..];
-                        o = &mut o[SIMD_LEN..];
-                        len -= SIMD_LEN
-                    }
-
-                    for (a, o) in a.iter().zip(o.iter_mut()) {
-                        *o = a * b.recip();
-                    }
-                });
-        } else {
             tctx.scope(|scope| {
                 input_a
-                    .chunks(n)
-                    .zip(input_b.iter())
-                    .zip(output.chunks_mut(n))
-                    .for_each(|((a, &b), o)| {
+                    .chunks(blen * batch)
+                    .zip(output.chunks_mut(blen * batch))
+                    .for_each(|(input_a, output)| {
                         scope.spawn(move || {
-                            for (&a, o) in a.iter().zip(o.iter_mut()) {
-                                *o = a * b.recip();
-                            }
-                        });
+                            input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
+                                move |(input_a, output)| {
+                                    for ((a, b), o) in
+                                        input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
+                                    {
+                                        // Auto-vectorized by LLVM
+                                        *o = a $op b;
+                                    }
+                                },
+                            );
+                        })
                     });
             });
         }
 
-        return;
-    }
+        fn [< $name _general >](input_a: &Tensor, input_b: &Tensor, output: &mut Tensor) {
+            if output.dims().len() == 4 {
+                let [odim0, odim1, odim2, odim3] = output.fixed_dims::<4>();
+                let out_shape = output.dims().as_slice().to_vec();
+                let [astr0, astr1, astr2, astr3] = input_a
+                    .strides_for_broadcasting(&out_shape)
+                    .unwrap()
+                    .to_fixed_dims::<4>();
+                let [bstr0, bstr1, bstr2, bstr3] = input_b
+                    .strides_for_broadcasting(&out_shape)
+                    .unwrap()
+                    .to_fixed_dims::<4>();
 
-    if input_b.dims().is_scalar() {
-        let mut input_a = input_a.data::<f32>();
-        let b = input_b.data::<f32>()[0].recip();
-        let simd_b = Simd::<f32, SIMD_LEN>::splat(b);
-        let mut output = output.data_mut::<f32>();
-        let mut len = input_a.len();
+                let mut input_a0 = input_a.data::<f32>().as_ptr();
+                let mut input_b0 = input_b.data::<f32>().as_ptr();
+                let mut output = output.data_mut::<f32>().as_mut_ptr();
 
-        while len >= SIMD_LEN {
-            let a = Simd::<f32, SIMD_LEN>::from_slice(&input_a[0..SIMD_LEN]);
-            output[0..SIMD_LEN].copy_from_slice((a * simd_b).as_ref());
-            input_a = &input_a[SIMD_LEN..];
-            output = &mut output[SIMD_LEN..];
-            len -= SIMD_LEN
+                for _ in 0..odim0 {
+                    let (mut input_a1, mut input_b1) = (input_a0, input_b0);
+                    for _ in 0..odim1 {
+                        let (mut input_a2, mut input_b2) = (input_a1, input_b1);
+                        for _ in 0..odim2 {
+                            let (mut input_a3, mut input_b3) = (input_a2, input_b2);
+                            for _ in 0..odim3 {
+                                unsafe { *output = *input_a3 $op *input_b3 };
+                                (output, input_a3, input_b3) =
+                                    unsafe { (output.add(1), input_a3.add(astr3), input_b3.add(bstr3)) };
+                            }
+                            (input_a2, input_b2) = unsafe { (input_a2.add(astr2), input_b2.add(bstr2)) };
+                        }
+                        (input_a1, input_b1) = unsafe { (input_a1.add(astr1), input_b1.add(bstr1)) };
+                    }
+                    (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
+                }
+                return;
+            }
+
+            if output.dims().len() == 3 {
+                let [odim0, odim1, odim2] = output.fixed_dims::<3>();
+                let out_shape = output.dims().as_slice().to_vec();
+                let [astr0, astr1, astr2] = input_a
+                    .strides_for_broadcasting(&out_shape)
+                    .unwrap()
+                    .to_fixed_dims::<3>();
+                let [bstr0, bstr1, bstr2] = input_b
+                    .strides_for_broadcasting(&out_shape)
+                    .unwrap()
+                    .to_fixed_dims::<3>();
+
+                let mut input_a0 = input_a.data::<f32>().as_ptr();
+                let mut input_b0 = input_b.data::<f32>().as_ptr();
+                let mut output = output.data_mut::<f32>().as_mut_ptr();
+
+                for _ in 0..odim0 {
+                    let (mut input_a1, mut input_b1) = (input_a0, input_b0);
+                    for _ in 0..odim1 {
+                        let (mut input_a2, mut input_b2) = (input_a1, input_b1);
+                        for _ in 0..odim2 {
+                            unsafe { *output = *input_a2 $op *input_b2 };
+                            (output, input_a2, input_b2) =
+                                unsafe { (output.add(1), input_a2.add(astr2), input_b2.add(bstr2)) };
+                        }
+                        (input_a1, input_b1) = unsafe { (input_a1.add(astr1), input_b1.add(bstr1)) };
+                    }
+                    (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
+                }
+                return;
+            }
+
+            if output.dims().len() == 2 {
+                let [odim0, odim1] = output.fixed_dims::<2>();
+                let out_shape = output.dims().as_slice().to_vec();
+                let [astr0, astr1] = input_a
+                    .strides_for_broadcasting(&out_shape)
+                    .unwrap()
+                    .to_fixed_dims::<2>();
+                let [bstr0, bstr1] = input_b
+                    .strides_for_broadcasting(&out_shape)
+                    .unwrap()
+                    .to_fixed_dims::<2>();
+
+                let mut input_a0 = input_a.data::<f32>().as_ptr();
+                let mut input_b0 = input_b.data::<f32>().as_ptr();
+                let mut output = output.data_mut::<f32>().as_mut_ptr();
+
+                for _ in 0..odim0 {
+                    let (mut input_a1, mut input_b1) = (input_a0, input_b0);
+                    for _ in 0..odim1 {
+                        unsafe { *output = *input_a1 $op *input_b1 };
+                        (output, input_a1, input_b1) =
+                            unsafe { (output.add(1), input_a1.add(astr1), input_b1.add(bstr1)) };
+                    }
+                    (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
+                }
+            }
         }
-
-        for (a, o) in input_a.iter().zip(output.iter_mut()) {
-            *o = a * b;
-        }
-        return;
-    }
-
-    todo!(
-        "A shape: {:?}, B shape: {:?}",
-        input_a.dims(),
-        input_b.dims()
-    )
+    }};
 }
+
+op_bin_elemwise!(compute_add, +);
+op_bin_elemwise!(compute_sub, -);
+op_bin_elemwise!(compute_mul, *);
+op_bin_elemwise!(compute_div, /);
 
 fn compute_greater(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     let input_0 = inputs[0];

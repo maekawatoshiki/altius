@@ -44,6 +44,7 @@ heavy-log = []
 x64-codegen = []
 
 [dev-dependencies]
+color-backtrace = "0.5.1"
 env_logger = "0.9.0"
 image = "0.24.2"
 structopt = "0.3.26"

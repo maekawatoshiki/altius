@@ -16,3 +16,4 @@ rustc-hash = "^1.1.0"
 opt-level = 3
 overflow-checks = false
 codegen-units = 8
+debug = true

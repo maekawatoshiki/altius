@@ -14,6 +14,7 @@ pub struct Opt {
 
 fn main() {
     env_logger::init();
+    color_backtrace::install();
 
     let opt = Opt::from_args();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");

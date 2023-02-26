@@ -1,6 +1,11 @@
 use std::time::Instant;
 
-use crate::{model::Model, node::Node, op::Op};
+use crate::{
+    model::Model,
+    node::Node,
+    op::{Gemm, Op},
+    value::ValueId,
+};
 
 pub fn fuse_transpose_matmul(model: &mut Model) {
     let start = Instant::now();
@@ -11,6 +16,20 @@ pub fn fuse_transpose_matmul(model: &mut Model) {
     let mut list = vec![];
     let mut delete_list = vec![];
 
+    enum MMInput {
+        Transpose(ValueId),
+        Other(ValueId),
+    }
+
+    impl MMInput {
+        fn val(&self) -> ValueId {
+            match self {
+                MMInput::Transpose(v) => *v,
+                MMInput::Other(v) => *v,
+            }
+        }
+    }
+
     // TODO: WIP
     for node_id in nodes {
         let mm_id = node_id;
@@ -18,42 +37,60 @@ pub fn fuse_transpose_matmul(model: &mut Model) {
         if !matches!(mm.op, Op::MatMul) {
             continue;
         }
-        if let Some(&lhs) = value_producer.get(&mm.inputs[0]) {
-            let transpose = &model.nodes[lhs];
-            if matches!(transpose.op, Op::Transpose(_)) {
-                list.push((transpose.inputs[0], mm.outputs[0]));
-                delete_list.push(lhs);
-                delete_list.push(mm_id);
+        let mut lhs_transpose = false;
+        let mut rhs_transpose = false;
+        let mut lhs_input = MMInput::Other(mm.inputs[0]);
+        let mut rhs_input = MMInput::Other(mm.inputs[1]);
+
+        if let Some(&transpose_id) = value_producer.get(&mm.inputs[0]) {
+            let transpose = &model.nodes[transpose_id];
+            if matches!(transpose.op, Op::Transpose(ref t)
+                if t.perm == [0, 1, 3, 2] || t.perm == [1, 0] || t.perm == [0, 2, 1])
+            {
+                lhs_transpose = true;
+                lhs_input = MMInput::Transpose(transpose.inputs[0]);
+                delete_list.push(transpose_id);
             }
         }
-        // let approx_sqrt_two = 1.4142099618911743f32;
-        // if model.inits.get(&div.inputs[1]).map_or(true, |rhs| {
-        //     !rhs.elem_ty().is_f32() || !allclose(rhs.data::<f32>(), &[approx_sqrt_two])
-        // }) {
-        //     continue;
-        // }
+        if let Some(&transpose_id) = value_producer.get(&mm.inputs[1]) {
+            let transpose = &model.nodes[transpose_id];
+            if matches!(transpose.op, Op::Transpose(ref t)
+                if t.perm == [0, 1, 3, 2] || t.perm == [1, 0] || t.perm == [0, 2, 1])
+            {
+                rhs_transpose = true;
+                rhs_input = MMInput::Transpose(transpose.inputs[0]);
+                delete_list.push(transpose_id);
+            }
+        }
 
-        // Gelu Detected!
-
-        // list.push((div.inputs[0], mul2.outputs[0]));
-        // delete_list.push(div_id);
-        // delete_list.push(erf_id);
-        // delete_list.push(add_id);
-        // delete_list.push(mul1_id);
-        // delete_list.push(mul2_id);
+        if lhs_transpose || rhs_transpose {
+            list.push((lhs_input, rhs_input, mm.outputs[0]));
+            delete_list.push(mm_id);
+        }
     }
 
     let count = list.len();
 
-    for (start, end) in list {
-        let gelu_out = model.values.new_val();
-        let gelu = Node::new(Op::Gelu).with_in(start).with_out(gelu_out);
-        let _gelu_id = model.add_node(gelu);
+    for (lhs_input, rhs_input, mm_output) in list {
+        let gemm_out = model.values.new_val();
+        let gemm = Node::new(Op::Gemm(Gemm {
+            alpha: 1.0,
+            beta: 0.0,
+            trans_a: matches!(lhs_input, MMInput::Transpose(_)),
+            trans_b: matches!(rhs_input, MMInput::Transpose(_)),
+        }))
+        .with_in(lhs_input.val())
+        .with_in(rhs_input.val())
+        .with_out(gemm_out);
+        model.add_node(gemm);
 
-        for user_id in &value_users[&end] {
+        for user_id in &value_users[&mm_output] {
             let user = &mut model.nodes[*user_id];
-            let idx = user.inputs.iter().position(|&i| i == end).unwrap();
-            user.inputs[idx] = gelu_out
+            for i in &mut user.inputs {
+                if *i == mm_output {
+                    *i = gemm_out;
+                }
+            }
         }
     }
 

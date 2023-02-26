@@ -85,10 +85,10 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             let mut dims = vec![];
             let mut is_dynamic_shape = false;
             let type_proto::Value::TensorType(tensor) = val else {
-            return Err(ModelLoadError::Todo(
-                "Graph input must be tensor type".into(),
-            ));
-        };
+                return Err(ModelLoadError::Todo(
+                    "Graph input must be tensor type".into(),
+                ));
+            };
 
             for d in tensor
                 .shape

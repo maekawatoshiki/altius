@@ -12,8 +12,13 @@ thiserror = "^1.0.31"
 log = "^0.4.17"
 rustc-hash = "^1.1.0"
 
+[profile.dev]
+opt-level = 2
+debug = true
+
 [profile.release]
 opt-level = 3
 overflow-checks = false
-codegen-units = 8
-debug = true
+codegen-units = 1
+panic = "abort"
+lto = "fat"

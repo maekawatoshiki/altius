@@ -17,15 +17,16 @@ Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) an
 # Download large models.
 (cd models && ./download.sh)
 
-# Run examples.
-# {mnist, mobilenet, vit} are available.
+# Run examples. {mnist, mobilenet, deit, vit} are available.
+# You can specify the number of threads by editing the code.
+# ./run.sh does not use release build as default.
 ./run.sh mnist
 ./run.sh mobilenet
 ./run.sh deit
-./run.sh vit # You can specify the number of threads in ./session/examples/vit.rs
+./run.sh vit
 
 # On macOS, you can use 'accelerate' library.
-cargo run --release --features accelerate --example mobilenet
+cargo run  --features accelerate --example mobilenet
 ```
 
 # Run from WebAssembly

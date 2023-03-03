@@ -35,25 +35,25 @@ jobs:
       run: cargo install grcov
     - name: Test
       run: |
-        cargo test --release --features blis
+        cargo test --features blis
       env:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
     - name: Run examples
       run: |
         (cd altius-py && source .env/bin/activate && python deit.py)
-        cargo run --release --features blis --example mnist
-        cargo run --release --features blis --example mobilenet
-        cargo run --release --features blis --example deit
-        cargo run --release --features blis --example vit
-        cargo run --release --features blis --example infer -- ./models/mnist-8.onnx
+        cargo run --features blis --example mnist
+        cargo run --features blis --example mobilenet
+        cargo run --features blis --example deit
+        cargo run --features blis --example vit
+        cargo run --features blis --example infer -- ./models/mnist-8.onnx
       env:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
     - name: Submit coverage
       run: |
         mkdir -p /tmp/cov/
-        cp -rf ./target/release/* /tmp/cov/
+        cp -rf ./target/debug/* /tmp/cov/
         grcov . --binary-path /tmp/cov/ -s . -t cobertura --branch --ignore-not-existing --ignore "*cargo*" -o coverage.xml
         bash <(curl -s https://codecov.io/bash)
       env:

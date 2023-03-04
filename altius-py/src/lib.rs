@@ -2,14 +2,14 @@ extern crate altius_core;
 extern crate altius_session;
 
 use altius_core::optimize;
-use altius_core::tensor::TensorElemTypeExt;
+use altius_core::tensor::{TensorElemType, TensorElemTypeExt};
 use altius_core::value::ValueId;
 use altius_core::{model::Model, tensor::Tensor};
 use altius_session::interpreter::{InterpreterSession, InterpreterSessionBuilder};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 
 use numpy::ndarray::ArrayD;
-use numpy::{Element, PyArrayDyn, PyReadonlyArrayDyn};
+use numpy::{Element, IntoPyArray, PyReadonlyArrayDyn};
 
 #[pyclass]
 #[repr(transparent)]
@@ -52,11 +52,7 @@ fn session(
 
 #[pymethods]
 impl PySession {
-    pub fn run<'a>(
-        &mut self,
-        py: Python<'a>,
-        inputs: &PyDict,
-    ) -> PyResult<Vec<&'a PyArrayDyn<f32>>> {
+    pub fn run<'a>(&mut self, py: Python<'a>, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
         fn create_input<T: Element + TensorElemTypeExt>(
             model: &Model,
             name: String,
@@ -102,18 +98,33 @@ impl PySession {
                 "Input {i} unsupported type"
             )));
         }
+
         let mut outputs = vec![];
         for out in self
             .0
             .run(new_inputs)
             .map_err(|e| PyRuntimeError::new_err(format!("Inference failed: {e}")))?
         {
-            let arr =
-                ArrayD::from_shape_vec(out.dims().as_slice().to_vec(), out.data::<f32>().to_vec())
+            macro_rules! arr {
+                ($t:tt) => {
+                    ArrayD::from_shape_vec(
+                        out.dims().as_slice().to_vec(),
+                        out.data::<$t>().to_vec(),
+                    )
                     .map_err(|e| {
                         PyRuntimeError::new_err(format!("Failed to create output array: {e:?}"))
-                    })?;
-            outputs.push(PyArrayDyn::from_array(py, &arr))
+                    })?
+                    .into_pyarray(py)
+                    .to_object(py)
+                };
+            }
+            let arr = match out.elem_ty() {
+                TensorElemType::F32 => arr!(f32),
+                TensorElemType::I32 => arr!(i32),
+                TensorElemType::I64 => arr!(i64),
+                TensorElemType::Bool => arr!(bool),
+            };
+            outputs.push(arr);
         }
         Ok(outputs)
     }

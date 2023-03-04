@@ -141,7 +141,31 @@ def test_pow_4():
         op_bin(os.path.join(tmpdir, "model.onnx"), "Pow", [128, 3, 8, 8], [1])
 
 
-def op_bin(filepath, op_type, shape_x, shape_y=None, shape_z=None):
+@pytest.mark.xfail
+def test_greater_1():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(
+            os.path.join(tmpdir, "model.onnx"),
+            "Greater",
+            [3, 4, 5],
+            zdtype=TensorProto.BOOL,
+        )
+
+
+def test_greater_2():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_bin(
+            os.path.join(tmpdir, "model.onnx"),
+            "Greater",
+            [3, 4, 5],
+            shape_y=[1],
+            zdtype=TensorProto.BOOL,
+        )
+
+
+def op_bin(
+    filepath, op_type, shape_x, shape_y=None, shape_z=None, zdtype=TensorProto.FLOAT
+):
     shape_y = shape_y if shape_y else shape_x
     shape_z = shape_z if shape_z else shape_x
 
@@ -149,7 +173,7 @@ def op_bin(filepath, op_type, shape_x, shape_y=None, shape_z=None):
         helper.make_tensor_value_info("x", TensorProto.FLOAT, shape_x),
         helper.make_tensor_value_info("y", TensorProto.FLOAT, shape_y),
     ]
-    outputs = [helper.make_tensor_value_info("z", TensorProto.FLOAT, shape_z)]
+    outputs = [helper.make_tensor_value_info("z", zdtype, shape_z)]
     nodes = [helper.make_node(op_type, ["x", "y"], ["z"])]
     graph = helper.make_graph(nodes, "graph", inputs, outputs)
     model = helper.make_model(graph)

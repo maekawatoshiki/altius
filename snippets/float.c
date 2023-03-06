@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 typedef struct {
   unsigned int frac : 23;
   unsigned int exp  : 8;
@@ -10,10 +12,16 @@ typedef struct {
 float add(float x, float y) {
   const f32 xi = *(f32*)&x;
   const f32 yi = *(f32*)&y;
+  printf("xi.exp = %d, yi.exp = %d\n", xi.exp, yi.exp);
+  unsigned int exp = MAX(xi.exp, yi.exp);
+  unsigned int xi_frac = (xi.frac | (1 << 23)) >> (exp - xi.exp);
+  unsigned int yi_frac = (yi.frac | (1 << 23)) >> (exp - yi.exp);
+  const int carry = (xi_frac + yi_frac) > 0xffffff;
+
   const f32 zi = {
     .sign = 0,
-    .exp  = 127,
-    .frac = xi.frac + (yi.frac >> 1) + 0x400000,
+    .exp  = exp + carry,
+    .frac = ((xi_frac + yi_frac) >> carry) & 0x7fffff,
   };
   return *(float*)&zi;
 
@@ -43,8 +51,8 @@ float add(float x, float y) {
 int main() {
   /* 1 + 8 + 7 */
   /* sign exp frac */
-  float x = 1.0;
-  float y = 0.52;
+  float x = 10.2;
+  float y = 0.1;
   float z = add(x, y);
   printf("%f\n", z);
   return 0;

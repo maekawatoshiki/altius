@@ -1,18 +1,27 @@
 use std::time::Instant;
 
+use rustc_hash::FxHashMap;
+
 use crate::{
     model::Model,
     node::Node,
-    op::{Gemm, Op, Squeeze},
+    op::{infer_shapes, Gemm, Op, Squeeze, Unsqueeze},
+    tensor::Tensor,
     // tensor::Tensor,
 };
 
 pub fn fuse_matmul_add(model: &mut Model) {
+    // TODO
+    log::warn!("fuse_matmul_add: This optimization pass is not implemented for general cases!!!");
+    log::warn!("fuse_matmul_add: In most cases, it does not perform a correct optimization!!!");
+
     let start = Instant::now();
     let nodes = model.topo_sort_nodes();
     let value_users = model.get_value_users();
 
-    // infer_shapes(model);
+    let seq = model.topo_sort_nodes();
+    let mut shapes = FxHashMap::default();
+    infer_shapes(model, &seq, &mut shapes).unwrap();
 
     let mut list = vec![];
     let mut delete_list = vec![];
@@ -22,6 +31,12 @@ pub fn fuse_matmul_add(model: &mut Model) {
         let mm_id = node_id;
         let mm = &model.nodes[mm_id];
         if !matches!(mm.op, Op::MatMul) {
+            continue;
+        }
+        let a = &shapes[&mm_id];
+        if a.1[0].dims.len() == 3 {
+            // println!(">>> {:?}", a);
+        } else {
             continue;
         }
 
@@ -47,7 +62,7 @@ pub fn fuse_matmul_add(model: &mut Model) {
         delete_list.push(add_id);
 
         if count == 4 {
-            break;
+            // break;
         }
         count += 1
     }
@@ -75,10 +90,21 @@ pub fn fuse_matmul_add(model: &mut Model) {
         .with_out(gemm_out);
         model.add_node(gemm);
 
+        let xx = model.values.new_val();
+        model
+            .inits
+            .insert(xx, Tensor::new(vec![1].into(), vec![0i64]));
+        let unsqueeze_out = model.values.new_val();
+        let unsqueeze = Node::new(Op::Unsqueeze(Unsqueeze { axes: vec![] }))
+            .with_in(gemm_out)
+            .with_in(xx)
+            .with_out(unsqueeze_out);
+        model.add_node(unsqueeze);
+
         for user_id in &value_users[&add_out] {
             let user = &mut model.nodes[*user_id];
             let idx = user.inputs.iter().position(|&i| i == add_out).unwrap();
-            user.inputs[idx] = gemm_out
+            user.inputs[idx] = unsqueeze_out;
         }
     }
 

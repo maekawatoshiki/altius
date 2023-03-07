@@ -1,8 +1,8 @@
-use altius_core::{model::Model, tensor::Tensor};
+use altius_core::{model::Model, op::infer_shapes, tensor::Tensor};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 
-use crate::{create_execution_plan, infer_shapes, SessionError};
+use crate::{create_execution_plan, SessionError};
 
 #[cfg(feature = "cuda")]
 use super::session::SafeCudnnContext;

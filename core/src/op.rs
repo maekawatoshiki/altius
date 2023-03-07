@@ -2,8 +2,12 @@ use std::borrow::Cow;
 
 use crate::{
     dim::Dimensions,
+    model::Model,
+    node::NodeId,
     tensor::{Tensor, TensorElemType, TypedShape},
+    value::ValueId,
 };
+use rustc_hash::FxHashMap;
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -918,4 +922,53 @@ pub fn compute_output_shapes(
     }
 
     Ok(shapes)
+}
+
+/// Infer `TypedShape`s of output tensors for each node.
+/// It skips to infer on nodes without information for inference.
+pub fn infer_shapes(
+    model: &Model,
+    sorted_nodes: &[NodeId],
+    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+) -> Result<(), ShapeError> {
+    let mut values = model.inits.clone();
+
+    for &val_id in &model.inputs {
+        let shape = &model.values.inner()[val_id].shape;
+        let Some(shape) = shape else { continue };
+        let tensor = Tensor::zeros_of_type(shape.elem_ty, shape.dims.clone());
+        values.insert(val_id, tensor);
+    }
+
+    for &node in sorted_nodes {
+        infer_shape(model, &mut values, shapes, node)?
+    }
+
+    Ok(())
+}
+
+fn infer_shape(
+    model: &Model,
+    values: &mut FxHashMap<ValueId, Tensor>,
+    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+    node_id: NodeId,
+) -> Result<(), ShapeError> {
+    let node = &model.nodes[node_id];
+    let mut op = node.op.clone();
+    let mut inputs = vec![];
+    for input in &node.inputs {
+        let Some(input) = values.get(input) else { return Ok(()); };
+        inputs.push(input);
+    }
+    let output_shapes =
+        compute_output_shapes(&mut op, &inputs, node.outputs.len(), model.opset_version).unwrap(); // TODO: Remove unwrap().
+    let mut outputs = vec![];
+    for shape in &output_shapes {
+        outputs.push(Tensor::empty_of_type(shape.elem_ty, shape.dims.clone()));
+    }
+    for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
+        values.insert(val, output);
+    }
+    shapes.insert(node_id, (op, output_shapes));
+    Ok(())
 }

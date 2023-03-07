@@ -9,13 +9,7 @@ pub mod wgpu;
 
 use std::borrow::Cow;
 
-use altius_core::{
-    model::Model,
-    node::NodeId,
-    op::{compute_output_shapes, Op, ShapeError},
-    tensor::{Tensor, TypedShape},
-    value::ValueId,
-};
+use altius_core::{model::Model, node::NodeId, op::ShapeError, value::ValueId};
 #[cfg(all(feature = "cblas", not(feature = "blis")))]
 #[allow(unused)]
 use blas_src;
@@ -44,55 +38,6 @@ struct NodeExecutionPlan {
 
     /// Values to be freed after the execution of the node.
     free_vals: Vec<ValueId>,
-}
-
-/// Infer `TypedShape`s of output tensors for each node.
-/// It skips to infer on nodes without information for inference.
-fn infer_shapes(
-    model: &Model,
-    sorted_nodes: &[NodeId],
-    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
-) -> Result<(), ShapeError> {
-    let mut values = model.inits.clone();
-
-    for &val_id in &model.inputs {
-        let shape = &model.values.inner()[val_id].shape;
-        let Some(shape) = shape else { continue };
-        let tensor = Tensor::zeros_of_type(shape.elem_ty, shape.dims.clone());
-        values.insert(val_id, tensor);
-    }
-
-    for &node in sorted_nodes {
-        infer_shape(model, &mut values, shapes, node)?
-    }
-
-    Ok(())
-}
-
-fn infer_shape(
-    model: &Model,
-    values: &mut FxHashMap<ValueId, Tensor>,
-    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
-    node_id: NodeId,
-) -> Result<(), ShapeError> {
-    let node = &model.nodes[node_id];
-    let mut op = node.op.clone();
-    let mut inputs = vec![];
-    for input in &node.inputs {
-        let Some(input) = values.get(input) else { return Ok(()); };
-        inputs.push(input);
-    }
-    let output_shapes =
-        compute_output_shapes(&mut op, &inputs, node.outputs.len(), model.opset_version).unwrap(); // TODO: Remove unwrap().
-    let mut outputs = vec![];
-    for shape in &output_shapes {
-        outputs.push(Tensor::empty_of_type(shape.elem_ty, shape.dims.clone()));
-    }
-    for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
-        values.insert(val, output);
-    }
-    shapes.insert(node_id, (op, output_shapes));
-    Ok(())
 }
 
 fn create_execution_plan(model: &Model, sorted_nodes: &[NodeId]) -> Vec<NodeExecutionPlan> {

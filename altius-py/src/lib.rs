@@ -52,7 +52,7 @@ fn session(
 
 #[pymethods]
 impl PySession {
-    pub fn run<'a>(&mut self, py: Python<'a>, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
+    pub fn run(&mut self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
         fn create_input<T: Element + TensorElemTypeExt>(
             model: &Model,
             name: String,

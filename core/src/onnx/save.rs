@@ -63,20 +63,21 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
                 &val.shape else { return Err(ModelSaveError::NoGraphInputShape) };
             let elem_ty: DataType = (*elem_ty).into();
 
-            let mut ty = TypeProto::default();
-            ty.denotation = Some("TENSOR".to_string());
-            ty.value = Some(TensorType(type_proto::Tensor {
-                elem_type: Some(elem_ty as i32),
-                shape: Some(TensorShapeProto {
-                    dim: dims
-                        .iter()
-                        .map(|d| Dimension {
-                            denotation: None,
-                            value: Some(DimValue::DimValue(*d as i64)),
-                        })
-                        .collect::<Vec<_>>(),
-                }),
-            }));
+            let ty = TypeProto {
+                denotation: Some("TENSOR".to_string()),
+                value: Some(TensorType(type_proto::Tensor {
+                    elem_type: Some(elem_ty as i32),
+                    shape: Some(TensorShapeProto {
+                        dim: dims
+                            .iter()
+                            .map(|d| Dimension {
+                                denotation: None,
+                                value: Some(DimValue::DimValue(*d as i64)),
+                            })
+                            .collect::<Vec<_>>(),
+                    }),
+                })),
+            };
 
             proto.push(ValueInfoProto {
                 name: val.name.clone(),
@@ -89,10 +90,11 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
     // Encode nodes.
     for &node_id in &model.topo_sort_nodes() {
         let node = &model.nodes[node_id];
-        let mut node_proto = NodeProto::default();
-
-        node_proto.name = node.name.clone();
-        node_proto.op_type = node.op.name().to_string().into();
+        let mut node_proto = NodeProto {
+            name: node.name.clone(),
+            op_type: node.op.name().to_string().into(),
+            ..Default::default()
+        };
 
         for &input_id in &node.inputs {
             let input = &model.values.inner()[input_id];

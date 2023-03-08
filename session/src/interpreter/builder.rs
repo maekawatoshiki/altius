@@ -16,7 +16,7 @@ pub struct InterpreterSessionBuilder {
     enable_profiling: bool,
 }
 
-impl<'a> InterpreterSessionBuilder {
+impl InterpreterSessionBuilder {
     pub const fn new(model: Model) -> Self {
         Self {
             model,

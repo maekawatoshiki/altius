@@ -930,6 +930,7 @@ pub fn infer_shapes(
     model: &Model,
     sorted_nodes: &[NodeId],
     shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+    value_shapes: &mut FxHashMap<ValueId, TypedShape>,
 ) -> Result<(), ShapeError> {
     let mut values = model.inits.clone();
 
@@ -943,6 +944,13 @@ pub fn infer_shapes(
     for &node in sorted_nodes {
         infer_shape(model, &mut values, shapes, node)?
     }
+
+    value_shapes.extend(values.into_iter().map(|(val_id, tensor)| {
+        let dims = tensor.dims().clone();
+        let elem_ty = tensor.elem_ty();
+        let shape = TypedShape::new(dims, elem_ty);
+        (val_id, shape)
+    }));
 
     Ok(())
 }

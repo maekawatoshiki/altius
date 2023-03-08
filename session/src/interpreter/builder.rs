@@ -42,7 +42,12 @@ impl<'a> InterpreterSessionBuilder {
 
         let sorted_nodes = model.topo_sort_nodes();
         let mut inferred_shapes = FxHashMap::default();
-        infer_shapes(&model, &sorted_nodes, &mut inferred_shapes)?;
+        infer_shapes(
+            &model,
+            &sorted_nodes,
+            &mut inferred_shapes,
+            &mut FxHashMap::default(),
+        )?;
 
         #[cfg(feature = "blis")]
         {

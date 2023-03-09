@@ -271,3 +271,79 @@ pub fn fast_sigmoid(output: &mut [f32], input: &[f32]) {
         *out = 1. / (1. + p);
     }
 }
+
+pub fn fast_gelu(mut output: &mut [f32], mut input: &[f32]) {
+    const B: f32 = 0.7978845608028654f32; // sqrt(2.0 / PI)
+    const C: f32 = 0.035677408136300125f32; // 0.044715 * sqrt(2.0 / PI)
+    const LOWER_RANGE: f32 = -9f32;
+    const UPPER_RANGE: f32 = 9f32;
+    const ALPHA_13: f32 = -2.76076847742355e-16f32;
+    const ALPHA_11: f32 = 2.00018790482477e-13f32;
+    const ALPHA_9: f32 = -8.60467152213735e-11f32;
+    const ALPHA_7: f32 = 5.12229709037114e-08f32;
+    const ALPHA_5: f32 = 1.48572235717979e-05f32;
+    const ALPHA_3: f32 = 6.37261928875436e-04f32;
+    const ALPHA_1: f32 = 4.89352455891786e-03f32;
+    const BETA_6: f32 = 1.19825839466702e-06f32;
+    const BETA_4: f32 = 1.18534705686654e-04f32;
+    const BETA_2: f32 = 2.26843463243900e-03f32;
+    const BETA_0: f32 = 4.89352518554385e-03f32;
+
+    const SIMD_LEN: usize = 8;
+
+    assert_eq!(output.len(), input.len());
+    let mut len = output.len();
+
+    while len >= SIMD_LEN {
+        let i = Simd::<f32, SIMD_LEN>::from_slice(input);
+        let vals = i * (Simd::splat(C) * i * i + Simd::splat(B));
+        let vals = vals.simd_clamp(Simd::splat(LOWER_RANGE), Simd::splat(UPPER_RANGE));
+
+        let vals_squared = vals * vals;
+
+        let p = vals_squared.mul_add(Simd::splat(ALPHA_13), Simd::splat(ALPHA_11));
+        let p = p.mul_add(vals_squared, Simd::splat(ALPHA_9));
+        let p = p.mul_add(vals_squared, Simd::splat(ALPHA_7));
+        let p = p.mul_add(vals_squared, Simd::splat(ALPHA_5));
+        let p = p.mul_add(vals_squared, Simd::splat(ALPHA_3));
+        let p = p.mul_add(vals_squared, Simd::splat(ALPHA_1));
+        let p = p * vals;
+
+        let q = vals_squared.mul_add(Simd::splat(BETA_6), Simd::splat(BETA_4));
+        let q = q.mul_add(vals_squared, Simd::splat(BETA_2));
+        let q = q.mul_add(vals_squared, Simd::splat(BETA_0));
+
+        let o = p / q;
+        let o = (o + Simd::splat(1.)) * (i * Simd::splat(0.5));
+
+        output[0..SIMD_LEN].copy_from_slice(o.as_ref());
+
+        len -= SIMD_LEN;
+        input = &input[SIMD_LEN..];
+        output = &mut output[SIMD_LEN..];
+    }
+
+    for (&i, out) in input.iter().zip(output.iter_mut()) {
+        let val = i * (C * i * i + B);
+        let val = val.clamp(LOWER_RANGE, UPPER_RANGE);
+
+        let val_squared = val * val;
+
+        let p = val_squared.mul_add(ALPHA_13, ALPHA_11);
+        let p = p.mul_add(val_squared, ALPHA_9);
+        let p = p.mul_add(val_squared, ALPHA_7);
+        let p = p.mul_add(val_squared, ALPHA_5);
+        let p = p.mul_add(val_squared, ALPHA_3);
+        let p = p.mul_add(val_squared, ALPHA_1);
+        let p = p * val;
+
+        let q = val_squared.mul_add(BETA_6, BETA_4);
+        let q = q.mul_add(val_squared, BETA_2);
+        let q = q.mul_add(val_squared, BETA_0);
+
+        let o = p / q;
+        let o = (o + 1.) * (i * 0.5);
+
+        *out = o
+    }
+}

@@ -2,7 +2,7 @@
 use super::gemm::sgemm2;
 use super::{
     conv2d::{self, Conv2dCtx},
-    fast_math::fast_sigmoid,
+    fast_math::{fast_gelu, fast_sigmoid},
     gemm::sgemm,
     thread::ThreadCtx,
 };
@@ -930,9 +930,6 @@ fn compute_leaky_relu(leaky: &LeakyReLU, inputs: &[&Tensor], outputs: &mut [Tens
 }
 
 fn compute_gelu(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    const B: f32 = 0.7978845608028654f32; // sqrt(2.0 / PI)
-    const C: f32 = 0.035677408136300125f32; // 0.044715 * sqrt(2.0 / PI)
-
     let input: &[f32] = inputs[0].data();
     let output: &mut [f32] = outputs[0].data_mut();
     let n = tctx.num_threads();
@@ -943,13 +940,7 @@ fn compute_gelu(tctx: &ThreadCtx, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             .zip(output.chunks_mut(input.len() / n))
             .for_each(|(input, output)| {
                 scope.spawn(move || {
-                    for (&i, o) in input.iter().zip(output.iter_mut()) {
-                        *o = i * (C * i * i + B);
-                    }
-                    tanh(output);
-                    for (&i, o) in input.iter().zip(output.iter_mut()) {
-                        *o = (*o + 1.) * (i * 0.5);
-                    }
+                    fast_gelu(output, input);
                 })
             });
     });

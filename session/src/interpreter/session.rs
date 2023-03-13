@@ -12,9 +12,9 @@ use altius_core::{
     model::Model,
     node::{Node, NodeId},
     op::{
-        compute_output_shapes, BatchNormalization, Cast, Concat, Flatten, Gather, Gemm,
-        HardSigmoid, LayerNormalization, LeakyReLU, MaxPool, Op, ReduceMax, ReduceMean, Resize,
-        Softmax, Split, Squeeze, Transpose, Unsqueeze,
+        BatchNormalization, Cast, Concat, Flatten, Gather, Gemm, HardSigmoid, LayerNormalization,
+        LeakyReLU, MaxPool, Op, ReduceMax, ReduceMean, Resize, Softmax, Split, Squeeze, Transpose,
+        Unsqueeze,
     },
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
@@ -181,13 +181,13 @@ impl InterpreterSession {
                 .cloned()
                 .unwrap_or_else(|| {
                     let mut op = node.op.clone();
-                    let output_shapes = compute_output_shapes(
-                        &mut op,
-                        &inputs,
-                        node.outputs.len(),
-                        self.model.opset_version,
-                    )
-                    .unwrap(); // TODO: Remove unwrap().
+                    let output_shapes = op
+                        .compute_output_shapes(
+                            &inputs,
+                            node.outputs.len(),
+                            self.model.opset_version,
+                        )
+                        .unwrap(); // TODO: Remove unwrap().
                     (op, output_shapes)
                 });
         let mut outputs = output_shapes

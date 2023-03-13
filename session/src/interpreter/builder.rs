@@ -1,4 +1,4 @@
-use altius_core::{model::Model, op::infer_shapes, tensor::Tensor};
+use altius_core::{analysis::shape::infer_shapes, model::Model, tensor::Tensor};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 

@@ -1,5 +1,6 @@
 #![allow(clippy::excessive_precision)]
 
+pub mod analysis;
 pub mod dim;
 pub mod model;
 pub mod node;

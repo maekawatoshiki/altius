@@ -9,7 +9,7 @@ pub mod wgpu;
 
 use std::borrow::Cow;
 
-use altius_core::{model::Model, node::NodeId, op::ShapeError, value::ValueId};
+use altius_core::{analysis::shape::ShapeError, model::Model, node::NodeId, value::ValueId};
 #[cfg(all(feature = "cblas", not(feature = "blis")))]
 #[allow(unused)]
 use blas_src;

@@ -175,21 +175,15 @@ impl InterpreterSession {
             .map(|input| values.get(input).unwrap_or(&self.dummy_value))
             .collect::<Vec<_>>();
         // Use inferred shapes if any.
-        let (op, output_shapes) =
-            self.inferred_shapes
-                .get(&node_id)
-                .cloned()
-                .unwrap_or_else(|| {
-                    let mut op = node.op.clone();
-                    let output_shapes = op
-                        .compute_output_shapes(
-                            &inputs,
-                            node.outputs.len(),
-                            self.model.opset_version,
-                        )
-                        .unwrap(); // TODO: Remove unwrap().
-                    (op, output_shapes)
-                });
+        let (op, output_shapes) = self.inferred_shapes.get(&node_id).cloned().map_or_else(
+            || {
+                let mut op = node.op.clone();
+                let output_shapes =
+                    op.compute_output_shapes(&inputs, node.outputs.len(), self.model.opset_version);
+                output_shapes.map(|os| (op, os))
+            },
+            |result| Ok(result),
+        )?;
         let mut outputs = output_shapes
             .into_iter()
             .map(|TypedShape { elem_ty, dims }| Tensor::uninit_of_type(elem_ty, dims))

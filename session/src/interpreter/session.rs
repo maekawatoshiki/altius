@@ -440,45 +440,6 @@ macro_rules! op_bin_elemwise {
                 return;
             }
 
-            if adims.len() == 4 && bdims.len() == 3 {
-                assert!(adims[1] == bdims[0]);
-                assert!(bdims[1] == 1);
-                assert!(bdims[2] == 1);
-
-                for n in 0..adims[0] {
-                    for z in 0..adims[1] {
-                        for x in 0..adims[2] {
-                            for y in 0..adims[3] {
-                                *output.at_4d_mut(n, z, x, y) =
-                                    input_a.at_4d(n, z, x, y) $op input_b.at_3d(z, 0, 0);
-                            }
-                        }
-                    }
-                }
-
-                return;
-            }
-
-            if adims.len() == bdims.len() && bdims[bdims.len() - 1] == 1 {
-                let dims = adims;
-                let chunk = *dims.0.last().unwrap();
-                let input_a = input_a.data::<f32>();
-                let input_b = input_b.data::<f32>();
-                let output = output.data_mut::<f32>();
-
-                input_a
-                    .chunks(chunk)
-                    .zip(input_b.iter())
-                    .zip(output.chunks_mut(chunk))
-                    .for_each(|((a, b), o)| {
-                        for (a, o) in a.iter().zip(o.iter_mut()) {
-                            *o = a $op b;
-                        }
-                    });
-
-                return;
-            }
-
             if bdims.is_scalar() {
                 let b = input_b.data::<f32>()[0];
                 let output = output.data_mut::<f32>();
@@ -501,165 +462,91 @@ macro_rules! op_bin_elemwise {
                 return;
             }
 
-            let (_adims, bdims, input_a, input_b) =
-                if bdims.len() == 1 && adims[adims.len() - 1] == bdims[0] {
-                    (adims, bdims, input_a, input_b)
-                } else if adims.len() == 1 && bdims[bdims.len() - 1] == adims[0] {
-                    (bdims, adims, input_b, input_a)
-                } else if bdims.as_slice()[0..bdims.len() - 1].iter().all(|&d| d == 1)
-                    && adims.as_slice().last().unwrap() == bdims.as_slice().last().unwrap()
-                {
-                    // e.g.
-                    //   a: [1, 12, 9, 9]
-                    //   b: [1,  1, 1, 9]
-                    (adims, bdims, input_a, input_b)
-                } else {
-                    [< $name _general >](input_a, input_b, output);
-                    return;
-                };
+            [< $name _general >](tctx, input_a, input_b, output);
+        }
 
+        fn [< $name _general >](_tctx: &ThreadCtx, input_a: &Tensor, input_b: &Tensor, output: &mut Tensor) {
+            fn compute(a_stride: &[usize],
+                    b_stride: &[usize],
+                    o_stride: &[usize],
+                    o_shape: &[usize],
+                    mut a: &[f32],
+                    mut b: &[f32],
+                    o: &mut [f32]) {
+                if a_stride.len() == 1 {
+                    let len = o_shape[0];
+                    let a_stride = a_stride[0];
+                    let b_stride = b_stride[0];
+
+                    if a_stride == 1 && b_stride == 1 {
+                        for (o, (a, b)) in o[..len].iter_mut().zip(a[..len].iter().zip(b[..len].iter())) {
+                            *o = a $op b;
+                        }
+                        return;
+                    }
+
+                    if a_stride == 0 && b_stride == 0 {
+                        let a = a[0];
+                        let b = b[0];
+                        for o in &mut o[..len] {
+                            *o = a $op b;
+                        }
+                        return;
+                    } 
+
+                    for o in &mut o[..len] {
+                        *o = a[0] $op b[0];
+                        a = &a[a_stride..];
+                        b = &b[b_stride..];
+                    }
+                    return;
+                }
+
+                for i in 0..o_shape[0] {
+                    compute(&a_stride[1..],
+                            &b_stride[1..],
+                            &o_stride[1..],
+                            &o_shape[1..],
+                            &a[i * a_stride[0]..],
+                            &b[i * b_stride[0]..],
+                            &mut o[i * o_stride[0]..]);
+                }
+            }
+
+            let o_shape = output.dims().clone();
+            let o_stride = output.strides().to_vec();
+            let a_stride = input_a
+                .strides_for_broadcasting(&o_shape)
+                .unwrap();
+            let b_stride  = input_b
+                .strides_for_broadcasting(&o_shape)
+                .unwrap();
             let input_a = input_a.data::<f32>();
             let input_b = input_b.data::<f32>();
             let output = output.data_mut::<f32>();
-            let blen = *bdims.as_slice().last().unwrap();
-            let batch = (100000 / blen).max(1);
-            let chunk = blen * batch;
-            let no_parallelism = output.len() / chunk == 0;
 
-            if no_parallelism {
-                input_a
-                    .chunks(chunk)
-                    .zip(output.chunks_mut(chunk))
-                    .for_each(|(input_a, output)| {
-                        input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
-                            move |(input_a, output)| {
-                                for ((a, b), o) in
-                                    input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
-                                {
-                                    // Auto-vectorized by LLVM
-                                    *o = a $op b;
-                                }
-                            },
-                        );
-                    });
-            } else {
-                tctx.scope(|scope| {
-                    input_a
-                        .chunks(chunk)
-                        .zip(output.chunks_mut(chunk))
-                        .for_each(|(input_a, output)| {
-                            scope.spawn(move || {
-                                input_a.chunks(blen).zip(output.chunks_mut(blen)).for_each(
-                                    move |(input_a, output)| {
-                                        for ((a, b), o) in
-                                            input_a.iter().zip(input_b.iter()).zip(output.iter_mut())
-                                        {
-                                            // Auto-vectorized by LLVM
-                                            *o = a $op b;
-                                        }
-                                    },
-                                );
-                            })
-                        });
-                });
-            }
-        }
+            assert!(o_shape.len() > 1);
 
-        fn [< $name _general >](input_a: &Tensor, input_b: &Tensor, output: &mut Tensor) {
-            if output.dims().len() == 4 {
-                let [odim0, odim1, odim2, odim3] = output.fixed_dims::<4>();
-                let out_shape = output.dims().as_slice().to_vec();
-                let [astr0, astr1, astr2, astr3] = input_a
-                    .strides_for_broadcasting(&out_shape)
-                    .unwrap()
-                    .to_fixed_dims::<4>();
-                let [bstr0, bstr1, bstr2, bstr3] = input_b
-                    .strides_for_broadcasting(&out_shape)
-                    .unwrap()
-                    .to_fixed_dims::<4>();
-
-                let mut input_a0 = input_a.data::<f32>().as_ptr();
-                let mut input_b0 = input_b.data::<f32>().as_ptr();
-                let mut output = output.data_mut::<f32>().as_mut_ptr();
-
-                for _ in 0..odim0 {
-                    let (mut input_a1, mut input_b1) = (input_a0, input_b0);
-                    for _ in 0..odim1 {
-                        let (mut input_a2, mut input_b2) = (input_a1, input_b1);
-                        for _ in 0..odim2 {
-                            let (mut input_a3, mut input_b3) = (input_a2, input_b2);
-                            for _ in 0..odim3 {
-                                unsafe { *output = *input_a3 $op *input_b3 };
-                                (output, input_a3, input_b3) =
-                                    unsafe { (output.add(1), input_a3.add(astr3), input_b3.add(bstr3)) };
-                            }
-                            (input_a2, input_b2) = unsafe { (input_a2.add(astr2), input_b2.add(bstr2)) };
-                        }
-                        (input_a1, input_b1) = unsafe { (input_a1.add(astr1), input_b1.add(bstr1)) };
-                    }
-                    (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
-                }
-                return;
-            }
-
-            if output.dims().len() == 3 {
-                let [odim0, odim1, odim2] = output.fixed_dims::<3>();
-                let out_shape = output.dims().as_slice().to_vec();
-                let [astr0, astr1, astr2] = input_a
-                    .strides_for_broadcasting(&out_shape)
-                    .unwrap()
-                    .to_fixed_dims::<3>();
-                let [bstr0, bstr1, bstr2] = input_b
-                    .strides_for_broadcasting(&out_shape)
-                    .unwrap()
-                    .to_fixed_dims::<3>();
-
-                let mut input_a0 = input_a.data::<f32>().as_ptr();
-                let mut input_b0 = input_b.data::<f32>().as_ptr();
-                let mut output = output.data_mut::<f32>().as_mut_ptr();
-
-                for _ in 0..odim0 {
-                    let (mut input_a1, mut input_b1) = (input_a0, input_b0);
-                    for _ in 0..odim1 {
-                        let (mut input_a2, mut input_b2) = (input_a1, input_b1);
-                        for _ in 0..odim2 {
-                            unsafe { *output = *input_a2 $op *input_b2 };
-                            (output, input_a2, input_b2) =
-                                unsafe { (output.add(1), input_a2.add(astr2), input_b2.add(bstr2)) };
-                        }
-                        (input_a1, input_b1) = unsafe { (input_a1.add(astr1), input_b1.add(bstr1)) };
-                    }
-                    (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
-                }
-                return;
-            }
-
-            if output.dims().len() == 2 {
-                let [odim0, odim1] = output.fixed_dims::<2>();
-                let out_shape = output.dims().as_slice().to_vec();
-                let [astr0, astr1] = input_a
-                    .strides_for_broadcasting(&out_shape)
-                    .unwrap()
-                    .to_fixed_dims::<2>();
-                let [bstr0, bstr1] = input_b
-                    .strides_for_broadcasting(&out_shape)
-                    .unwrap()
-                    .to_fixed_dims::<2>();
-
-                let mut input_a0 = input_a.data::<f32>().as_ptr();
-                let mut input_b0 = input_b.data::<f32>().as_ptr();
-                let mut output = output.data_mut::<f32>().as_mut_ptr();
-
-                for _ in 0..odim0 {
-                    let (mut input_a1, mut input_b1) = (input_a0, input_b0);
-                    for _ in 0..odim1 {
-                        unsafe { *output = *input_a1 $op *input_b1 };
-                        (output, input_a1, input_b1) =
-                            unsafe { (output.add(1), input_a1.add(astr1), input_b1.add(bstr1)) };
-                    }
-                    (input_a0, input_b0) = unsafe { (input_a0.add(astr0), input_b0.add(bstr0)) };
-                }
-            }
+            // if astrides[0] != 0 && bstrides[0] != 0 && ostrides[0] != 0 {
+            //     tctx.scope(|scope| {
+            //         input_a
+            //             .chunks(astrides[0])
+            //             .zip(input_b.chunks(bstrides[0]))
+            //             .zip(output.chunks_mut(ostrides[0]))
+            //             .for_each(|((input_a, input_b), output)| {
+            //                 let astrides = astrides[1..].to_owned();
+            //                 let bstrides = bstrides[1..].to_owned();
+            //                 let ostrides = ostrides[1..].to_owned();
+            //                 let odims = odims[1..].to_owned();
+            //                 scope.spawn(move || {
+            //                     compute(&astrides, &bstrides, &ostrides, &odims, input_a, input_b, output);
+            //                 })
+            //             });
+            //     });
+            // } else {
+            // TODO: Parallelize this.
+            compute(&a_stride, &b_stride, &o_stride, &o_shape, &input_a, &input_b, output);
+            // }
         }
     }};
 }

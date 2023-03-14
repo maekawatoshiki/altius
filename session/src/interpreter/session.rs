@@ -492,7 +492,23 @@ macro_rules! op_bin_elemwise {
                             *o = a $op b;
                         }
                         return;
-                    } 
+                    }
+
+                    if a_stride == 1 && b_stride == 0 {
+                        let b = b[0];
+                        for (o, a) in o[..len].iter_mut().zip(a[..len].iter()) {
+                            *o = a $op b;
+                        }
+                        return;
+                    }
+
+                    if a_stride == 0 && b_stride == 1 {
+                        let a = a[0];
+                        for (o, b) in o[..len].iter_mut().zip(b[..len].iter()) {
+                            *o = a $op b;
+                        }
+                        return;
+                    }
 
                     for o in &mut o[..len] {
                         *o = a[0] $op b[0];

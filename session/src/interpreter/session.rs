@@ -543,26 +543,7 @@ macro_rules! op_bin_elemwise {
 
             assert!(o_shape.len() > 1);
 
-            // if astrides[0] != 0 && bstrides[0] != 0 && ostrides[0] != 0 {
-            //     tctx.scope(|scope| {
-            //         input_a
-            //             .chunks(astrides[0])
-            //             .zip(input_b.chunks(bstrides[0]))
-            //             .zip(output.chunks_mut(ostrides[0]))
-            //             .for_each(|((input_a, input_b), output)| {
-            //                 let astrides = astrides[1..].to_owned();
-            //                 let bstrides = bstrides[1..].to_owned();
-            //                 let ostrides = ostrides[1..].to_owned();
-            //                 let odims = odims[1..].to_owned();
-            //                 scope.spawn(move || {
-            //                     compute(&astrides, &bstrides, &ostrides, &odims, input_a, input_b, output);
-            //                 })
-            //             });
-            //     });
-            // } else {
-            // TODO: Parallelize this.
             compute(&a_stride, &b_stride, &o_stride, &o_shape, &input_a, &input_b, output);
-            // }
         }
     }};
 }

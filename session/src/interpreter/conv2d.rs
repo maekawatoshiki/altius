@@ -209,7 +209,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
     });
 }
 
-#[inline]
+#[inline(never)]
 fn im2col(
     input_h: usize,
     input_w: usize,
@@ -233,33 +233,35 @@ fn im2col(
                 let ih = fy + oh * stride_h;
 
                 if pad_t > ih || ih >= input_h + pad_t {
-                    col[..output_w].fill(0.);
+                    // Faster than col[..output_w].fill(0.);
+                    for i in 0..output_w {
+                        col[i] = 0.;
+                    }
                     continue;
                 }
 
                 let mut ow = 0;
-                loop {
-                    let iw = fx + (ow * stride_w);
-                    if pad_l <= iw {
-                        break;
-                    }
+                let mut iw = fx + (ow * stride_w);
+                while iw < pad_l {
                     unsafe { *col.get_unchecked_mut(ow) = 0. };
+                    iw += stride_w;
                     ow += 1;
                 }
 
                 let c = (ih - pad_t) * input_w;
-                loop {
-                    let iw = fx + (ow * stride_w);
-                    if iw >= input_w + pad_l {
-                        break;
-                    }
+                let mut iw = fx + (ow * stride_w);
+                while iw < input_w + pad_l {
                     let jw = c + iw - pad_l;
                     unsafe { *col.get_unchecked_mut(ow) = *input.get_unchecked(jw) };
+                    iw += stride_w;
                     ow += 1;
                 }
 
                 if ow < output_w {
-                    col[ow..output_w].fill(0.);
+                    // Faster than col[ow..output_w].fill(0.);
+                    for i in ow..output_w {
+                        col[i] = 0.;
+                    }
                 }
             }
             col = unsafe { col.get_unchecked_mut(output_hw..) };

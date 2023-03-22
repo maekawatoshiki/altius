@@ -1026,6 +1026,21 @@ fn fast_sum(mut slice: &[f32]) -> f32 {
     sum.reduce_sum() + slice.iter().sum::<f32>()
 }
 
+fn fast_sum_squares(mut slice: &[f32]) -> f32 {
+    const SIMD_LEN: usize = 8;
+    let mut sum = Simd::<f32, SIMD_LEN>::splat(0f32);
+    let mut len = slice.len();
+
+    while len >= SIMD_LEN {
+        let lane = Simd::<f32, SIMD_LEN>::from_slice(slice);
+        sum += lane * lane;
+        slice = &slice[SIMD_LEN..];
+        len -= SIMD_LEN
+    }
+
+    sum.reduce_sum() + slice.iter().map(|x| x * x).sum::<f32>()
+}
+
 fn compute_resize(tctx: &ThreadCtx, resize: &Resize, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     assert!(matches!(inputs.len(), 3 | 4));
 
@@ -1412,8 +1427,6 @@ fn compute_layer_normalization(
     let scale = inputs[1].data::<f32>();
     let bias = inputs[2].data::<f32>();
     let output = &mut outputs[0];
-    let mut tmp = Tensor::uninit::<f32>(output.dims().to_vec().into());
-    let tmp = tmp.data_mut::<f32>();
 
     assert!(
         ln.axis == -1 || ln.axis == *data.dims().last().unwrap() as i64,
@@ -1433,29 +1446,25 @@ fn compute_layer_normalization(
 
     tctx.scope(|scope| {
         data.chunks(axis_len * batch)
-            .zip(tmp.chunks_mut(axis_len * batch))
             .zip(output.chunks_mut(axis_len * batch))
-            .for_each(|((data, tmp), output)| {
+            .for_each(|(data, output)| {
                 scope.spawn(move || {
                     data.chunks(axis_len)
-                        .zip(tmp.chunks_mut(axis_len))
                         .zip(output.chunks_mut(axis_len))
-                        .for_each(|((input, tmp), output)| {
-                            let mean = fast_sum(input) / axis_len as f32;
-                            for ((i, t), o) in
-                                input.iter().zip(tmp.iter_mut()).zip(output.iter_mut())
-                            {
-                                *t = *i - mean;
-                                *o = *t * *t;
+                        .for_each(|(input, output)| {
+                            let inv_axis_len = (axis_len as f32).recip();
+                            let mean = fast_sum(input) * inv_axis_len;
+                            for (&i, o) in input.iter().zip(output.iter_mut()) {
+                                *o = i - mean;
                             }
-                            let mean = (fast_sum(output) / axis_len as f32 + ln.epsilon).sqrt();
-                            for (((t, &scale), &bias), o) in tmp
-                                .iter()
-                                .zip(scale.iter())
-                                .zip(bias.iter())
-                                .zip(output.iter_mut())
+                            let inv_mean = fast_sum_squares(output)
+                                .mul_add(inv_axis_len, ln.epsilon)
+                                .sqrt()
+                                .recip();
+                            for ((&scale, &bias), o) in
+                                scale.iter().zip(bias.iter()).zip(output.iter_mut())
                             {
-                                *o = (*t / mean).mul_add(scale, bias)
+                                *o = (*o * inv_mean).mul_add(scale, bias)
                             }
                         });
                 });

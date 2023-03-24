@@ -120,9 +120,15 @@ impl<'a> Translator<'a> {
 #include <blis.h>
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>"
+#include <stdlib.h>\n\n"
             );
             writer.write_all(headers.as_bytes())?;
+
+            for call in &self.created_calls {
+                writer.write_all(b"\t")?;
+                writer.write_all(call.as_bytes())?;
+                writer.write_all(b"\n")?;
+            }
         }
 
         writer.flush()?;
@@ -156,7 +162,21 @@ impl<'a> Translator<'a> {
             .name
             .clone()
             .unwrap_or_else(|| format!("{}_noname_{}", node.op.name(), node_id.index()));
+        let node_name = escape_name(node_name);
         log::debug!("Translating node: {}", node_name);
+
+        let mut args = Vec::new();
+        for &id in node.inputs.iter().chain(node.outputs.iter()) {
+            let input = &self.model.values.inner()[id];
+            let name = input
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("Value_noname_{}", id.index()));
+            let name = escape_name(name);
+            args.push(name)
+        }
+        self.created_calls
+            .push(format!("{node_name}({});", args.join(", ")));
 
         match op {
             Op::Conv2d(ref c) => self.translate_conv2d(c, &inputs, &outputs)?,
@@ -257,4 +277,11 @@ impl<'a> Translator<'a> {
         self.created_file_paths.push(path);
         Ok(file)
     }
+}
+
+fn escape_name(s: impl Into<String>) -> String {
+    s.into()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect()
 }

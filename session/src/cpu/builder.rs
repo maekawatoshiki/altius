@@ -724,9 +724,21 @@ float *output_ptr = {};\n",
     fn translate_flatten(
         &mut self,
         _flatten: &Flatten,
-        _inputs: &[&TypedShape],
+        name: String,
+        args: Vec<String>,
+        inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
+        let input_name = &args[0];
+        let output_name = &args[1];
+        assert!(inputs[0].elem_ty.is_f32());
+        let kernel = format!(
+            "static void {name}(const float *{input_name}, float *{output_name}) {{
+    memcpy({output_name}, {input_name}, {size} * sizeof(float));
+}}",
+            size = inputs[0].dims.total_elems()
+        );
+        self.created_kernels.push(kernel);
         Ok(())
     }
 

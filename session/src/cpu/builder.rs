@@ -12,6 +12,7 @@ use altius_core::{
     tensor::{Tensor, TypedShape},
     value::ValueId,
 };
+use indent::indent_all_by;
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 
@@ -153,14 +154,14 @@ impl<'a> Translator<'a> {
             writer.write_all(b"int main() {\n")?;
 
             for value in &self.created_values {
-                writer.write_all(b"\t")?;
+                writer.write_all(b"    ")?;
                 writer.write_all(value.as_bytes())?;
                 writer.write_all(b"\n")?;
             }
             writer.write_all(b"\n")?;
 
             for call in &self.created_calls {
-                writer.write_all(b"\t")?;
+                writer.write_all(b"    ")?;
                 writer.write_all(call.as_bytes())?;
                 writer.write_all(b"\n")?;
             }
@@ -229,19 +230,82 @@ impl<'a> Translator<'a> {
 
     fn translate_conv2d(
         &mut self,
-        _conv2d: &Conv2d,
+        op: &Conv2d,
         name: String,
         args: Vec<String>,
         inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
         let input_names = &args[..inputs.len()];
         let output_names = &args[inputs.len()..];
         log::debug!("input names: {:?}", input_names);
         log::debug!("output names: {:?}", output_names);
 
+        let input = &inputs[Op::CONV2D_IN];
+        let weight = &inputs[Op::CONV2D_WEIGHT];
+        let output = &outputs[0];
+
+        let kernel = &op.kernel_shape;
+        let padding = &op.padding;
+        let stride = &op.strides;
+        let dilations = &op.dilations;
+
+        let batch_size = input.dims[0]; // .dims()[0];
+        let input_c = input.dims[1];
+        let input_h = input.dims[2];
+        let input_w = input.dims[3];
+        let input_hw = input_h * input_w;
+        let output_h = output.dims[2];
+        let output_w = output.dims[3];
+        let output_hw = output_h * output_w;
+        let _dilation = 1;
+        let group = op.group as usize;
+        let in_c_per_g = input_c / group;
+        let out_c_per_g = output.dims[1] / group;
+        let stride_h = stride[0];
+        let stride_w = stride[1];
+        let dilation_h = dilations[0];
+        let dilation_w = dilations[1];
+        let kernel_h = kernel[0];
+        let kernel_w = kernel[1];
+
+        assert_eq!(dilations.len(), 2);
+        assert!(padding.len() == 4);
+        let pad_t = padding[0];
+        let pad_l = padding[1];
+        let _pad_b = padding[2];
+        let _pad_r = padding[3];
+
+        log::debug!("kernel: {:?}", kernel);
+
+        let code_fill_bias = if let Some(bias) = input_names.get(Op::CONV2D_BIAS) {
+            let output_name = &output_names[0];
+            format!(
+                "{{
+    float *output_ptr = {output_name};
+    for (int b = 0; b < {batch_size}; b++) {{
+        float *bias_ptr = (float *){bias};
+        for (int g = 0; g < {group}; g++) {{
+            for (int oc = 0; oc < {out_c_per_g}; oc++) {{
+                for (int oh = 0; oh < {output_h}; oh++) {{
+                    for (int ow = 0; ow < {output_w}; ow++) {{
+                        *output_ptr = *bias_ptr;
+                        output_ptr++;
+                    }}
+                    bias_ptr++;
+                }}
+            }}
+        }}
+    }}
+}}"
+            )
+        } else {
+            "{{ }}".to_string()
+        };
+
         let kernel = format!(
             "static void {name}({}) {{
+{}
 }}",
             input_names
                 .iter()
@@ -249,6 +313,7 @@ impl<'a> Translator<'a> {
                 .chain(output_names.iter().map(|name| format!("float *{}", name)))
                 .collect::<Vec<_>>()
                 .join(", "),
+            indent_all_by(4, code_fill_bias)
         );
         // log::debug!("kernel: {}", kernel);
         self.created_kernels.push(kernel);

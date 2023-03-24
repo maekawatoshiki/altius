@@ -8,7 +8,7 @@ use altius_core::{
     analysis::shape::infer_shapes,
     model::Model,
     node::NodeId,
-    op::{Conv2d, Flatten, Gemm, HardSigmoid, Op},
+    op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op},
     tensor::{Tensor, TypedShape},
     value::ValueId,
 };
@@ -165,6 +165,7 @@ impl<'a> Translator<'a> {
             Op::Mul => self.translate_mul(&inputs, &outputs)?,
             Op::ReLU => self.translate_relu(&inputs, &outputs)?,
             Op::GlobalAveragePool => self.translate_gavg_pool(&inputs, &outputs)?,
+            Op::MaxPool(ref m) => self.translate_max_pool(m, &inputs, &outputs)?,
             Op::Flatten(ref f) => self.translate_flatten(f, &inputs, &outputs)?,
             Op::Gemm(ref g) => self.translate_gemm(g, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
@@ -217,6 +218,15 @@ impl<'a> Translator<'a> {
 
     fn translate_gavg_pool(
         &mut self,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn translate_max_pool(
+        &mut self,
+        _max_pool: &MaxPool,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {

@@ -324,8 +324,8 @@ impl<'a> Translator<'a> {
                         *output_ptr = *bias_ptr;
                         output_ptr++;
                     }}
-                    bias_ptr++;
                 }}
+                bias_ptr++;
             }}
         }}
     }}

@@ -568,9 +568,23 @@ float *output_ptr = {};\n",
 
     fn translate_relu(
         &mut self,
-        _inputs: &[&TypedShape],
+        name: String,
+        args: Vec<String>,
+        inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
+        let input_name = &args[..inputs.len()][0];
+        let output_name = &args[inputs.len()..][0];
+        let size = inputs[0].dims.total_elems();
+        let kernel = format!(
+            "static void {name}(const float *{input_name}, float *{output_name}) {{
+    for (int i = 0; i < {size}; i++) {{
+        const float x = {input_name}[i];
+        {output_name}[i] = fmaxf(0.0, x);
+    }}
+}}"
+        );
+        self.created_kernels.push(kernel);
         Ok(())
     }
 

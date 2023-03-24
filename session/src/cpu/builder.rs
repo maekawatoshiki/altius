@@ -317,7 +317,7 @@ impl<'a> Translator<'a> {
             let input_name = &input_names[0];
 
             format!("float *col =
-    (float *)malloc(sizeof(float) * {batch_size} * {group} * {out_c_per_g} * {output_h} * {output_w} * {kernel_h} * {kernel_w});
+    (float *)malloc(sizeof(float) * {batch_size} * {input_c} * {output_h} * {output_w} * {kernel_h} * {kernel_w});
 
 {{
     int outer = {batch_size} * {input_c};
@@ -328,7 +328,7 @@ impl<'a> Translator<'a> {
         int inner = {kernel_h} * {kernel_w};
         while (inner > 0) {{
             memcpy(col_ptr, input_ptr, sizeof(float) * {input_hw});
-            col_ptr = col_ptr + {output_hw};
+            col_ptr += {output_hw};
             inner -= 1;
         }}
         input_ptr += {input_hw};
@@ -351,7 +351,7 @@ impl<'a> Translator<'a> {
         for (int fy = 0; fy < {kernel_h}; fy++) {{
             for (int fx = 0; fx < {kernel_w}; fx++) {{
                 for (int oh = 0; oh < {output_h}; oh++) {{
-                    float *col = &col_ptr[oh * output_hw];
+                    float *col = &col_ptr[oh * {output_h}];
                     int ih = fy + oh * {stride_h};
 
                     if ({pad_t} > ih || ih >= {input_h} + {pad_t}) {{
@@ -384,10 +384,10 @@ impl<'a> Translator<'a> {
                         }}
                     }}
                 }}
+                col_ptr += {output_hw};
             }}
         }}
         input_ptr += {input_hw};
-        col_ptr += {output_hw} * {kernel_h} * {kernel_w};
     }}
 }}")
         } else {
@@ -407,8 +407,9 @@ impl<'a> Translator<'a> {
     float *weight_ptr = (float *){weight_name}; 
     float *output_ptr = (float *){output_name};
     float *col_ptr = col;
+    int outer = {outer};
 
-    for (int outer = 0; outer < {outer}; outer++) {{
+    do {{
         cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
             {out_c_per_g}, {output_hw}, {k}, 1.,
             weight_ptr, {k}, col_ptr, {output_hw}, 1., output_ptr, {output_hw});
@@ -416,7 +417,8 @@ impl<'a> Translator<'a> {
         weight_ptr += {weight_stride};
         output_ptr += {output_stride};
         col_ptr += {col_stride};
-    }}
+        outer--;
+    }} while (outer > 0);
 }}"
         );
 

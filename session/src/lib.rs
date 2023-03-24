@@ -30,6 +30,10 @@ pub enum SessionError {
     #[error("Io: {0}")]
     Io(#[from] std::io::Error),
 
+    #[cfg(feature = "cpu-backend")]
+    #[error("Libloading: {0}")]
+    Libloading(#[from] libloading::Error),
+
     /// General error messages (including TODOs).
     #[error("Something went wrong: {0}")]
     Message(Cow<'static, str>),

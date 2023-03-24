@@ -62,17 +62,17 @@ impl CPUSessionBuilder {
 
         let execution_plans = create_execution_plan(&self.model, &sorted_nodes);
 
-        Translator::new(&self.model, &inferred_shapes, &value_shapes)?
-            .translate_into_c(&execution_plans)?;
+        let target_dir;
+        {
+            let mut translator = Translator::new(&self.model, &inferred_shapes, &value_shapes)?;
+            translator.translate_into_c(&execution_plans)?;
+            translator.compile()?;
+            target_dir = translator.target_dir;
+        }
 
         Ok(CPUSession {
-            execution_plans,
             model: self.model,
-            inferred_shapes,
-            enable_profiling: self.enable_profiling,
-            values: ThreadLocal::new(),
-            dummy_value: Tensor::zeros::<f32>(vec![0].into()),
-            tctx: ThreadCtx::new_with_num_threads(self.intra_op_num_threads),
+            target_dir,
         })
     }
 }
@@ -104,6 +104,24 @@ impl<'a> Translator<'a> {
             created_file_paths: Vec::new(),
             target_dir: PathBuf::from("/tmp/model"),
         })
+    }
+
+    fn compile(&self) -> Result<(), SessionError> {
+        let mut cmd = std::process::Command::new("gcc");
+        cmd.arg("-O3")
+            .arg("-o")
+            .arg(self.target_dir.join("model.so"))
+            .arg(self.target_dir.join("main.c"))
+            .arg("-shared")
+            .arg("-fPIC")
+            .arg("-lblis")
+            .arg("-lm")
+            .current_dir(&self.target_dir);
+        let status = cmd.status()?;
+        if !status.success() {
+            return Err(SessionError::Message("Failed to compile model".into()));
+        }
+        Ok(())
     }
 
     fn translate_into_c(

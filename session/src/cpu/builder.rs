@@ -80,6 +80,7 @@ struct Translator<'a> {
     model: &'a Model,
     inferred_shapes: &'a FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     value_shapes: &'a FxHashMap<ValueId, TypedShape>,
+    created_calls: Vec<String>,
     created_file_paths: Vec<PathBuf>,
     tempdir: tempfile::TempDir,
     save_generated_files: bool,
@@ -95,6 +96,7 @@ impl<'a> Translator<'a> {
             model,
             inferred_shapes,
             value_shapes,
+            created_calls: Vec::new(),
             created_file_paths: Vec::new(),
             tempdir: tempfile::tempdir()?,
             save_generated_files: true,
@@ -149,6 +151,12 @@ impl<'a> Translator<'a> {
             || todo!("Why is this node output shape not inferred?"),
             |result| Ok::<(Op, Vec<TypedShape>), SessionError>(result),
         )?;
+
+        let node_name = node
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("{}_noname_{}", node.op.name(), node_id.index()));
+        log::debug!("Translating node: {}", node_name);
 
         match op {
             Op::Conv2d(ref c) => self.translate_conv2d(c, &inputs, &outputs)?,

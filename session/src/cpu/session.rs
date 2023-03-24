@@ -48,7 +48,7 @@ mod cuda {
 #[cfg(feature = "cuda")]
 pub(super) use cuda::*;
 
-pub struct InterpreterSession {
+pub struct CPUSession {
     pub(super) model: Model,
     #[cfg(feature = "cuda")]
     pub(super) cudnn_ctx: SafeCudnnContext,
@@ -88,7 +88,7 @@ pub struct InterpreterSession {
 // let entry_fn: extern "C" fn(*const f32, *const f32, *mut f32, u64) -> f32 =
 //     unsafe { std::mem::transmute(buf.ptr(entry)) };
 
-impl InterpreterSession {
+impl CPUSession {
     pub fn model(&self) -> &Model {
         &self.model
     }

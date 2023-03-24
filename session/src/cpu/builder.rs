@@ -6,17 +6,17 @@ use crate::{create_execution_plan, SessionError};
 
 #[cfg(feature = "cuda")]
 use super::session::SafeCudnnContext;
-use super::{session::InterpreterSession, thread::ThreadCtx};
+use super::{session::CPUSession, thread::ThreadCtx};
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
 
-pub struct InterpreterSessionBuilder {
+pub struct CPUSessionBuilder {
     model: Model,
     intra_op_num_threads: usize,
     enable_profiling: bool,
 }
 
-impl InterpreterSessionBuilder {
+impl CPUSessionBuilder {
     pub const fn new(model: Model) -> Self {
         Self {
             model,
@@ -35,7 +35,7 @@ impl InterpreterSessionBuilder {
         self
     }
 
-    pub fn build(self) -> Result<InterpreterSession, SessionError> {
+    pub fn build(self) -> Result<CPUSession, SessionError> {
         let model = self.model;
         let enable_profiling = self.enable_profiling;
         let intra_op_num_threads = self.intra_op_num_threads;
@@ -57,7 +57,7 @@ impl InterpreterSessionBuilder {
             unsafe { bli_thread_set_num_threads(intra_op_num_threads) };
         }
 
-        Ok(InterpreterSession {
+        Ok(CPUSession {
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
             execution_plans: create_execution_plan(&model, &sorted_nodes),

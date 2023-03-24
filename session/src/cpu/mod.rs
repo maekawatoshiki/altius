@@ -5,5 +5,5 @@ mod gemm;
 mod session;
 mod thread;
 
-pub use builder::InterpreterSessionBuilder;
-pub use session::InterpreterSession;
+pub use builder::CPUSessionBuilder;
+pub use session::CPUSession;

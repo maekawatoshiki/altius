@@ -56,6 +56,57 @@ impl Dimensions {
         dims.copy_from_slice(&self.0);
         dims
     }
+
+    pub fn strides(&self) -> Self {
+        compute_strides(self)
+    }
+
+    pub fn strides_for_broadcasting_to(&self, dims: &[Dimension]) -> Option<Dimensions> {
+        fn upcast(
+            to: &[Dimension],
+            from: &[Dimension],
+            stride: &[Dimension],
+        ) -> Option<Dimensions> {
+            let mut new_stride = to.to_vec();
+
+            if to.len() < from.len() {
+                return None;
+            }
+
+            {
+                let mut new_stride_iter = new_stride.iter_mut().rev();
+                for ((er, es), dr) in from
+                    .iter()
+                    .rev()
+                    .zip(stride.iter().rev())
+                    .zip(new_stride_iter.by_ref())
+                {
+                    if *dr == *er {
+                        *dr = *es;
+                    } else if *er == 1 {
+                        *dr = 0
+                    } else {
+                        return None;
+                    }
+                }
+
+                for dr in new_stride_iter {
+                    *dr = 0;
+                }
+            }
+            Some(new_stride.into())
+        }
+
+        upcast(dims, self, compute_strides(self).as_slice())
+    }
+}
+
+fn compute_strides(dims: &Dimensions) -> Dimensions {
+    let mut strides = vec![];
+    for i in 0..dims.len() {
+        strides.push(dims[i + 1..].iter().product());
+    }
+    strides.into()
 }
 
 pub fn broadcast(shapes: &[impl AsRef<Dimensions>]) -> Option<Dimensions> {

@@ -671,9 +671,44 @@ float *output_ptr = {};\n",
 
     fn translate_gavg_pool(
         &mut self,
-        _inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        name: String,
+        args: Vec<String>,
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
+        let input_name = &args[0];
+        let output_name = &args[1];
+
+        let input = inputs[0];
+        let output = &outputs[0];
+
+        assert!(input.dims.len() == 4);
+        assert!(output.dims.len() == 4);
+
+        let Some(&[n, c, h, w]) = input.dims.get(0..4) else {
+            return Err(SessionError::Message("Input must be four dimensions".into()))
+        };
+        let Some(&[isn, isc, _, _]) = input.dims.strides().get(0..4) else { panic!() };
+        let area = h * w;
+        let osn = output.dims.strides()[0];
+
+        let kernel = format!(
+            "static void {name}(const float *{input_name}, float *{output_name}) {{
+    for (int n = 0; n < {n}; n++) {{
+        for (int c = 0; c < {c}; c++) {{
+            float sum = 0.0;
+            for (int h = 0; h < {h}; h++) {{
+                for (int w = 0; w < {w}; w++) {{
+                    sum += {input_name}[n * {isn} + c * {isc} + h * {w} + w];
+                }}
+            }}
+            {output_name}[n * {osn} + c] = sum / {area};
+        }}
+    }}
+}}"
+        );
+        self.created_kernels.push(kernel);
+
         Ok(())
     }
 

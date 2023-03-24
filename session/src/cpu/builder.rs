@@ -1,5 +1,6 @@
 use std::{
     fs::{self, File},
+    io::{BufWriter, Write as _},
     path::PathBuf,
 };
 
@@ -104,11 +105,25 @@ impl<'a> Translator<'a> {
         &mut self,
         execution_plans: &[NodeExecutionPlan],
     ) -> Result<(), SessionError> {
-        let _main = self.create_file("main.c")?;
+        let main_file = self.create_file("main.c")?;
+        let mut writer = BufWriter::new(main_file);
 
         for plan in execution_plans {
             self.translate_node(plan.node_id)?;
         }
+
+        {
+            let headers = format!(
+                "#include <assert.h>
+#include <blis.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>"
+            );
+            writer.write_all(headers.as_bytes())?;
+        }
+
+        writer.flush()?;
 
         if self.save_generated_files {
             let dir = "/tmp/model";

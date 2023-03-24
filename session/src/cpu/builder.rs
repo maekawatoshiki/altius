@@ -1,8 +1,14 @@
-use altius_core::{analysis::shape::infer_shapes, model::Model, tensor::Tensor};
+use altius_core::{
+    analysis::shape::infer_shapes,
+    model::Model,
+    node::NodeId,
+    op::Op,
+    tensor::{Tensor, TypedShape},
+};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 
-use crate::{create_execution_plan, SessionError};
+use crate::{create_execution_plan, NodeExecutionPlan, SessionError};
 
 #[cfg(feature = "cuda")]
 use super::session::SafeCudnnContext;
@@ -49,17 +55,10 @@ impl CPUSessionBuilder {
             &mut FxHashMap::default(),
         )?;
 
-        #[cfg(feature = "blis")]
-        {
-            extern "C" {
-                fn bli_thread_set_num_threads(n_threads: usize);
-            }
-            unsafe { bli_thread_set_num_threads(intra_op_num_threads) };
-        }
+        let execution_plans = create_execution_plan(&model, &sorted_nodes);
+        translate_into_c(&model, &execution_plans, &inferred_shapes)?;
 
         Ok(CPUSession {
-            #[cfg(feature = "cuda")]
-            cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
             execution_plans: create_execution_plan(&model, &sorted_nodes),
             model,
             inferred_shapes,
@@ -69,4 +68,12 @@ impl CPUSessionBuilder {
             tctx: ThreadCtx::new_with_num_threads(intra_op_num_threads),
         })
     }
+}
+
+fn translate_into_c(
+    _model: &Model,
+    _execution_plans: &[NodeExecutionPlan],
+    _inferred_shapes: &FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+) -> Result<(), SessionError> {
+    todo!()
 }

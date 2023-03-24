@@ -19,8 +19,6 @@ use altius_core::{
     tensor::{Tensor, TensorElemType, TypedShape},
     value::ValueId,
 };
-#[cfg(feature = "cuda")]
-use cudnn::CudnnContext;
 #[cfg(feature = "x64-fusion")]
 use dynasm::dynasm;
 #[cfg(feature = "x64-fusion")]
@@ -35,23 +33,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[cfg(feature = "cuda")]
-mod cuda {
-    use super::*;
-
-    pub struct SafeCudnnContext(pub CudnnContext);
-
-    unsafe impl Send for SafeCudnnContext {}
-    unsafe impl Sync for SafeCudnnContext {}
-}
-
-#[cfg(feature = "cuda")]
-pub(super) use cuda::*;
-
 pub struct CPUSession {
     pub(super) model: Model,
-    #[cfg(feature = "cuda")]
-    pub(super) cudnn_ctx: SafeCudnnContext,
     pub(super) execution_plans: Vec<NodeExecutionPlan>,
     pub(super) inferred_shapes: FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     pub(super) enable_profiling: bool,
@@ -195,8 +178,6 @@ impl CPUSession {
         // Actual kernel runs here.
         match op {
             Op::Conv2d(ref conv) => conv2d::compute(&mut Conv2dCtx {
-                #[cfg(feature = "cuda")]
-                cudnn: &self.cudnn_ctx,
                 op: conv,
                 inputs: &inputs,
                 outputs: &mut outputs,

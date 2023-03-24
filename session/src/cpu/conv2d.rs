@@ -2,27 +2,15 @@
 
 use altius_core::{op::Conv2d, op::Op, tensor::Tensor};
 
-#[cfg(feature = "cuda")]
-use super::session::SafeCudnnContext;
 use super::thread::ThreadCtx;
-#[cfg(feature = "cuda")]
-pub use cudnn::{
-    ActivationDescriptor, ActivationMode, ConvDescriptor, ConvFwdAlgo, ConvMode, FilterDescriptor,
-    NanPropagation, ScalarC, TensorDescriptor,
-};
-#[cfg(feature = "cuda")]
-pub use cust::memory::DeviceBuffer;
 
 pub struct Conv2dCtx<'a> {
-    #[cfg(feature = "cuda")]
-    pub cudnn: &'a SafeCudnnContext,
     pub op: &'a Conv2d,
     pub inputs: &'a [&'a Tensor],
     pub outputs: &'a mut [Tensor],
     pub tctx: &'a ThreadCtx,
 }
 
-#[cfg(not(feature = "cuda"))]
 pub fn compute(ctx: &mut Conv2dCtx) {
     let input = &ctx.inputs[Op::CONV2D_IN];
     let weight = &ctx.inputs[Op::CONV2D_WEIGHT];
@@ -327,91 +315,4 @@ fn im2col_with_dilation(
             col = unsafe { col.get_unchecked_mut(output_hw..) };
         }
     }
-}
-
-#[cfg(feature = "cuda")]
-pub fn compute(ctx: &mut Conv2dCtx) {
-    let conv = ctx.op;
-    let input = &ctx.inputs[Op::CONV2D_IN];
-    let weight = &ctx.inputs[Op::CONV2D_WEIGHT];
-    let bias = ctx.inputs.get(Op::CONV2D_BIAS).map_or(
-        Tensor::zeros::<f32>(vec![weight.dims()[0]].into()),
-        |&bias| bias.clone(),
-    );
-    let output = &mut ctx.outputs[0];
-
-    let padding = [conv.padding[0] as i32, conv.padding[1] as i32];
-    let stride = [conv.strides[0] as i32, conv.strides[1] as i32];
-    let dilation = [1, 1];
-    let mode = ConvMode::CrossCorrelation;
-
-    let conv_desc = ConvDescriptor::<f32>::new(padding, stride, dilation, mode).unwrap();
-
-    let input_cuda = DeviceBuffer::from_slice(input.data::<f32>()).unwrap();
-    let weight_cuda = DeviceBuffer::from_slice(weight.data::<f32>()).unwrap();
-    let bias_cuda = DeviceBuffer::from_slice(bias.data::<f32>()).unwrap();
-    let mut output_cuda =
-        unsafe { DeviceBuffer::uninitialized(output.dims().total_elems()).unwrap() };
-    let input_desc =
-        TensorDescriptor::<f32>::new_format(&input.dims().to_i32_vec(), ScalarC::Nchw).unwrap();
-    let weight_desc =
-        FilterDescriptor::<f32>::new(&weight.dims().to_i32_vec(), ScalarC::Nchw).unwrap();
-    let bias_desc =
-        TensorDescriptor::<f32>::new_format(&[1i32, bias.dims()[0] as i32, 1, 1], ScalarC::Nchw)
-            .unwrap();
-    let output_desc =
-        TensorDescriptor::<f32>::new_format(&output.dims().to_i32_vec(), ScalarC::Nchw).unwrap();
-
-    let algo = ConvFwdAlgo::Gemm;
-
-    let size = ctx
-        .cudnn
-        .0
-        .get_convolution_forward_workspace_size(
-            &input_desc,
-            &weight_desc,
-            &output_desc,
-            &conv_desc,
-            algo,
-        )
-        .unwrap();
-
-    let mut workspace =
-        size.map(|size| unsafe { DeviceBuffer::<u8>::uninitialized(size).unwrap() });
-
-    let alpha = 1.;
-    let beta = 0.;
-
-    let mode = ActivationMode::Identity;
-    let nan_opt = NanPropagation::NotPropagateNaN;
-    let coefficient = None;
-
-    let activation_desc = ActivationDescriptor::new(mode, nan_opt, coefficient).unwrap();
-
-    let z = DeviceBuffer::from_slice(&[0.0f32]).unwrap();
-    let z_desc = TensorDescriptor::<f32>::new_format(&[1, 1, 1, 1], ScalarC::Nchw).unwrap();
-
-    ctx.cudnn
-        .0
-        .convolution_bias_act_forward(
-            alpha,
-            &input_desc,
-            &input_cuda,
-            &weight_desc,
-            &weight_cuda,
-            &conv_desc,
-            algo,
-            workspace.as_mut(),
-            beta,
-            &z_desc,
-            &z,
-            &bias_desc,
-            &bias_cuda,
-            &activation_desc,
-            &output_desc,
-            &mut output_cuda,
-        )
-        .unwrap();
-
-    output.set_raw_vec(output_cuda.as_host_vec().unwrap());
 }

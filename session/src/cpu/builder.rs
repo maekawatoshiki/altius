@@ -260,7 +260,7 @@ impl<'a> Translator<'a> {
         let output_hw = output_h * output_w;
         let _dilation = 1;
         let group = op.group as usize;
-        let _in_c_per_g = input_c / group;
+        let in_c_per_g = input_c / group;
         let out_c_per_g = output.dims[1] / group;
         let stride_h = stride[0];
         let stride_w = stride[1];
@@ -310,7 +310,28 @@ impl<'a> Translator<'a> {
             && dilation_h == 1
             && dilation_w == 1
         {
-            String::new()
+            let input_name = &input_names[0];
+
+            format!("float *col =
+    (float *)malloc(sizeof(float) * {batch_size} * {group} * {out_c_per_g} * {output_h} * {output_w} * {kernel_h} * {kernel_w});
+
+{{
+    int outer = {batch_size} * {input_c};
+    float *input_ptr = (float *){input_name};
+    float *col_ptr = (float *)col;
+
+    while (outer > 0) {{
+        int inner = {kernel_h} * {kernel_w};
+        while (inner > 0) {{
+            memcpy(col_ptr, input_ptr, sizeof(float) * {input_hw});
+            col_ptr = col_ptr + {output_hw};
+            inner -= 1;
+        }}
+        input_ptr += {input_hw};
+        outer -= 1;
+    }}
+}}
+")
         } else if dilation_h == 1 && dilation_w == 1 {
             let input_name = &input_names[0];
 
@@ -366,11 +387,39 @@ impl<'a> Translator<'a> {
     }}
 }}")
         } else {
-            String::new()
+            todo!();
         };
+
+        let col_stride = in_c_per_g * kernel[0] * kernel[1] * output_h * output_w;
+        let weight_stride = out_c_per_g * in_c_per_g * kernel[0] * kernel[1];
+        let output_stride = out_c_per_g * output_hw;
+        let k = in_c_per_g * kernel[0] * kernel[1];
+        let outer = (batch_size * group) / in_c_per_g;
+        let weight_name = &input_names[1];
+        let output_name = &output_names[0];
+
+        let code_gemm = format!(
+            "{{
+    float *weight_ptr = (float *){weight_name}; 
+    float *output_ptr = (float *){output_name};
+    float *col_ptr = col;
+
+    for (int outer = 0; outer < {outer}; outer++) {{
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            {out_c_per_g}, {output_hw}, {k}, 1.,
+            weight_ptr, {k}, col_ptr, {output_hw}, 1., output_ptr, {output_hw});
+
+        weight_ptr += {weight_stride};
+        output_ptr += {output_stride};
+        col_ptr += {col_stride};
+    }}
+}}"
+        );
 
         let kernel = format!(
             "static void {name}({}) {{
+{}
+
 {}
 
 {}
@@ -384,7 +433,8 @@ impl<'a> Translator<'a> {
                 .collect::<Vec<_>>()
                 .join(", "),
             indent_all_by(4, code_fill_bias),
-            indent_all_by(4, code_im2col)
+            indent_all_by(4, code_im2col),
+            indent_all_by(4, code_gemm)
         );
         // log::debug!("kernel: {}", kernel);
         self.created_kernels.push(kernel);

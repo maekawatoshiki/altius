@@ -306,6 +306,10 @@ impl Tensor {
         self.data.as_ptr()
     }
 
+    pub fn data_as_bytes(&self) -> &[u8] {
+        self.data.as_ref()
+    }
+
     pub fn copy_data_from(&mut self, other: &Self) {
         self.data = other.data.clone()
     }

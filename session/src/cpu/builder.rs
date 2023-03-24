@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, File},
+    fs::{self, create_dir, remove_dir_all, File},
     io::{BufWriter, Write as _},
     path::PathBuf,
 };
@@ -90,6 +90,10 @@ impl<'a> Translator<'a> {
         inferred_shapes: &'a FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
         value_shapes: &'a FxHashMap<ValueId, TypedShape>,
     ) -> Result<Self, SessionError> {
+        let target_dir = PathBuf::from("/tmp/model");
+        let _ = remove_dir_all(&target_dir);
+        create_dir(&target_dir)?;
+
         Ok(Self {
             model,
             inferred_shapes,
@@ -98,7 +102,7 @@ impl<'a> Translator<'a> {
             created_values: Vec::new(),
             created_calls: Vec::new(),
             created_file_paths: Vec::new(),
-            target_dir: PathBuf::from("/tmp/model"),
+            target_dir,
         })
     }
 

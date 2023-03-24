@@ -27,6 +27,7 @@ opencl3 = { version = "^0.9.1", optional = true }
 dynasm = "^2.0.0"
 dynasmrt = "^2.0.0"
 paste = "1.0.11"
+tempfile = { version = "3.4.0", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = "0.14.2"
@@ -43,7 +44,7 @@ opencl = ["opencl3"]
 wgpu-backend = ["wgpu"]
 heavy-log = []
 x64-codegen = []
-cpu-backend = []
+cpu-backend = ["tempfile"]
 
 [dev-dependencies]
 color-backtrace = "0.5.1"

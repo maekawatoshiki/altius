@@ -1,3 +1,8 @@
+use std::{
+    fs::{self, File},
+    path::PathBuf,
+};
+
 use altius_core::{
     analysis::shape::infer_shapes,
     model::Model,
@@ -55,12 +60,8 @@ impl CPUSessionBuilder {
 
         let execution_plans = create_execution_plan(&self.model, &sorted_nodes);
 
-        Translator {
-            model: &self.model,
-            inferred_shapes: &inferred_shapes,
-            value_shapes: &value_shapes,
-        }
-        .translate_into_c(&execution_plans)?;
+        Translator::new(&self.model, &inferred_shapes, &value_shapes)?
+            .translate_into_c(&execution_plans)?;
 
         Ok(CPUSession {
             execution_plans,
@@ -78,18 +79,51 @@ struct Translator<'a> {
     model: &'a Model,
     inferred_shapes: &'a FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     value_shapes: &'a FxHashMap<ValueId, TypedShape>,
+    created_file_paths: Vec<PathBuf>,
+    tempdir: tempfile::TempDir,
+    save_generated_files: bool,
 }
 
 impl<'a> Translator<'a> {
-    fn translate_into_c(&self, execution_plans: &[NodeExecutionPlan]) -> Result<(), SessionError> {
+    fn new(
+        model: &'a Model,
+        inferred_shapes: &'a FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+        value_shapes: &'a FxHashMap<ValueId, TypedShape>,
+    ) -> Result<Self, SessionError> {
+        Ok(Self {
+            model,
+            inferred_shapes,
+            value_shapes,
+            created_file_paths: Vec::new(),
+            tempdir: tempfile::tempdir()?,
+            save_generated_files: true,
+        })
+    }
+
+    fn translate_into_c(
+        &mut self,
+        execution_plans: &[NodeExecutionPlan],
+    ) -> Result<(), SessionError> {
+        let _main = self.create_file("main.c")?;
+
         for plan in execution_plans {
             self.translate_node(plan.node_id)?;
+        }
+
+        if self.save_generated_files {
+            let dir = "/tmp/model";
+            let _ = fs::remove_dir_all(dir); // Ignore errors if the directory does not exist.
+            fs::create_dir(dir)?;
+            for path in &self.created_file_paths {
+                let name = path.file_name().unwrap();
+                fs::copy(path, PathBuf::from(dir).join(name)).unwrap();
+            }
         }
 
         Ok(())
     }
 
-    fn translate_node(&self, node_id: NodeId) -> Result<(), SessionError> {
+    fn translate_node(&mut self, node_id: NodeId) -> Result<(), SessionError> {
         let node = &self.model.nodes[node_id];
         let inputs = node
             .inputs
@@ -117,7 +151,7 @@ impl<'a> Translator<'a> {
     }
 
     fn translate_conv2d(
-        &self,
+        &mut self,
         _conv2d: &Conv2d,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
@@ -126,7 +160,7 @@ impl<'a> Translator<'a> {
     }
 
     fn translate_hard_sigmoid(
-        &self,
+        &mut self,
         _hs: &HardSigmoid,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
@@ -135,7 +169,7 @@ impl<'a> Translator<'a> {
     }
 
     fn translate_add(
-        &self,
+        &mut self,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
@@ -143,7 +177,7 @@ impl<'a> Translator<'a> {
     }
 
     fn translate_mul(
-        &self,
+        &mut self,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
@@ -151,7 +185,7 @@ impl<'a> Translator<'a> {
     }
 
     fn translate_relu(
-        &self,
+        &mut self,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
@@ -159,7 +193,7 @@ impl<'a> Translator<'a> {
     }
 
     fn translate_gavg_pool(
-        &self,
+        &mut self,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
@@ -167,7 +201,7 @@ impl<'a> Translator<'a> {
     }
 
     fn translate_flatten(
-        &self,
+        &mut self,
         _flatten: &Flatten,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
@@ -176,11 +210,18 @@ impl<'a> Translator<'a> {
     }
 
     fn translate_gemm(
-        &self,
+        &mut self,
         _gemm: &Gemm,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
         Ok(())
+    }
+
+    fn create_file(&mut self, name: &str) -> Result<File, SessionError> {
+        let path = self.tempdir.path().join(name);
+        let file = fs::File::create(&path)?;
+        self.created_file_paths.push(path);
+        Ok(file)
     }
 }

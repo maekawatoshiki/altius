@@ -1,13 +1,13 @@
 #![feature(portable_simd)]
 #![allow(clippy::excessive_precision)]
 
+#[cfg(feature = "cpu-backend")]
+pub mod cpu;
 pub mod interpreter;
 #[cfg(feature = "opencl")]
 pub mod opencl;
 #[cfg(feature = "wgpu-backend")]
 pub mod wgpu;
-#[cfg(feature = "cpu-backend")]
-pub mod cpu;
 
 use std::borrow::Cow;
 
@@ -21,11 +21,14 @@ use blis_src;
 use rustc_hash::FxHashMap;
 use thiserror::Error;
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error)]
 pub enum SessionError {
     /// Errors arised from shape inference.
     #[error("Shape: {0}")]
     Shape(#[from] ShapeError),
+
+    #[error("Io: {0}")]
+    Io(#[from] std::io::Error),
 
     /// General error messages (including TODOs).
     #[error("Something went wrong: {0}")]

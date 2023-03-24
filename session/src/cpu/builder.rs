@@ -214,7 +214,9 @@ impl<'a> Translator<'a> {
 
         match op {
             Op::Conv2d(ref c) => self.translate_conv2d(c, node_name, args, &inputs, &outputs)?,
-            Op::HardSigmoid(ref h) => self.translate_hard_sigmoid(h, &inputs, &outputs)?,
+            Op::HardSigmoid(ref h) => {
+                self.translate_hard_sigmoid(h, node_name, args, &inputs, &outputs)?
+            }
             Op::Add => self.translate_add(&inputs, &outputs)?,
             Op::Mul => self.translate_mul(&inputs, &outputs)?,
             Op::ReLU => self.translate_relu(&inputs, &outputs)?,
@@ -444,10 +446,26 @@ impl<'a> Translator<'a> {
 
     fn translate_hard_sigmoid(
         &mut self,
-        _hs: &HardSigmoid,
-        _inputs: &[&TypedShape],
+        hs: &HardSigmoid,
+        name: String,
+        args: Vec<String>,
+        inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
+        let input_name = &args[..inputs.len()][0];
+        let output_name = &args[inputs.len()..][0];
+        let alpha = hs.alpha;
+        let beta = hs.beta;
+        let size = inputs[0].dims.total_elems();
+        let kernel = format!(
+            "static void {name}(const float *{input_name}, float *{output_name}) {{
+    for (int i = 0; i < {size}; i++) {{
+        const float x = {input_name}[i];
+        {output_name}[i] = fminf(1.0, fmaxf(0.0, x * {alpha} + {beta}));
+    }}
+}}"
+        );
+        self.created_kernels.push(kernel);
         Ok(())
     }
 

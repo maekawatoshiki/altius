@@ -85,8 +85,7 @@ struct Translator<'a> {
     created_values: Vec<String>,
     created_calls: Vec<String>,
     created_file_paths: Vec<PathBuf>,
-    tempdir: tempfile::TempDir,
-    save_generated_files: bool,
+    target_dir: PathBuf,
 }
 
 impl<'a> Translator<'a> {
@@ -103,8 +102,7 @@ impl<'a> Translator<'a> {
             created_values: Vec::new(),
             created_calls: Vec::new(),
             created_file_paths: Vec::new(),
-            tempdir: tempfile::tempdir()?,
-            save_generated_files: true,
+            target_dir: PathBuf::from("/tmp/model"),
         })
     }
 
@@ -148,11 +146,12 @@ impl<'a> Translator<'a> {
                     4,
                     format!(
                         "{{
-    FILE *fp = fopen(\"{name}\", \"rb\");
+    FILE *fp = fopen(\"{dir}/{name}\", \"rb\");
     assert(fp);
     assert(fread((float *){name}, sizeof(float), {size}, fp) == {size});
     fclose(fp);
-}}"
+}}",
+                        dir = self.target_dir.as_os_str().to_str().unwrap()
                     ),
                 ));
             }
@@ -198,16 +197,6 @@ impl<'a> Translator<'a> {
         }
 
         writer.flush()?;
-
-        if self.save_generated_files {
-            let dir = "/tmp/model";
-            let _ = fs::remove_dir_all(dir); // Ignore errors if the directory does not exist.
-            fs::create_dir(dir)?;
-            for path in &self.created_file_paths {
-                let name = path.file_name().unwrap();
-                fs::copy(path, PathBuf::from(dir).join(name)).unwrap();
-            }
-        }
 
         Ok(())
     }
@@ -837,7 +826,7 @@ float *output_ptr = {};\n",
     }
 
     fn create_file(&mut self, name: &str) -> Result<File, SessionError> {
-        let path = self.tempdir.path().join(name);
+        let path = self.target_dir.join(name);
         let file = fs::File::create(&path)?;
         self.created_file_paths.push(path);
         Ok(file)

@@ -242,7 +242,7 @@ impl<'a> Translator<'a> {
         log::debug!("output names: {:?}", output_names);
 
         let input = &inputs[Op::CONV2D_IN];
-        let weight = &inputs[Op::CONV2D_WEIGHT];
+        let _weight = &inputs[Op::CONV2D_WEIGHT];
         let output = &outputs[0];
 
         let kernel = &op.kernel_shape;
@@ -260,7 +260,7 @@ impl<'a> Translator<'a> {
         let output_hw = output_h * output_w;
         let _dilation = 1;
         let group = op.group as usize;
-        let in_c_per_g = input_c / group;
+        let _in_c_per_g = input_c / group;
         let out_c_per_g = output.dims[1] / group;
         let stride_h = stride[0];
         let stride_w = stride[1];
@@ -303,9 +303,79 @@ impl<'a> Translator<'a> {
             "{{ }}".to_string()
         };
 
+        let code_im2col = if pad_t == 0
+            && pad_l == 0
+            && stride_h == 1
+            && stride_w == 1
+            && dilation_h == 1
+            && dilation_w == 1
+        {
+            String::new()
+        } else if dilation_h == 1 && dilation_w == 1 {
+            let input_name = &input_names[0];
+
+            format!("float *col =
+    (float *)malloc(sizeof(float) * {batch_size} * {group} * {out_c_per_g} * {output_h} * {output_w} * {kernel_h} * {kernel_w});
+
+{{
+    const int output_hw = {output_h} * {output_w};
+    float *input_ptr = (float *){input_name};
+    float *col_ptr = (float *)col;
+    
+    for (int outer = 0; outer < {batch_size} * {input_c}; outer++) {{
+        for (int fy = 0; fy < {kernel_h}; fy++) {{
+            for (int fx = 0; fx < {kernel_w}; fx++) {{
+                for (int oh = 0; oh < {output_h}; oh++) {{
+                    float *col = &col_ptr[oh * output_hw];
+                    int ih = fy + oh * {stride_h};
+
+                    if ({pad_t} > ih || ih >= {input_h} + {pad_t}) {{
+                        for (int i = 0; i < {output_w}; i++) {{
+                            col[i] = 0.;
+                        }}
+                        continue;
+                    }}
+
+                    int ow = 0;
+                    int iw = fx + (ow * {stride_w});
+                    while (iw < {pad_l}) {{
+                        col[ow] = 0.;
+                        iw += {stride_w};
+                        ow += 1;
+                    }}
+
+                    int c = (ih - {pad_t}) * {input_w};
+                    iw = fx + (ow * {stride_w});
+                    while (iw < {input_w} + {pad_l}) {{
+                        int jw = c + iw - {pad_l};
+                        col[ow] = input_ptr[jw];
+                        iw += {stride_w};
+                        ow += 1;
+                    }}
+
+                    if (ow < {output_w}) {{
+                        for (int i = ow; i < {output_w}; i++) {{
+                            col[i] = 0.;
+                        }}
+                    }}
+                }}
+            }}
+        }}
+        input_ptr += {input_hw};
+        col_ptr += {output_hw} * {kernel_h} * {kernel_w};
+    }}
+}}")
+        } else {
+            String::new()
+        };
+
         let kernel = format!(
             "static void {name}({}) {{
 {}
+
+{}
+
+    free(col);
 }}",
             input_names
                 .iter()
@@ -313,7 +383,8 @@ impl<'a> Translator<'a> {
                 .chain(output_names.iter().map(|name| format!("float *{}", name)))
                 .collect::<Vec<_>>()
                 .join(", "),
-            indent_all_by(4, code_fill_bias)
+            indent_all_by(4, code_fill_bias),
+            indent_all_by(4, code_im2col)
         );
         // log::debug!("kernel: {}", kernel);
         self.created_kernels.push(kernel);

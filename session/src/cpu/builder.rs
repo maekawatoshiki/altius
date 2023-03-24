@@ -42,38 +42,46 @@ impl CPUSessionBuilder {
     }
 
     pub fn build(self) -> Result<CPUSession, SessionError> {
-        let model = self.model;
-        let enable_profiling = self.enable_profiling;
-        let intra_op_num_threads = self.intra_op_num_threads;
-
-        let sorted_nodes = model.topo_sort_nodes();
+        let sorted_nodes = self.model.topo_sort_nodes();
         let mut inferred_shapes = FxHashMap::default();
         infer_shapes(
-            &model,
+            &self.model,
             &sorted_nodes,
             &mut inferred_shapes,
             &mut FxHashMap::default(),
         )?;
 
-        let execution_plans = create_execution_plan(&model, &sorted_nodes);
-        translate_into_c(&model, &execution_plans, &inferred_shapes)?;
+        let execution_plans = create_execution_plan(&self.model, &sorted_nodes);
+        self.translate_into_c(&execution_plans, &inferred_shapes)?;
 
         Ok(CPUSession {
-            execution_plans: create_execution_plan(&model, &sorted_nodes),
-            model,
+            execution_plans,
+            model: self.model,
             inferred_shapes,
-            enable_profiling,
+            enable_profiling: self.enable_profiling,
             values: ThreadLocal::new(),
             dummy_value: Tensor::zeros::<f32>(vec![0].into()),
-            tctx: ThreadCtx::new_with_num_threads(intra_op_num_threads),
+            tctx: ThreadCtx::new_with_num_threads(self.intra_op_num_threads),
         })
     }
-}
 
-fn translate_into_c(
-    _model: &Model,
-    _execution_plans: &[NodeExecutionPlan],
-    _inferred_shapes: &FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
-) -> Result<(), SessionError> {
-    todo!()
+    fn translate_into_c(
+        &self,
+        execution_plans: &[NodeExecutionPlan],
+        inferred_shapes: &FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+    ) -> Result<(), SessionError> {
+        for plan in execution_plans {
+            self.translate_node(plan.node_id, inferred_shapes)?;
+        }
+
+        Ok(())
+    }
+
+    fn translate_node(
+        &self,
+        _node_id: NodeId,
+        _inferred_shapes: &FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+    ) -> Result<(), SessionError> {
+        todo!();
+    }
 }

@@ -2,8 +2,9 @@ use altius_core::{
     analysis::shape::infer_shapes,
     model::Model,
     node::NodeId,
-    op::Op,
+    op::{Conv2d, Flatten, Gemm, HardSigmoid, Op},
     tensor::{Tensor, TypedShape},
+    value::ValueId,
 };
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
@@ -53,7 +54,13 @@ impl CPUSessionBuilder {
         )?;
 
         let execution_plans = create_execution_plan(&self.model, &sorted_nodes);
-        self.translate_into_c(&execution_plans, &inferred_shapes)?;
+
+        Translator {
+            model: &self.model,
+            inferred_shapes: &inferred_shapes,
+            value_shapes: &value_shapes,
+        }
+        .translate_into_c(&execution_plans)?;
 
         Ok(CPUSession {
             execution_plans,
@@ -65,30 +72,115 @@ impl CPUSessionBuilder {
             tctx: ThreadCtx::new_with_num_threads(self.intra_op_num_threads),
         })
     }
+}
 
-    fn translate_into_c(
-        &self,
-        execution_plans: &[NodeExecutionPlan],
-        inferred_shapes: &FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
-    ) -> Result<(), SessionError> {
+struct Translator<'a> {
+    model: &'a Model,
+    inferred_shapes: &'a FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+    value_shapes: &'a FxHashMap<ValueId, TypedShape>,
+}
+
+impl<'a> Translator<'a> {
+    fn translate_into_c(&self, execution_plans: &[NodeExecutionPlan]) -> Result<(), SessionError> {
         for plan in execution_plans {
-            self.translate_node(plan.node_id, inferred_shapes)?;
+            self.translate_node(plan.node_id)?;
         }
 
         Ok(())
     }
 
-    fn translate_node(
-        &self,
-        node_id: NodeId,
-        inferred_shapes: &FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
-    ) -> Result<(), SessionError> {
-        let _node = &self.model.nodes[node_id];
-        let (_op, _output_shapes) = inferred_shapes.get(&node_id).cloned().map_or_else(
+    fn translate_node(&self, node_id: NodeId) -> Result<(), SessionError> {
+        let node = &self.model.nodes[node_id];
+        let inputs = node
+            .inputs
+            .iter()
+            .map(|value_id| &self.value_shapes[value_id])
+            .collect::<Vec<_>>();
+        let (op, outputs) = self.inferred_shapes.get(&node_id).cloned().map_or_else(
             || todo!("Why is this node output shape not inferred?"),
             |result| Ok::<(Op, Vec<TypedShape>), SessionError>(result),
         )?;
 
+        match op {
+            Op::Conv2d(ref c) => self.translate_conv2d(c, &inputs, &outputs)?,
+            Op::HardSigmoid(ref h) => self.translate_hard_sigmoid(h, &inputs, &outputs)?,
+            Op::Add => self.translate_add(&inputs, &outputs)?,
+            Op::Mul => self.translate_mul(&inputs, &outputs)?,
+            Op::ReLU => self.translate_relu(&inputs, &outputs)?,
+            Op::GlobalAveragePool => self.translate_gavg_pool(&inputs, &outputs)?,
+            Op::Flatten(ref f) => self.translate_flatten(f, &inputs, &outputs)?,
+            Op::Gemm(ref g) => self.translate_gemm(g, &inputs, &outputs)?,
+            _ => todo!("Translation not implemented for {:?}", op),
+        };
+
+        Ok(())
+    }
+
+    fn translate_conv2d(
+        &self,
+        _conv2d: &Conv2d,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn translate_hard_sigmoid(
+        &self,
+        _hs: &HardSigmoid,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn translate_add(
+        &self,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn translate_mul(
+        &self,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn translate_relu(
+        &self,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn translate_gavg_pool(
+        &self,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn translate_flatten(
+        &self,
+        _flatten: &Flatten,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<(), SessionError> {
+        Ok(())
+    }
+
+    fn translate_gemm(
+        &self,
+        _gemm: &Gemm,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<(), SessionError> {
         Ok(())
     }
 }

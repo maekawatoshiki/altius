@@ -44,11 +44,12 @@ impl CPUSessionBuilder {
     pub fn build(self) -> Result<CPUSession, SessionError> {
         let sorted_nodes = self.model.topo_sort_nodes();
         let mut inferred_shapes = FxHashMap::default();
+        let mut value_shapes = FxHashMap::default();
         infer_shapes(
             &self.model,
             &sorted_nodes,
             &mut inferred_shapes,
-            &mut FxHashMap::default(),
+            &mut value_shapes,
         )?;
 
         let execution_plans = create_execution_plan(&self.model, &sorted_nodes);
@@ -79,9 +80,15 @@ impl CPUSessionBuilder {
 
     fn translate_node(
         &self,
-        _node_id: NodeId,
-        _inferred_shapes: &FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+        node_id: NodeId,
+        inferred_shapes: &FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     ) -> Result<(), SessionError> {
-        todo!();
+        let _node = &self.model.nodes[node_id];
+        let (_op, _output_shapes) = inferred_shapes.get(&node_id).cloned().map_or_else(
+            || todo!("Why is this node output shape not inferred?"),
+            |result| Ok::<(Op, Vec<TypedShape>), SessionError>(result),
+        )?;
+
+        Ok(())
     }
 }

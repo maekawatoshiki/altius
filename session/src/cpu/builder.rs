@@ -471,9 +471,90 @@ impl<'a> Translator<'a> {
 
     fn translate_add(
         &mut self,
-        _inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        name: String,
+        args: Vec<String>,
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
+        let input_names = &args[..inputs.len()];
+        let output_name = &args[inputs.len()..][0];
+
+        let kernel = if inputs[0].dims == inputs[1].dims {
+            format!("static void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
+    for (int i = 0; i < {size}; i++) {{
+        {output}[i] = {input_0}[i] + {input_1}[i];
+    }}
+}}",
+                input_0 = input_names[0],
+                input_1 = input_names[1],
+                size = outputs[0].dims.total_elems(),
+                output = output_name,
+            )
+        } else {
+            let rank = outputs[0].dims.len();
+            let input_0_strides = inputs[0]
+                .dims
+                .strides_for_broadcasting_to(&outputs[0].dims)
+                .unwrap();
+            let input_1_strides = inputs[1]
+                .dims
+                .strides_for_broadcasting_to(&outputs[0].dims)
+                .unwrap();
+
+            let mut kernel = String::new();
+            for (i, ((odim, i0str), i1str)) in outputs[0]
+                .dims
+                .iter()
+                .zip(input_0_strides.iter())
+                .zip(input_1_strides.iter())
+                .enumerate()
+                .rev()
+            {
+                if i == rank - 1 {
+                    kernel = format!(
+                        "for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
+    *output_ptr = *input_0_ptr_{i} + *input_1_ptr_{i};
+    input_0_ptr_{i} += {i0str};
+    input_1_ptr_{i} += {i1str};
+    output_ptr += 1;
+}}"
+                    );
+                } else {
+                    kernel = format!(
+                        "{}for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
+    float *input_0_ptr_{iplus1} = input_0_ptr_{i};
+    float *input_1_ptr_{iplus1} = input_1_ptr_{i};
+{}
+    input_0_ptr_{i} += {i0str};
+    input_1_ptr_{i} += {i1str};
+}}",
+                        if i == 0 {
+                            format!(
+                                "float *input_0_ptr_0 = (float *){};
+float *input_1_ptr_0 = (float *){};
+float *output_ptr = {};\n",
+                                input_names[0], input_names[1], output_name
+                            )
+                        } else {
+                            "".to_string()
+                        },
+                        indent_all_by(4, kernel),
+                        iplus1 = i + 1,
+                    );
+                }
+            }
+
+            format!("static void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
+{kernel}
+}}",
+                input_0 = input_names[0],
+                input_1 = input_names[1],
+                output = output_name,
+                kernel = indent_all_by(4, kernel),
+            )
+        };
+        self.created_kernels.push(kernel);
+
         Ok(())
     }
 

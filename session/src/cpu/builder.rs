@@ -13,7 +13,7 @@ use altius_core::{
     value::ValueId,
 };
 use indent::indent_all_by;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use thread_local::ThreadLocal;
 
 use crate::{create_execution_plan, NodeExecutionPlan, SessionError};
@@ -119,21 +119,43 @@ impl<'a> Translator<'a> {
             self.translate_node(plan.node_id)?;
         }
 
+        let mut const_values = FxHashSet::default();
+        let mut code_inits = Vec::new();
         for (&id, shape) in self.value_shapes {
             let name = self.value_name(id);
+            assert!(shape.elem_ty.is_f32());
+
+            let size = if shape.dims.is_scalar() {
+                "1".to_string()
+            } else {
+                shape
+                    .dims
+                    .iter()
+                    .map(|d| d.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" * ")
+            };
             self.created_values.push(format!(
-                "float *{name} = (float *)malloc(sizeof(float) * {});",
-                if shape.dims.is_scalar() {
-                    "1".to_string()
-                } else {
-                    shape
-                        .dims
-                        .iter()
-                        .map(|d| d.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" * ")
-                }
+                "float *{name} = (float *)malloc(sizeof(float) * {size});",
             ));
+
+            if let Some(data) = self.model.inits.get(&id) {
+                let data = data.data_as_bytes();
+                const_values.insert(name.clone());
+                self.create_file(&name)?.write_all(data)?;
+
+                code_inits.push(indent_all_by(
+                    4,
+                    format!(
+                        "{{
+    FILE *fp = fopen(\"{name}\", \"rb\");
+    assert(fp);
+    assert(fread((float *){name}, sizeof(float), {size}, fp) == {size});
+    fclose(fp);
+}}"
+                    ),
+                ));
+            }
         }
 
         {
@@ -156,6 +178,12 @@ impl<'a> Translator<'a> {
             for value in &self.created_values {
                 writer.write_all(b"    ")?;
                 writer.write_all(value.as_bytes())?;
+                writer.write_all(b"\n")?;
+            }
+            writer.write_all(b"\n")?;
+
+            for code in code_inits {
+                writer.write_all(code.as_bytes())?;
                 writer.write_all(b"\n")?;
             }
             writer.write_all(b"\n")?;

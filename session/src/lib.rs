@@ -6,6 +6,8 @@ pub mod interpreter;
 pub mod opencl;
 #[cfg(feature = "wgpu-backend")]
 pub mod wgpu;
+#[cfg(feature = "cpu-backend")]
+pub mod cpu;
 
 use std::borrow::Cow;
 

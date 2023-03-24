@@ -9,20 +9,15 @@ use altius_core::{
     model::Model,
     node::NodeId,
     op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op},
-    tensor::{Tensor, TypedShape},
+    tensor::TypedShape,
     value::ValueId,
 };
 use indent::indent_all_by;
 use rustc_hash::{FxHashMap, FxHashSet};
-use thread_local::ThreadLocal;
 
 use crate::{create_execution_plan, NodeExecutionPlan, SessionError};
 
-#[cfg(feature = "cuda")]
-use super::session::SafeCudnnContext;
-use super::{session::CPUSession, thread::ThreadCtx};
-#[cfg(feature = "cuda")]
-use cudnn::CudnnContext;
+use super::session::CPUSession;
 
 pub struct CPUSessionBuilder {
     model: Model,
@@ -73,6 +68,7 @@ impl CPUSessionBuilder {
         Ok(CPUSession {
             model: self.model,
             target_dir,
+            value_shapes,
         })
     }
 }
@@ -109,6 +105,7 @@ impl<'a> Translator<'a> {
     fn compile(&self) -> Result<(), SessionError> {
         let mut cmd = std::process::Command::new("gcc");
         cmd.arg("-O3")
+            .arg("-march=native")
             .arg("-o")
             .arg(self.target_dir.join("model.so"))
             .arg(self.target_dir.join("main.c"))
@@ -138,6 +135,10 @@ impl<'a> Translator<'a> {
         let mut const_values = FxHashSet::default();
         let mut code_inits = Vec::new();
         for (&id, shape) in self.value_shapes {
+            if self.model.inputs.contains(&id) || self.model.outputs.contains(&id) {
+                continue;
+            }
+
             let name = self.value_name(id);
             assert!(shape.elem_ty.is_f32());
 
@@ -190,7 +191,25 @@ impl<'a> Translator<'a> {
                 writer.write_all(b"\n\n")?;
             }
 
-            writer.write_all(b"int main() {\n")?;
+            writer.write_all(
+                format!(
+                    "int main({}) {{\n",
+                    self.model
+                        .inputs
+                        .iter()
+                        .map(|&id| {
+                            let name = self.value_name(id);
+                            format!("const float *{}", name)
+                        })
+                        .chain(self.model.outputs.iter().map(|&id| {
+                            let name = self.value_name(id);
+                            format!("float *{}", name)
+                        }))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+                .as_bytes(),
+            )?;
 
             for value in &self.created_values {
                 writer.write_all(b"    ")?;

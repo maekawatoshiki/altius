@@ -217,13 +217,15 @@ impl<'a> Translator<'a> {
             Op::HardSigmoid(ref h) => {
                 self.translate_hard_sigmoid(h, node_name, args, &inputs, &outputs)?
             }
-            Op::Add => self.translate_add(&inputs, &outputs)?,
-            Op::Mul => self.translate_mul(&inputs, &outputs)?,
-            Op::ReLU => self.translate_relu(&inputs, &outputs)?,
-            Op::GlobalAveragePool => self.translate_gavg_pool(&inputs, &outputs)?,
+            Op::Add => self.translate_add(node_name, args, &inputs, &outputs)?,
+            Op::Mul => self.translate_mul(node_name, args, &inputs, &outputs)?,
+            Op::ReLU => self.translate_relu(node_name, args, &inputs, &outputs)?,
+            Op::GlobalAveragePool => {
+                self.translate_gavg_pool(node_name, args, &inputs, &outputs)?
+            }
             Op::MaxPool(ref m) => self.translate_max_pool(m, &inputs, &outputs)?,
-            Op::Flatten(ref f) => self.translate_flatten(f, &inputs, &outputs)?,
-            Op::Gemm(ref g) => self.translate_gemm(g, &inputs, &outputs)?,
+            Op::Flatten(ref f) => self.translate_flatten(f, node_name, args, &inputs, &outputs)?,
+            Op::Gemm(ref g) => self.translate_gemm(g, node_name, args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
         };
 
@@ -744,10 +746,63 @@ float *output_ptr = {};\n",
 
     fn translate_gemm(
         &mut self,
-        _gemm: &Gemm,
-        _inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        gemm: &Gemm,
+        name: String,
+        args: Vec<String>,
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
+        let input_0 = inputs[0];
+        let input_1 = inputs[1];
+        let input_2 = inputs[2];
+        let output = &outputs[0];
+        let input_names = &args[..inputs.len()];
+        let output_names = &args[inputs.len()..];
+
+        assert!(input_0.dims.len() == 2);
+        assert!(input_1.dims.len() == 2);
+        assert!(input_2.dims.len() == 1);
+
+        let m = input_0.dims[gemm.trans_a as usize];
+        let k = input_0.dims[1 - gemm.trans_a as usize];
+        let n = input_1.dims[1 - gemm.trans_b as usize];
+
+        let kernel = format!(
+            "static void {name}({}) {{
+    for (int i = 0; i < {output_size}; i += {n}) {{
+        memcpy({out} + i, {in2}, {n} * sizeof(float));
+    }}
+    cblas_sgemm(CblasRowMajor, {transa}, {transb},
+        {m}, {n}, {k}, 1.,
+        {in0}, {lda}, {in1}, {ldb}, 1., {out}, {n});
+
+}}",
+            input_names
+                .iter()
+                .map(|name| format!("const float *{}", name))
+                .chain(output_names.iter().map(|name| format!("float *{}", name)))
+                .collect::<Vec<_>>()
+                .join(", "),
+            transa = if gemm.trans_a {
+                "CblasTrans"
+            } else {
+                "CblasNoTrans"
+            },
+            transb = if gemm.trans_b {
+                "CblasTrans"
+            } else {
+                "CblasNoTrans"
+            },
+            output_size = output.dims.total_elems(),
+            in0 = input_names[0],
+            in1 = input_names[1],
+            in2 = input_names[2],
+            lda = if gemm.trans_a { m } else { k },
+            ldb = if gemm.trans_b { k } else { n },
+            out = output_names[0]
+        );
+        self.created_kernels.push(kernel);
+
         Ok(())
     }
 

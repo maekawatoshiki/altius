@@ -80,6 +80,8 @@ struct Translator<'a> {
     model: &'a Model,
     inferred_shapes: &'a FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     value_shapes: &'a FxHashMap<ValueId, TypedShape>,
+    created_kernels: Vec<String>,
+    created_values: Vec<String>,
     created_calls: Vec<String>,
     created_file_paths: Vec<PathBuf>,
     tempdir: tempfile::TempDir,
@@ -96,6 +98,8 @@ impl<'a> Translator<'a> {
             model,
             inferred_shapes,
             value_shapes,
+            created_kernels: Vec::new(),
+            created_values: Vec::new(),
             created_calls: Vec::new(),
             created_file_paths: Vec::new(),
             tempdir: tempfile::tempdir()?,
@@ -114,6 +118,23 @@ impl<'a> Translator<'a> {
             self.translate_node(plan.node_id)?;
         }
 
+        for (&id, shape) in self.value_shapes {
+            let name = self.value_name(id);
+            self.created_values.push(format!(
+                "float *{name} = (float *)malloc(sizeof(float) * {});",
+                if shape.dims.is_scalar() {
+                    "1".to_string()
+                } else {
+                    shape
+                        .dims
+                        .iter()
+                        .map(|d| d.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" * ")
+                }
+            ));
+        }
+
         {
             let headers = format!(
                 "#include <assert.h>
@@ -124,11 +145,27 @@ impl<'a> Translator<'a> {
             );
             writer.write_all(headers.as_bytes())?;
 
+            for kernel in &self.created_kernels {
+                writer.write_all(kernel.as_bytes())?;
+                writer.write_all(b"\n\n")?;
+            }
+
+            writer.write_all(b"int main() {\n")?;
+
+            for value in &self.created_values {
+                writer.write_all(b"\t")?;
+                writer.write_all(value.as_bytes())?;
+                writer.write_all(b"\n")?;
+            }
+            writer.write_all(b"\n")?;
+
             for call in &self.created_calls {
                 writer.write_all(b"\t")?;
                 writer.write_all(call.as_bytes())?;
                 writer.write_all(b"\n")?;
             }
+
+            writer.write_all(b"}\n")?;
         }
 
         writer.flush()?;
@@ -153,9 +190,9 @@ impl<'a> Translator<'a> {
             .iter()
             .map(|value_id| &self.value_shapes[value_id])
             .collect::<Vec<_>>();
-        let (op, outputs) = self.inferred_shapes.get(&node_id).cloned().map_or_else(
+        let (op, outputs) = self.inferred_shapes.get(&node_id).map_or_else(
             || todo!("Why is this node output shape not inferred?"),
-            |result| Ok::<(Op, Vec<TypedShape>), SessionError>(result),
+            |result| Ok::<&(Op, Vec<TypedShape>), SessionError>(result),
         )?;
 
         let node_name = node
@@ -165,21 +202,17 @@ impl<'a> Translator<'a> {
         let node_name = escape_name(node_name);
         log::debug!("Translating node: {}", node_name);
 
-        let mut args = Vec::new();
-        for &id in node.inputs.iter().chain(node.outputs.iter()) {
-            let input = &self.model.values.inner()[id];
-            let name = input
-                .name
-                .clone()
-                .unwrap_or_else(|| format!("Value_noname_{}", id.index()));
-            let name = escape_name(name);
-            args.push(name)
-        }
+        let args = node
+            .inputs
+            .iter()
+            .chain(node.outputs.iter())
+            .map(|id| self.value_name(*id))
+            .collect::<Vec<_>>();
         self.created_calls
             .push(format!("{node_name}({});", args.join(", ")));
 
         match op {
-            Op::Conv2d(ref c) => self.translate_conv2d(c, &inputs, &outputs)?,
+            Op::Conv2d(ref c) => self.translate_conv2d(c, node_name, args, &inputs, &outputs)?,
             Op::HardSigmoid(ref h) => self.translate_hard_sigmoid(h, &inputs, &outputs)?,
             Op::Add => self.translate_add(&inputs, &outputs)?,
             Op::Mul => self.translate_mul(&inputs, &outputs)?,
@@ -197,9 +230,29 @@ impl<'a> Translator<'a> {
     fn translate_conv2d(
         &mut self,
         _conv2d: &Conv2d,
-        _inputs: &[&TypedShape],
+        name: String,
+        args: Vec<String>,
+        inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<(), SessionError> {
+        let input_names = &args[..inputs.len()];
+        let output_names = &args[inputs.len()..];
+        log::debug!("input names: {:?}", input_names);
+        log::debug!("output names: {:?}", output_names);
+
+        let kernel = format!(
+            "static void {name}({}) {{
+}}",
+            input_names
+                .iter()
+                .map(|name| format!("const float *{}", name))
+                .chain(output_names.iter().map(|name| format!("float *{}", name)))
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+        // log::debug!("kernel: {}", kernel);
+        self.created_kernels.push(kernel);
+
         Ok(())
     }
 
@@ -276,6 +329,16 @@ impl<'a> Translator<'a> {
         let file = fs::File::create(&path)?;
         self.created_file_paths.push(path);
         Ok(file)
+    }
+
+    fn value_name(&self, id: ValueId) -> String {
+        let value = &self.model.values.inner()[id];
+        escape_name(
+            value
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("Value_noname_{}", id.index())),
+        )
     }
 }
 

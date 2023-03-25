@@ -172,7 +172,26 @@ impl<'a> Translator<'a> {
         let mut writer = BufWriter::new(main_file);
 
         for plan in execution_plans {
+            // Allocate temporary tensors.
+            for output in self.model.nodes[plan.node_id]
+                .outputs
+                .iter()
+                .filter(|id| !self.model.outputs.contains(id))
+            {
+                self.created_calls.push(format!(
+                    "{name} = (float *)malloc(sizeof(float) * ({size}));",
+                    name = self.value_name(*output),
+                    size = self.value_shapes[output].dims.total_elems(),
+                ));
+            }
+
             self.translate_node(plan.node_id)?;
+
+            // Free tensors.
+            for free in plan.free_vals.iter() {
+                self.created_calls
+                    .push(format!("free({});", self.value_name(*free)));
+            }
         }
 
         for (&id, shape) in self.value_shapes {
@@ -183,24 +202,12 @@ impl<'a> Translator<'a> {
             let name = self.value_name(id);
             assert!(shape.elem_ty.is_f32());
 
-            let size = if shape.dims.is_scalar() {
-                "1".to_string()
-            } else {
-                shape
-                    .dims
-                    .iter()
-                    .map(|d| d.to_string())
-                    .collect::<Vec<_>>()
-                    .join(" * ")
-            };
-
             if self.model.inits.contains_key(&id) {
-                self.created_extern_values.push(format!("float *{name};"));
+                &mut self.created_extern_values
             } else {
-                self.created_tmp_values.push(format!(
-                    "float *{name} = (float *)malloc(sizeof(float) * {size});",
-                ));
+                &mut self.created_tmp_values
             }
+            .push(format!("float *{name};"));
         }
 
         {
@@ -214,12 +221,12 @@ impl<'a> Translator<'a> {
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <sys/time.h>
+#include <time.h>
 
-double now_in_sec() {{
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return (double)tv.tv_sec + (double)tv.tv_usec / 1000.f / 1000.f;
+struct timespec now() {{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts;
 }}
 
 {profile}
@@ -356,14 +363,22 @@ double now_in_sec() {{
                 .join(", "),
             body = indent_all_by(4, kernel),
             start_profiling = if self.enable_profiling {
-                indent_all_by(4, format!("double _start = now_in_sec();"))
+                indent_all_by(4, format!("const struct timespec _start = now();"))
             } else {
                 String::new()
             },
             end_profiling = if self.enable_profiling {
                 indent_all_by(
                     4,
-                    format!("elapsed_{} += now_in_sec() - _start;", op.name(),),
+                    format!(
+                        "{{
+    const struct timespec _end = now();
+    const double start_in_sec = (double)_start.tv_sec + (double)_start.tv_nsec / 1e9;
+    const double end_in_sec = (double)_end.tv_sec + (double)_end.tv_nsec / 1e9;
+    elapsed_{} += end_in_sec - start_in_sec;
+}}",
+                        op.name(),
+                    ),
                 )
             } else {
                 String::new()

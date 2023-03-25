@@ -339,7 +339,9 @@ double now_in_sec() {{
         };
         let kernel = format!(
             "void {node_name}({args}) {{
+{start_profiling}
 {body}
+{end_profiling}
 }}",
             args = args[..inputs.len()]
                 .iter()
@@ -352,6 +354,19 @@ double now_in_sec() {{
                 .collect::<Vec<_>>()
                 .join(", "),
             body = indent_all_by(4, kernel),
+            start_profiling = if self.enable_profiling {
+                indent_all_by(4, format!("double _start = now_in_sec();"))
+            } else {
+                String::new()
+            },
+            end_profiling = if self.enable_profiling {
+                indent_all_by(
+                    4,
+                    format!("elapsed_{} += now_in_sec() - _start;", op.name(),),
+                )
+            } else {
+                String::new()
+            },
         );
         self.created_kernels.push(kernel);
 

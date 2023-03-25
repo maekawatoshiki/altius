@@ -64,10 +64,15 @@ impl CPUSessionBuilder {
             translator.translate_into_c(&execution_plans)?;
             translator.compile()?;
         }
-        let target_dir = translator.target_dir;
-        let lib = unsafe { libloading::Library::new(target_dir.join("model.so")) }?;
+        let lib = unsafe { libloading::Library::new(translator.target_dir.join("model.so")) }?;
         let entry: libloading::Symbol<unsafe extern "C" fn()> = unsafe { lib.get(b"model_entry")? };
         let entry = unsafe { entry.into_raw().into_raw() };
+
+        for (&val_id, tensor) in &self.model.inits {
+            let name = translator.value_name(val_id);
+            let entry: libloading::Symbol<*const *const u8> = unsafe { lib.get(name.as_bytes())? };
+            unsafe { *entry.cast_mut() = tensor.data_as_ptr() };
+        }
 
         if self.enable_profiling {
             for name in translator.used_op_names {
@@ -78,9 +83,9 @@ impl CPUSessionBuilder {
         }
 
         Ok(CPUSession {
+            target_dir: translator.target_dir,
             model: self.model,
             lib,
-            target_dir,
             value_shapes,
             entry,
             enable_profiling: self.enable_profiling,
@@ -94,7 +99,8 @@ struct Translator<'a> {
     inferred_shapes: &'a FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     value_shapes: &'a FxHashMap<ValueId, TypedShape>,
     created_kernels: Vec<String>,
-    created_values: Vec<String>,
+    created_extern_values: Vec<String>,
+    created_tmp_values: Vec<String>,
     created_calls: Vec<String>,
     created_file_paths: Vec<PathBuf>,
     used_op_names: FxHashSet<String>,
@@ -117,7 +123,8 @@ impl<'a> Translator<'a> {
             inferred_shapes,
             value_shapes,
             created_kernels: Vec::new(),
-            created_values: Vec::new(),
+            created_extern_values: Vec::new(),
+            created_tmp_values: Vec::new(),
             created_calls: Vec::new(),
             created_file_paths: Vec::new(),
             used_op_names: FxHashSet::default(),
@@ -168,8 +175,6 @@ impl<'a> Translator<'a> {
             self.translate_node(plan.node_id)?;
         }
 
-        let mut const_values = FxHashSet::default();
-        let mut code_inits = Vec::new();
         for (&id, shape) in self.value_shapes {
             if self.model.inputs.contains(&id) || self.model.outputs.contains(&id) {
                 continue;
@@ -188,26 +193,12 @@ impl<'a> Translator<'a> {
                     .collect::<Vec<_>>()
                     .join(" * ")
             };
-            self.created_values.push(format!(
-                "float *{name} = (float *)malloc(sizeof(float) * {size});",
-            ));
 
-            if let Some(data) = self.model.inits.get(&id) {
-                let data = data.data_as_bytes();
-                const_values.insert(name.clone());
-                self.create_file(&name)?.write_all(data)?;
-
-                code_inits.push(indent_all_by(
-                    4,
-                    format!(
-                        "{{
-    FILE *fp = fopen(\"{dir}/{name}\", \"rb\");
-    assert(fp);
-    assert(fread((float *){name}, sizeof(float), {size}, fp) == {size});
-    fclose(fp);
-}}",
-                        dir = self.target_dir.as_os_str().to_str().unwrap()
-                    ),
+            if self.model.inits.contains_key(&id) {
+                self.created_extern_values.push(format!("float *{name};"));
+            } else {
+                self.created_tmp_values.push(format!(
+                    "float *{name} = (float *)malloc(sizeof(float) * {size});",
                 ));
             }
         }
@@ -251,6 +242,13 @@ double now_in_sec() {{
                 writer.write_all(b"\n\n")?;
             }
 
+            for value in &self.created_extern_values {
+                writer.write_all(b"")?;
+                writer.write_all(value.as_bytes())?;
+                writer.write_all(b"\n")?;
+            }
+            writer.write_all(b"\n")?;
+
             writer.write_all(
                 format!(
                     "void model_entry({}) {{\n",
@@ -278,15 +276,9 @@ double now_in_sec() {{
                 writer.write_all(b"\n")?;
             }
 
-            for value in &self.created_values {
+            for value in &self.created_tmp_values {
                 writer.write_all(b"    ")?;
                 writer.write_all(value.as_bytes())?;
-                writer.write_all(b"\n")?;
-            }
-            writer.write_all(b"\n")?;
-
-            for code in code_inits {
-                writer.write_all(code.as_bytes())?;
                 writer.write_all(b"\n")?;
             }
             writer.write_all(b"\n")?;

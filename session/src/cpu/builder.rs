@@ -65,10 +65,16 @@ impl CPUSessionBuilder {
             target_dir = translator.target_dir;
         }
 
+        let lib = unsafe { libloading::Library::new(target_dir.join("model.so")) }?;
+        let entry: libloading::Symbol<unsafe extern "C" fn()> = unsafe { lib.get(b"model_entry")? };
+        let entry = unsafe { entry.into_raw().into_raw() };
+
         Ok(CPUSession {
             model: self.model,
+            lib,
             target_dir,
             value_shapes,
+            entry,
         })
     }
 }

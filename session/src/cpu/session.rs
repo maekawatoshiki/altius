@@ -10,8 +10,12 @@ use std::{path::PathBuf, time::Instant};
 
 pub struct CPUSession {
     pub(super) model: Model,
+    #[allow(dead_code)]
     pub(super) target_dir: PathBuf,
     pub(super) value_shapes: FxHashMap<ValueId, TypedShape>,
+    #[allow(dead_code)]
+    pub(super) lib: libloading::Library,
+    pub(super) entry: *const std::ffi::c_void,
 }
 
 impl CPUSession {
@@ -22,9 +26,9 @@ impl CPUSession {
     pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
         assert_eq!(inputs.len(), 1);
 
-        let lib = unsafe { libloading::Library::new(self.target_dir.join("model.so")) }?;
-        let func: libloading::Symbol<unsafe extern "C" fn(*const f32, *mut f32)> =
-            unsafe { lib.get(b"model_entry")? };
+        let entry = unsafe {
+            std::mem::transmute::<_, unsafe extern "C" fn(*const f32, *mut f32)>(self.entry)
+        };
         let mut outputs = self
             .model
             .outputs
@@ -34,10 +38,10 @@ impl CPUSession {
                 Tensor::uninit_of_type(shape.elem_ty, shape.dims.clone())
             })
             .collect::<Vec<_>>();
-        for _ in 0..10 {
+        for _ in 0..1 {
             let start = Instant::now();
             let _ = unsafe {
-                func(
+                entry(
                     inputs[0].1.data().as_ptr(),
                     outputs[0].data_mut().as_mut_ptr(),
                 )

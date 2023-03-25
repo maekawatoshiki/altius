@@ -59,7 +59,8 @@ impl CPUSessionBuilder {
 
         let target_dir;
         {
-            let mut translator = Translator::new(&self.model, &inferred_shapes, &value_shapes)?;
+            let mut translator = Translator::new(&self.model, &inferred_shapes, &value_shapes)?
+                .with_profiling_enabled(self.enable_profiling);
             translator.translate_into_c(&execution_plans)?;
             translator.compile()?;
             target_dir = translator.target_dir;
@@ -87,7 +88,9 @@ struct Translator<'a> {
     created_values: Vec<String>,
     created_calls: Vec<String>,
     created_file_paths: Vec<PathBuf>,
+    used_op_names: FxHashSet<String>,
     target_dir: PathBuf,
+    enable_profiling: bool,
 }
 
 impl<'a> Translator<'a> {
@@ -108,8 +111,15 @@ impl<'a> Translator<'a> {
             created_values: Vec::new(),
             created_calls: Vec::new(),
             created_file_paths: Vec::new(),
+            used_op_names: FxHashSet::default(),
             target_dir,
+            enable_profiling: false,
         })
+    }
+
+    fn with_profiling_enabled(mut self, enable_profiling: bool) -> Self {
+        self.enable_profiling = enable_profiling;
+        self
     }
 
     fn compile(&self) -> Result<(), SessionError> {
@@ -203,7 +213,27 @@ impl<'a> Translator<'a> {
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>\n\n",
+#include <assert.h>
+#include <sys/time.h>
+
+double now_in_sec() {{
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (double)tv.tv_sec + (double)tv.tv_usec / 1000.f / 1000.f;
+}}
+
+{profile}
+
+",
+                profile = if self.enable_profiling {
+                    self.used_op_names
+                        .iter()
+                        .map(|name| format!("double elapsed_{} = 0.0;", name))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                } else {
+                    String::new()
+                }
             );
             writer.write_all(headers.as_bytes())?;
 
@@ -231,6 +261,13 @@ impl<'a> Translator<'a> {
                 )
                 .as_bytes(),
             )?;
+
+            if self.enable_profiling {
+                for name in &self.used_op_names {
+                    writer.write_all(format!("    elapsed_{} = 0.0;\n", name).as_bytes())?;
+                }
+                writer.write_all(b"\n")?;
+            }
 
             for value in &self.created_values {
                 writer.write_all(b"    ")?;
@@ -270,6 +307,7 @@ impl<'a> Translator<'a> {
             || todo!("Why is this node output shape not inferred?"),
             |result| Ok::<&(Op, Vec<TypedShape>), SessionError>(result),
         )?;
+        self.used_op_names.insert(op.name().into());
 
         let node_name = node
             .name

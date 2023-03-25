@@ -38,16 +38,14 @@ impl CPUSession {
                 Tensor::uninit_of_type(shape.elem_ty, shape.dims.clone())
             })
             .collect::<Vec<_>>();
-        for _ in 0..1 {
-            let start = Instant::now();
-            let _ = unsafe {
-                entry(
-                    inputs[0].1.data().as_ptr(),
-                    outputs[0].data_mut().as_mut_ptr(),
-                )
-            };
-            log::debug!("elapsed: {:?}", start.elapsed());
-        }
+        let start = Instant::now();
+        let _ = unsafe {
+            entry(
+                inputs[0].1.data().as_ptr(),
+                outputs[0].data_mut().as_mut_ptr(),
+            )
+        };
+        log::debug!("elapsed: {:?}", start.elapsed());
 
         Ok(outputs)
     }

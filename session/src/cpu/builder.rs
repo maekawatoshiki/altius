@@ -107,7 +107,7 @@ impl<'a> Translator<'a> {
     }
 
     fn compile(&self) -> Result<(), SessionError> {
-        let mut cmd = std::process::Command::new("gcc");
+        let mut cmd = std::process::Command::new("clang");
 
         #[cfg(target_os = "macos")]
         let args = &["-framework", "Accelerate"];
@@ -119,6 +119,8 @@ impl<'a> Translator<'a> {
             .arg(self.target_dir.join("model.so"))
             .arg(self.target_dir.join("main.c"))
             .args(args)
+            .arg("-fopenmp")
+            .arg("-fvectorize")
             .arg("-shared")
             .arg("-fPIC")
             .arg("-lm")
@@ -189,7 +191,7 @@ impl<'a> Translator<'a> {
             #[cfg(target_os = "macos")]
             let blas = "#include <Accelerate/Accelerate.h>";
             #[cfg(not(target_os = "macos"))]
-            let blas = "#include <blis.h>";
+            let blas = "#include <blis/blis.h>";
             let headers = format!(
                 "{blas}
 #include <math.h>
@@ -490,7 +492,7 @@ impl<'a> Translator<'a> {
         );
 
         let kernel = format!(
-            "static void {name}({}) {{
+            "void {name}({}) {{
 {}
 
 {}
@@ -529,7 +531,7 @@ impl<'a> Translator<'a> {
         let beta = hs.beta;
         let size = inputs[0].dims.total_elems();
         let kernel = format!(
-            "static void {name}(const float *{input_name}, float *{output_name}) {{
+            "void {name}(const float *{input_name}, float *{output_name}) {{
     for (int i = 0; i < {size}; i++) {{
         const float x = {input_name}[i];
         {output_name}[i] = fminf(1.0, fmaxf(0.0, x * {alpha} + {beta}));
@@ -551,7 +553,8 @@ impl<'a> Translator<'a> {
         let output_name = &args[inputs.len()..][0];
 
         let kernel = if inputs[0].dims == inputs[1].dims {
-            format!("static void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
+            format!(
+                "void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
     for (int i = 0; i < {size}; i++) {{
         {output}[i] = {input_0}[i] + {input_1}[i];
     }}
@@ -615,7 +618,8 @@ float *output_ptr = {};\n",
                 }
             }
 
-            format!("static void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
+            format!(
+                "void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
 {kernel}
 }}",
                 input_0 = input_names[0],
@@ -640,7 +644,8 @@ float *output_ptr = {};\n",
         let output_name = &args[inputs.len()..][0];
 
         let kernel = if inputs[0].dims == inputs[1].dims {
-            format!("static void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
+            format!(
+                "void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
     for (int i = 0; i < {size}; i++) {{
         {output}[i] = {input_0}[i] * {input_1}[i];
     }}
@@ -704,7 +709,8 @@ float *output_ptr = {};\n",
                 }
             }
 
-            format!("static void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
+            format!(
+                "void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
 {kernel}
 }}",
                 input_0 = input_names[0],
@@ -729,7 +735,7 @@ float *output_ptr = {};\n",
         let output_name = &args[inputs.len()..][0];
         let size = inputs[0].dims.total_elems();
         let kernel = format!(
-            "static void {name}(const float *{input_name}, float *{output_name}) {{
+            "void {name}(const float *{input_name}, float *{output_name}) {{
     for (int i = 0; i < {size}; i++) {{
         const float x = {input_name}[i];
         {output_name}[i] = fmaxf(0.0, x);
@@ -764,7 +770,7 @@ float *output_ptr = {};\n",
         let osn = output.dims.strides()[0];
 
         let kernel = format!(
-            "static void {name}(const float *{input_name}, float *{output_name}) {{
+            "void {name}(const float *{input_name}, float *{output_name}) {{
     for (int n = 0; n < {n}; n++) {{
         for (int c = 0; c < {c}; c++) {{
             float sum = 0.0;
@@ -804,7 +810,7 @@ float *output_ptr = {};\n",
         let output_name = &args[1];
         assert!(inputs[0].elem_ty.is_f32());
         let kernel = format!(
-            "static void {name}(const float *{input_name}, float *{output_name}) {{
+            "void {name}(const float *{input_name}, float *{output_name}) {{
     memcpy({output_name}, {input_name}, {size} * sizeof(float));
 }}",
             size = inputs[0].dims.total_elems()
@@ -837,7 +843,7 @@ float *output_ptr = {};\n",
         let n = input_1.dims[1 - gemm.trans_b as usize];
 
         let kernel = format!(
-            "static void {name}({}) {{
+            "void {name}({}) {{
     for (int i = 0; i < {output_size}; i += {n}) {{
         memcpy({out} + i, {in2}, {n} * sizeof(float));
     }}

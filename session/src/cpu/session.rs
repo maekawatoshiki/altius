@@ -16,6 +16,8 @@ pub struct CPUSession {
     #[allow(dead_code)]
     pub(super) lib: libloading::Library,
     pub(super) entry: *const std::ffi::c_void,
+    pub(super) enable_profiling: bool,
+    pub(super) profile_symbols: FxHashMap<String, *const f64>,
 }
 
 impl CPUSession {
@@ -26,9 +28,6 @@ impl CPUSession {
     pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
         assert_eq!(inputs.len(), 1);
 
-        let elapsed_conv2d: libloading::Symbol<*const f64> =
-            unsafe { self.lib.get(b"elapsed_Conv2d")? };
-        unsafe { log::debug!("elapsed_conv2d: {}[ms]", **elapsed_conv2d * 1000.0) };
         let entry = unsafe {
             std::mem::transmute::<_, unsafe extern "C" fn(*const f32, *mut f32)>(self.entry)
         };
@@ -41,6 +40,7 @@ impl CPUSession {
                 Tensor::uninit_of_type(shape.elem_ty, shape.dims.clone())
             })
             .collect::<Vec<_>>();
+
         let start = Instant::now();
         let _ = unsafe {
             entry(
@@ -48,7 +48,24 @@ impl CPUSession {
                 outputs[0].data_mut().as_mut_ptr(),
             )
         };
-        log::debug!("elapsed: {:?}", start.elapsed());
+
+        if self.enable_profiling {
+            let entire_duration = start.elapsed().as_secs_f32() * 1000.0;
+            let mut durations = self
+                .profile_symbols
+                .iter()
+                .map(|(name, &duration)| {
+                    let duration = unsafe { *duration };
+                    (name.as_str(), duration as f32 * 1000.0)
+                })
+                .collect::<Vec<_>>();
+            durations.push(("All", entire_duration));
+            durations.sort_by(|(_, b), (_, a)| a.partial_cmp(b).unwrap());
+            let width = durations.iter().map(|(op, _)| op.len()).max().unwrap();
+            for (op, duration) in durations {
+                log::debug!("| {op:width$}: {duration:.5} [ms]");
+            }
+        }
 
         Ok(outputs)
     }

@@ -57,18 +57,25 @@ impl CPUSessionBuilder {
 
         let execution_plans = create_execution_plan(&self.model, &sorted_nodes);
 
-        let target_dir;
+        let mut profile_symbols = FxHashMap::default();
+        let mut translator = Translator::new(&self.model, &inferred_shapes, &value_shapes)?
+            .with_profiling_enabled(self.enable_profiling);
         {
-            let mut translator = Translator::new(&self.model, &inferred_shapes, &value_shapes)?
-                .with_profiling_enabled(self.enable_profiling);
             translator.translate_into_c(&execution_plans)?;
             translator.compile()?;
-            target_dir = translator.target_dir;
         }
-
+        let target_dir = translator.target_dir;
         let lib = unsafe { libloading::Library::new(target_dir.join("model.so")) }?;
         let entry: libloading::Symbol<unsafe extern "C" fn()> = unsafe { lib.get(b"model_entry")? };
         let entry = unsafe { entry.into_raw().into_raw() };
+
+        if self.enable_profiling {
+            for name in translator.used_op_names {
+                let symbol: libloading::Symbol<*const f64> =
+                    unsafe { lib.get(format!("elapsed_{}", name).as_bytes())? };
+                profile_symbols.insert(name, unsafe { *symbol.into_raw() });
+            }
+        }
 
         Ok(CPUSession {
             model: self.model,
@@ -76,6 +83,8 @@ impl CPUSessionBuilder {
             target_dir,
             value_shapes,
             entry,
+            enable_profiling: self.enable_profiling,
+            profile_symbols,
         })
     }
 }

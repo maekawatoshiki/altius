@@ -326,21 +326,33 @@ double now_in_sec() {{
             .push(format!("{node_name}({});", args.join(", ")));
 
         let kernel = match op {
-            Op::Conv2d(ref c) => self.translate_conv2d(c, node_name, args, &inputs, &outputs)?,
-            Op::HardSigmoid(ref h) => {
-                self.translate_hard_sigmoid(h, node_name, args, &inputs, &outputs)?
-            }
-            Op::Add => self.translate_add(node_name, args, &inputs, &outputs)?,
-            Op::Mul => self.translate_mul(node_name, args, &inputs, &outputs)?,
-            Op::ReLU => self.translate_relu(node_name, args, &inputs, &outputs)?,
-            Op::GlobalAveragePool => {
-                self.translate_gavg_pool(node_name, args, &inputs, &outputs)?
-            }
+            Op::Conv2d(ref c) => self.translate_conv2d(c, &args, &inputs, &outputs)?,
+            Op::HardSigmoid(ref h) => self.translate_hard_sigmoid(h, &args, &inputs, &outputs)?,
+            Op::Add => self.translate_add(&args, &inputs, &outputs)?,
+            Op::Mul => self.translate_mul(&args, &inputs, &outputs)?,
+            Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
+            Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, &outputs)?,
             Op::MaxPool(ref m) => self.translate_max_pool(m, &inputs, &outputs)?,
-            Op::Flatten(ref f) => self.translate_flatten(f, node_name, args, &inputs, &outputs)?,
-            Op::Gemm(ref g) => self.translate_gemm(g, node_name, args, &inputs, &outputs)?,
+            Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, &outputs)?,
+            Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
         };
+        let kernel = format!(
+            "void {node_name}({args}) {{
+{body}
+}}",
+            args = args[..inputs.len()]
+                .iter()
+                .map(|name| format!("const float *{}", name))
+                .chain(
+                    args[inputs.len()..]
+                        .iter()
+                        .map(|name| format!("float *{}", name))
+                )
+                .collect::<Vec<_>>()
+                .join(", "),
+            body = indent_all_by(4, kernel),
+        );
         self.created_kernels.push(kernel);
 
         Ok(())
@@ -349,8 +361,7 @@ double now_in_sec() {{
     fn translate_conv2d(
         &mut self,
         op: &Conv2d,
-        name: String,
-        args: Vec<String>,
+        args: &[String],
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
@@ -537,24 +548,14 @@ double now_in_sec() {{
         );
 
         let kernel = format!(
-            "void {name}({}) {{
-{}
+            "{}
 
 {}
 
 {}
 
-    free(col);
-}}",
-            input_names
-                .iter()
-                .map(|name| format!("const float *{}", name))
-                .chain(output_names.iter().map(|name| format!("float *{}", name)))
-                .collect::<Vec<_>>()
-                .join(", "),
-            indent_all_by(4, code_fill_bias),
-            indent_all_by(4, code_im2col),
-            indent_all_by(4, code_gemm)
+free(col);",
+            code_fill_bias, code_im2col, code_gemm
         );
 
         Ok(kernel)
@@ -563,8 +564,7 @@ double now_in_sec() {{
     fn translate_hard_sigmoid(
         &mut self,
         hs: &HardSigmoid,
-        name: String,
-        args: Vec<String>,
+        args: &[String],
         inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
@@ -574,11 +574,9 @@ double now_in_sec() {{
         let beta = hs.beta;
         let size = inputs[0].dims.total_elems();
         let kernel = format!(
-            "void {name}(const float *{input_name}, float *{output_name}) {{
-    for (int i = 0; i < {size}; i++) {{
-        const float x = {input_name}[i];
-        {output_name}[i] = fminf(1.0, fmaxf(0.0, x * {alpha} + {beta}));
-    }}
+            "for (int i = 0; i < {size}; i++) {{
+    const float x = {input_name}[i];
+    {output_name}[i] = fminf(1.0, fmaxf(0.0, x * {alpha} + {beta}));
 }}"
         );
         Ok(kernel)
@@ -586,8 +584,7 @@ double now_in_sec() {{
 
     fn translate_add(
         &mut self,
-        name: String,
-        args: Vec<String>,
+        args: &[String],
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
@@ -596,10 +593,8 @@ double now_in_sec() {{
 
         let kernel = if inputs[0].dims == inputs[1].dims {
             format!(
-                "void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
-    for (int i = 0; i < {size}; i++) {{
-        {output}[i] = {input_0}[i] + {input_1}[i];
-    }}
+                "for (int i = 0; i < {size}; i++) {{
+    {output}[i] = {input_0}[i] + {input_1}[i];
 }}",
                 input_0 = input_names[0],
                 input_1 = input_names[1],
@@ -660,15 +655,7 @@ float *output_ptr = {};\n",
                 }
             }
 
-            format!(
-                "void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
-{kernel}
-}}",
-                input_0 = input_names[0],
-                input_1 = input_names[1],
-                output = output_name,
-                kernel = indent_all_by(4, kernel),
-            )
+            indent_all_by(4, kernel)
         };
 
         Ok(kernel)
@@ -676,8 +663,7 @@ float *output_ptr = {};\n",
 
     fn translate_mul(
         &mut self,
-        name: String,
-        args: Vec<String>,
+        args: &[String],
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
@@ -686,10 +672,8 @@ float *output_ptr = {};\n",
 
         let kernel = if inputs[0].dims == inputs[1].dims {
             format!(
-                "void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
-    for (int i = 0; i < {size}; i++) {{
-        {output}[i] = {input_0}[i] * {input_1}[i];
-    }}
+                "for (int i = 0; i < {size}; i++) {{
+    {output}[i] = {input_0}[i] * {input_1}[i];
 }}",
                 input_0 = input_names[0],
                 input_1 = input_names[1],
@@ -750,15 +734,7 @@ float *output_ptr = {};\n",
                 }
             }
 
-            format!(
-                "void {name}(const float *{input_0}, const float *{input_1}, float *{output}) {{
-{kernel}
-}}",
-                input_0 = input_names[0],
-                input_1 = input_names[1],
-                output = output_name,
-                kernel = indent_all_by(4, kernel),
-            )
+            indent_all_by(4, kernel)
         };
 
         Ok(kernel)
@@ -766,8 +742,7 @@ float *output_ptr = {};\n",
 
     fn translate_relu(
         &mut self,
-        name: String,
-        args: Vec<String>,
+        args: &[String],
         inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
@@ -775,11 +750,9 @@ float *output_ptr = {};\n",
         let output_name = &args[inputs.len()..][0];
         let size = inputs[0].dims.total_elems();
         let kernel = format!(
-            "void {name}(const float *{input_name}, float *{output_name}) {{
-    for (int i = 0; i < {size}; i++) {{
-        const float x = {input_name}[i];
-        {output_name}[i] = fmaxf(0.0, x);
-    }}
+            "for (int i = 0; i < {size}; i++) {{
+    const float x = {input_name}[i];
+    {output_name}[i] = fmaxf(0.0, x);
 }}"
         );
         Ok(kernel)
@@ -787,8 +760,7 @@ float *output_ptr = {};\n",
 
     fn translate_gavg_pool(
         &mut self,
-        name: String,
-        args: Vec<String>,
+        args: &[String],
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
@@ -809,17 +781,15 @@ float *output_ptr = {};\n",
         let osn = output.dims.strides()[0];
 
         let kernel = format!(
-            "void {name}(const float *{input_name}, float *{output_name}) {{
-    for (int n = 0; n < {n}; n++) {{
-        for (int c = 0; c < {c}; c++) {{
-            float sum = 0.0;
-            for (int h = 0; h < {h}; h++) {{
-                for (int w = 0; w < {w}; w++) {{
-                    sum += {input_name}[n * {isn} + c * {isc} + h * {w} + w];
-                }}
+            "for (int n = 0; n < {n}; n++) {{
+    for (int c = 0; c < {c}; c++) {{
+        float sum = 0.0;
+        for (int h = 0; h < {h}; h++) {{
+            for (int w = 0; w < {w}; w++) {{
+                sum += {input_name}[n * {isn} + c * {isc} + h * {w} + w];
             }}
-            {output_name}[n * {osn} + c] = sum / {area};
         }}
+        {output_name}[n * {osn} + c] = sum / {area};
     }}
 }}"
         );
@@ -839,8 +809,7 @@ float *output_ptr = {};\n",
     fn translate_flatten(
         &mut self,
         _flatten: &Flatten,
-        name: String,
-        args: Vec<String>,
+        args: &[String],
         inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
@@ -848,9 +817,7 @@ float *output_ptr = {};\n",
         let output_name = &args[1];
         assert!(inputs[0].elem_ty.is_f32());
         let kernel = format!(
-            "void {name}(const float *{input_name}, float *{output_name}) {{
-    memcpy({output_name}, {input_name}, {size} * sizeof(float));
-}}",
+            "memcpy({output_name}, {input_name}, {size} * sizeof(float));",
             size = inputs[0].dims.total_elems()
         );
         Ok(kernel)
@@ -859,8 +826,7 @@ float *output_ptr = {};\n",
     fn translate_gemm(
         &mut self,
         gemm: &Gemm,
-        name: String,
-        args: Vec<String>,
+        args: &[String],
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
@@ -880,21 +846,12 @@ float *output_ptr = {};\n",
         let n = input_1.dims[1 - gemm.trans_b as usize];
 
         let kernel = format!(
-            "void {name}({}) {{
-    for (int i = 0; i < {output_size}; i += {n}) {{
-        memcpy({out} + i, {in2}, {n} * sizeof(float));
-    }}
-    cblas_sgemm(CblasRowMajor, {transa}, {transb},
-        {m}, {n}, {k}, 1.,
-        {in0}, {lda}, {in1}, {ldb}, 1., {out}, {n});
-
-}}",
-            input_names
-                .iter()
-                .map(|name| format!("const float *{}", name))
-                .chain(output_names.iter().map(|name| format!("float *{}", name)))
-                .collect::<Vec<_>>()
-                .join(", "),
+            "for (int i = 0; i < {output_size}; i += {n}) {{
+    memcpy({out} + i, {in2}, {n} * sizeof(float));
+}}
+cblas_sgemm(CblasRowMajor, {transa}, {transb},
+    {m}, {n}, {k}, 1.,
+    {in0}, {lda}, {in1}, {ldb}, 1., {out}, {n});",
             transa = if gemm.trans_a {
                 "CblasTrans"
             } else {

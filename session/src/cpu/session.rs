@@ -26,6 +26,9 @@ impl CPUSession {
     pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
         assert_eq!(inputs.len(), 1);
 
+        let elapsed_conv2d: libloading::Symbol<*const f64> =
+            unsafe { self.lib.get(b"elapsed_Conv2d")? };
+        unsafe { log::debug!("elapsed_conv2d: {}[ms]", **elapsed_conv2d * 1000.0) };
         let entry = unsafe {
             std::mem::transmute::<_, unsafe extern "C" fn(*const f32, *mut f32)>(self.entry)
         };

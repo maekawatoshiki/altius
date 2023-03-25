@@ -325,7 +325,7 @@ double now_in_sec() {{
         self.created_calls
             .push(format!("{node_name}({});", args.join(", ")));
 
-        match op {
+        let kernel = match op {
             Op::Conv2d(ref c) => self.translate_conv2d(c, node_name, args, &inputs, &outputs)?,
             Op::HardSigmoid(ref h) => {
                 self.translate_hard_sigmoid(h, node_name, args, &inputs, &outputs)?
@@ -341,6 +341,7 @@ double now_in_sec() {{
             Op::Gemm(ref g) => self.translate_gemm(g, node_name, args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
         };
+        self.created_kernels.push(kernel);
 
         Ok(())
     }
@@ -352,7 +353,7 @@ double now_in_sec() {{
         args: Vec<String>,
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
-    ) -> Result<(), SessionError> {
+    ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_names = &args[inputs.len()..];
         log::debug!("input names: {:?}", input_names);
@@ -555,10 +556,8 @@ double now_in_sec() {{
             indent_all_by(4, code_im2col),
             indent_all_by(4, code_gemm)
         );
-        // log::debug!("kernel: {}", kernel);
-        self.created_kernels.push(kernel);
 
-        Ok(())
+        Ok(kernel)
     }
 
     fn translate_hard_sigmoid(
@@ -568,7 +567,7 @@ double now_in_sec() {{
         args: Vec<String>,
         inputs: &[&TypedShape],
         _outputs: &[TypedShape],
-    ) -> Result<(), SessionError> {
+    ) -> Result<String, SessionError> {
         let input_name = &args[..inputs.len()][0];
         let output_name = &args[inputs.len()..][0];
         let alpha = hs.alpha;
@@ -582,8 +581,7 @@ double now_in_sec() {{
     }}
 }}"
         );
-        self.created_kernels.push(kernel);
-        Ok(())
+        Ok(kernel)
     }
 
     fn translate_add(
@@ -592,7 +590,7 @@ double now_in_sec() {{
         args: Vec<String>,
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
-    ) -> Result<(), SessionError> {
+    ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_name = &args[inputs.len()..][0];
 
@@ -672,9 +670,8 @@ float *output_ptr = {};\n",
                 kernel = indent_all_by(4, kernel),
             )
         };
-        self.created_kernels.push(kernel);
 
-        Ok(())
+        Ok(kernel)
     }
 
     fn translate_mul(
@@ -683,7 +680,7 @@ float *output_ptr = {};\n",
         args: Vec<String>,
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
-    ) -> Result<(), SessionError> {
+    ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_name = &args[inputs.len()..][0];
 
@@ -763,9 +760,8 @@ float *output_ptr = {};\n",
                 kernel = indent_all_by(4, kernel),
             )
         };
-        self.created_kernels.push(kernel);
 
-        Ok(())
+        Ok(kernel)
     }
 
     fn translate_relu(
@@ -774,7 +770,7 @@ float *output_ptr = {};\n",
         args: Vec<String>,
         inputs: &[&TypedShape],
         _outputs: &[TypedShape],
-    ) -> Result<(), SessionError> {
+    ) -> Result<String, SessionError> {
         let input_name = &args[..inputs.len()][0];
         let output_name = &args[inputs.len()..][0];
         let size = inputs[0].dims.total_elems();
@@ -786,8 +782,7 @@ float *output_ptr = {};\n",
     }}
 }}"
         );
-        self.created_kernels.push(kernel);
-        Ok(())
+        Ok(kernel)
     }
 
     fn translate_gavg_pool(
@@ -796,7 +791,7 @@ float *output_ptr = {};\n",
         args: Vec<String>,
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
-    ) -> Result<(), SessionError> {
+    ) -> Result<String, SessionError> {
         let input_name = &args[0];
         let output_name = &args[1];
 
@@ -828,9 +823,8 @@ float *output_ptr = {};\n",
     }}
 }}"
         );
-        self.created_kernels.push(kernel);
 
-        Ok(())
+        Ok(kernel)
     }
 
     fn translate_max_pool(
@@ -838,8 +832,8 @@ float *output_ptr = {};\n",
         _max_pool: &MaxPool,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
-    ) -> Result<(), SessionError> {
-        Ok(())
+    ) -> Result<String, SessionError> {
+        Ok(String::new())
     }
 
     fn translate_flatten(
@@ -849,7 +843,7 @@ float *output_ptr = {};\n",
         args: Vec<String>,
         inputs: &[&TypedShape],
         _outputs: &[TypedShape],
-    ) -> Result<(), SessionError> {
+    ) -> Result<String, SessionError> {
         let input_name = &args[0];
         let output_name = &args[1];
         assert!(inputs[0].elem_ty.is_f32());
@@ -859,8 +853,7 @@ float *output_ptr = {};\n",
 }}",
             size = inputs[0].dims.total_elems()
         );
-        self.created_kernels.push(kernel);
-        Ok(())
+        Ok(kernel)
     }
 
     fn translate_gemm(
@@ -870,7 +863,7 @@ float *output_ptr = {};\n",
         args: Vec<String>,
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
-    ) -> Result<(), SessionError> {
+    ) -> Result<String, SessionError> {
         let input_0 = inputs[0];
         let input_1 = inputs[1];
         let input_2 = inputs[2];
@@ -920,9 +913,8 @@ float *output_ptr = {};\n",
             ldb = if gemm.trans_b { k } else { n },
             out = output_names[0]
         );
-        self.created_kernels.push(kernel);
 
-        Ok(())
+        Ok(kernel)
     }
 
     fn create_file(&mut self, name: &str) -> Result<File, SessionError> {

@@ -59,7 +59,9 @@ impl CPUSession {
                     (name.as_str(), duration as f32 * 1000.0)
                 })
                 .collect::<Vec<_>>();
+            let sum_durations = durations.iter().map(|(_, d)| d).sum::<f32>();
             durations.push(("All", entire_duration));
+            durations.push(("All (Kernel)", sum_durations));
             durations.sort_by(|(_, b), (_, a)| a.partial_cmp(b).unwrap());
             let width = durations.iter().map(|(op, _)| op.len()).max().unwrap();
             for (op, duration) in durations {

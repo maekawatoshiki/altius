@@ -24,7 +24,7 @@ impl CPUSession {
 
         let lib = unsafe { libloading::Library::new(self.target_dir.join("model.so")) }?;
         let func: libloading::Symbol<unsafe extern "C" fn(*const f32, *mut f32) -> u32> =
-            unsafe { lib.get(b"main")? };
+            unsafe { lib.get(b"model_entry")? };
         let mut outputs = self
             .model
             .outputs

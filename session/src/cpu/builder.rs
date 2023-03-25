@@ -197,7 +197,7 @@ impl<'a> Translator<'a> {
 
             writer.write_all(
                 format!(
-                    "int main({}) {{\n",
+                    "int model_entry({}) {{\n",
                     self.model
                         .inputs
                         .iter()

@@ -110,7 +110,7 @@ impl<'a> Translator<'a> {
         let mut cmd = std::process::Command::new("clang");
 
         #[cfg(target_os = "macos")]
-        let args = &["-framework", "Accelerate"];
+        let args = &["-framework", "Accelerate", "-L/opt/homebrew/opt/libomp/lib"];
         #[cfg(target_os = "linux")]
         let args = &["-march=native", "-lblis"];
 

@@ -108,14 +108,19 @@ impl<'a> Translator<'a> {
 
     fn compile(&self) -> Result<(), SessionError> {
         let mut cmd = std::process::Command::new("gcc");
+
+        #[cfg(target_os = "macos")]
+        let args = &["-framework", "Accelerate"];
+        #[cfg(target_os = "linux")]
+        let args = &["-march=native", "-lblis"];
+
         cmd.arg("-O3")
-            .arg("-march=native")
             .arg("-o")
             .arg(self.target_dir.join("model.so"))
             .arg(self.target_dir.join("main.c"))
+            .args(args)
             .arg("-shared")
             .arg("-fPIC")
-            .arg("-lblis")
             .arg("-lm")
             .current_dir(&self.target_dir);
         let status = cmd.status()?;
@@ -181,12 +186,16 @@ impl<'a> Translator<'a> {
         }
 
         {
+            #[cfg(target_os = "macos")]
+            let blas = "#include <Accelerate/Accelerate.h>";
+            #[cfg(not(target_os = "macos"))]
+            let blas = "#include <blis.h>";
             let headers = format!(
-                "#include <assert.h>
-#include <blis.h>
+                "{blas}
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>\n\n"
+#include <stdlib.h>
+#include <assert.h>\n\n",
             );
             writer.write_all(headers.as_bytes())?;
 
@@ -197,7 +206,7 @@ impl<'a> Translator<'a> {
 
             writer.write_all(
                 format!(
-                    "int model_entry({}) {{\n",
+                    "void model_entry({}) {{\n",
                     self.model
                         .inputs
                         .iter()

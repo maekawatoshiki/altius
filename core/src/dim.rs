@@ -173,6 +173,16 @@ fn total_elems() {
 }
 
 #[test]
+fn total_elems2() {
+    assert_eq!(Dimensions(vec![1]).total_elems(), 1)
+}
+
+#[test]
+fn total_elems3() {
+    assert_eq!(Dimensions(vec![]).total_elems(), 1)
+}
+
+#[test]
 fn broadcast_1() {
     let one = Dimensions::from(vec![1]);
     let shape = broadcast(&[&one]).unwrap();

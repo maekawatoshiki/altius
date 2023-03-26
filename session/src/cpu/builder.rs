@@ -1,7 +1,7 @@
 use std::{
-    fs::{self, create_dir, remove_dir_all, File},
+    fs::{self, create_dir_all, remove_file, File},
     io::{BufWriter, Write as _},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use altius_core::{
@@ -14,6 +14,7 @@ use altius_core::{
 };
 use indent::indent_all_by;
 use rustc_hash::{FxHashMap, FxHashSet};
+use sha1::{Digest, Sha1};
 
 use crate::{create_execution_plan, NodeExecutionPlan, SessionError};
 
@@ -106,6 +107,7 @@ struct Translator<'a> {
     used_op_names: FxHashSet<String>,
     target_dir: PathBuf,
     enable_profiling: bool,
+    prev_code_hash: Option<[u8; 20]>,
 }
 
 impl<'a> Translator<'a> {
@@ -115,8 +117,12 @@ impl<'a> Translator<'a> {
         value_shapes: &'a FxHashMap<ValueId, TypedShape>,
     ) -> Result<Self, SessionError> {
         let target_dir = PathBuf::from("/tmp/model");
-        let _ = remove_dir_all(&target_dir);
-        create_dir(&target_dir)?;
+        let mut prev_code_hash = None;
+        if target_dir.as_path().exists() {
+            prev_code_hash = get_file_sha1("/tmp/model/main.c");
+            let _ = remove_file("/tmp/model/main.c");
+        }
+        create_dir_all(&target_dir)?;
 
         Ok(Self {
             model,
@@ -130,6 +136,7 @@ impl<'a> Translator<'a> {
             used_op_names: FxHashSet::default(),
             target_dir,
             enable_profiling: false,
+            prev_code_hash,
         })
     }
 
@@ -139,6 +146,11 @@ impl<'a> Translator<'a> {
     }
 
     fn compile(&self) -> Result<(), SessionError> {
+        let newer_hash = get_file_sha1("/tmp/model/main.c");
+        if newer_hash.is_some() && newer_hash == self.prev_code_hash {
+            return Ok(());
+        }
+
         let mut cmd = std::process::Command::new("clang");
 
         #[cfg(target_os = "macos")]
@@ -928,4 +940,12 @@ fn escape_name(s: impl Into<String>) -> String {
         .chars()
         .map(|c| if c.is_alphanumeric() { c } else { '_' })
         .collect()
+}
+
+fn get_file_sha1(path: impl AsRef<Path>) -> Option<[u8; 20]> {
+    let mut file = fs::File::open(path).ok()?;
+    let mut hasher = Sha1::new();
+    std::io::copy(&mut file, &mut hasher).ok()?;
+    let hash = hasher.finalize();
+    hash.get(..20)?.try_into().ok()
 }

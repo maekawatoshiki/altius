@@ -355,9 +355,9 @@ struct timespec now() {{
             Op::Mul => self.translate_mul(&args, &inputs, &outputs)?,
             Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
             Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, &outputs)?,
-            Op::MaxPool(ref m) => self.translate_max_pool(m, &inputs, &outputs)?,
-            Op::Reshape => self.translate_reshape(&inputs, &outputs)?,
-            Op::MatMul => self.translate_mat_mul(&inputs, &outputs)?,
+            Op::MaxPool(ref m) => self.translate_max_pool(m, &args, &inputs, &outputs)?,
+            Op::Reshape => self.translate_reshape(&args, &inputs, &outputs)?,
+            Op::MatMul => self.translate_mat_mul(&args, &inputs, &outputs)?,
             Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, &outputs)?,
             Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
@@ -479,7 +479,15 @@ struct timespec now() {{
 }}"
             )
         } else {
-            "{}".to_string()
+            let output_name = &output_names[0];
+            format!(
+                "{{
+    for (int i = 0; i < {size}; i++) {{
+        {output_name}[i] = 0.0f;
+    }}
+}}",
+                size = output.dims.total_elems()
+            )
         };
 
         let code_im2col = if pad_t == 0
@@ -849,27 +857,124 @@ float *output_ptr = {};\n",
 
     fn translate_max_pool(
         &mut self,
-        _max_pool: &MaxPool,
-        _inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        maxpool: &MaxPool,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
-        Ok(String::new())
+        let input_names = &args[..inputs.len()];
+        let output_names = &args[inputs.len()..];
+        let input_name = &input_names[0];
+        let output_name = &output_names[0];
+
+        let input = inputs[Op::MAXPOOL_IN];
+        let output = &outputs[Op::MAXPOOL_OUT];
+
+        let kernel = &maxpool.kernel_shape;
+        let stride = &maxpool.strides;
+
+        assert!(input.dims.len() == 4);
+        assert!(output.dims.len() == 4);
+
+        let padding = &maxpool.padding;
+        let batches = output.dims[0];
+        let channels = output.dims[1];
+        let outer = batches * channels;
+        let output_h = output.dims[2];
+        let output_w = output.dims[3];
+        let input_h = input.dims[2];
+        let input_w = input.dims[3];
+        let kernel_h = kernel[0];
+        let kernel_w = kernel[1];
+        let stride_h = stride[0];
+        let stride_w = stride[1];
+        let input_hw = input_h * input_w;
+        let output_hw = output_h * output_w;
+
+        let pad_t = padding[0] as isize;
+        let pad_l = padding[1] as isize;
+
+        let kernel = format!(
+            "float *input_ptr = (float *){input_name};
+float *output_ptr = (float *){output_name};
+
+for (int outer = 0; outer < {outer}; outer++) {{
+    int y = -{pad_t};
+    for (int ay = 0; ay < {output_h}; ay++) {{
+        int x = -{pad_l};
+        float *output = &output_ptr[ay * {output_w}];
+        int fy_min = -y > 0 ? -y : 0;
+        int fy_max = {kernel_h} < ({input_h} - y) ? {kernel_h} : ({input_h} - y);
+        for (int i = 0; i < {output_w}; i++) {{
+            float max = -INFINITY;
+            int fx_min = -x > 0 ? -x : 0;
+            int fx_max = {kernel_w} < ({input_w} - x) ? {kernel_w} : ({input_w} - x);
+            for (int fy = fy_min; fy < fy_max; fy++) {{
+                int oy = y + fy;
+                for (int fx = fx_min; fx < fx_max; fx++) {{
+                    int ox = x + fx;
+                    max = fmaxf(max, input_ptr[oy * {input_w} + ox]);
+                }}
+            }}
+            *output++ = max;
+            x += {stride_w};
+        }}
+        y += {stride_h};
+    }}
+    input_ptr += {input_hw};
+    output_ptr += {output_hw};
+}}"
+        );
+
+        Ok(kernel)
     }
 
     fn translate_reshape(
         &mut self,
-        _inputs: &[&TypedShape],
+        args: &[String],
+        inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
-        Ok(String::new())
+        let input_name = &args[..inputs.len()][0];
+        let output_name = &args[inputs.len()..][0];
+        assert!(inputs[0].elem_ty.is_f32());
+        let kernel = format!(
+            "memcpy({output_name}, {input_name}, {size} * sizeof(float));",
+            size = inputs[0].dims.total_elems()
+        );
+        Ok(kernel)
     }
 
     fn translate_mat_mul(
         &mut self,
-        _inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
-        Ok(String::new())
+        let input_names = &args[..inputs.len()];
+        let output_names = &args[inputs.len()..];
+
+        let input_0 = inputs[0];
+        let input_1 = inputs[1];
+        let output = &outputs[0];
+
+        assert_eq!(input_0.dims.len(), 2);
+        assert_eq!(input_1.dims.len(), 2);
+        assert_eq!(output.dims.len(), 2);
+
+        let [m, _k] = input_0.dims.to_fixed_dims::<2>();
+        let [k, n] = input_1.dims.to_fixed_dims::<2>();
+
+        let kernel = format!(
+            "cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+    {m}, {n}, {k}, 1.,
+    {in0}, {k}, {in1}, {n}, 0., {out}, {n});",
+            in0 = input_names[0],
+            in1 = input_names[1],
+            out = output_names[0],
+        );
+
+        Ok(kernel)
     }
 
     fn translate_flatten(

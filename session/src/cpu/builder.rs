@@ -276,6 +276,7 @@ struct timespec now() {{
                     self.model
                         .inputs
                         .iter()
+                        .filter(|&id| !self.model.inits.contains_key(id))
                         .map(|&id| {
                             let name = self.value_name(id);
                             format!("const float *{}", name)

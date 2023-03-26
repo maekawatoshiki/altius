@@ -356,6 +356,8 @@ struct timespec now() {{
             Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
             Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, &outputs)?,
             Op::MaxPool(ref m) => self.translate_max_pool(m, &inputs, &outputs)?,
+            Op::Reshape => self.translate_reshape(&inputs, &outputs)?,
+            Op::MatMul => self.translate_mat_mul(&inputs, &outputs)?,
             Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, &outputs)?,
             Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
@@ -848,6 +850,22 @@ float *output_ptr = {};\n",
     fn translate_max_pool(
         &mut self,
         _max_pool: &MaxPool,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        Ok(String::new())
+    }
+
+    fn translate_reshape(
+        &mut self,
+        _inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        Ok(String::new())
+    }
+
+    fn translate_mat_mul(
+        &mut self,
         _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<String, SessionError> {

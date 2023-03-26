@@ -9,7 +9,7 @@ use altius_core::{
     model::Model,
     node::NodeId,
     op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op},
-    tensor::TypedShape,
+    tensor::{TensorElemType, TypedShape},
     value::ValueId,
 };
 use indent::indent_all_by;
@@ -214,14 +214,19 @@ impl<'a> Translator<'a> {
             }
 
             let name = self.value_name(id);
-            assert!(shape.elem_ty.is_f32());
+            let ty = match shape.elem_ty {
+                TensorElemType::Bool => "unsigned char",
+                TensorElemType::I32 => "int32_t",
+                TensorElemType::I64 => "int64_t",
+                TensorElemType::F32 => "float",
+            };
 
             if self.model.inits.contains_key(&id) {
                 &mut self.created_extern_values
             } else {
                 &mut self.created_tmp_values
             }
-            .push(format!("float *{name};"));
+            .push(format!("{ty} *{name};"));
         }
 
         {
@@ -475,7 +480,7 @@ struct timespec now() {{
 }}"
             )
         } else {
-            "{{ }}".to_string()
+            "{}".to_string()
         };
 
         let code_im2col = if pad_t == 0

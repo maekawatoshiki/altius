@@ -214,12 +214,7 @@ impl<'a> Translator<'a> {
             }
 
             let name = self.value_name(id);
-            let ty = match shape.elem_ty {
-                TensorElemType::Bool => "unsigned char",
-                TensorElemType::I32 => "int32_t",
-                TensorElemType::I64 => "int64_t",
-                TensorElemType::F32 => "float",
-            };
+            let ty = get_c_type(shape.elem_ty);
 
             if self.model.inits.contains_key(&id) {
                 &mut self.created_extern_values
@@ -365,20 +360,22 @@ struct timespec now() {{
             Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
         };
+
         let kernel = format!(
             "void {node_name}({args}) {{
 {start_profiling}
 {body}
 {end_profiling}
 }}",
-            args = args[..inputs.len()]
+            args = inputs
                 .iter()
-                .map(|name| format!("const float *{}", name))
-                .chain(
-                    args[inputs.len()..]
-                        .iter()
-                        .map(|name| format!("float *{}", name))
-                )
+                .map(|i| ("const ", *i))
+                .chain(outputs.iter().map(|o| ("", o)))
+                .zip(args.iter())
+                .map(|((prefix, shape), name)| format!(
+                    "{prefix}{ty} *{name}",
+                    ty = get_c_type(shape.elem_ty)
+                ))
                 .collect::<Vec<_>>()
                 .join(", "),
             body = indent_all_by(4, kernel),
@@ -956,4 +953,13 @@ fn get_file_sha1(path: impl AsRef<Path>) -> Option<[u8; 20]> {
     std::io::copy(&mut file, &mut hasher).ok()?;
     let hash = hasher.finalize();
     hash.get(..20)?.try_into().ok()
+}
+
+fn get_c_type(ty: TensorElemType) -> &'static str {
+    match ty {
+        TensorElemType::F32 => "float",
+        TensorElemType::I32 => "int32_t",
+        TensorElemType::I64 => "int64_t",
+        TensorElemType::Bool => "unsigned char",
+    }
 }

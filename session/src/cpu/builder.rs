@@ -207,7 +207,9 @@ impl<'a> Translator<'a> {
         }
 
         for (&id, shape) in self.value_shapes {
-            if self.model.inputs.contains(&id) || self.model.outputs.contains(&id) {
+            if (self.model.inputs.contains(&id) || self.model.outputs.contains(&id))
+                && !self.model.inits.contains_key(&id)
+            {
                 continue;
             }
 

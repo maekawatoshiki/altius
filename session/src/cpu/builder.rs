@@ -466,12 +466,11 @@ struct timespec now() {{
         float *bias_ptr = (float *){bias};
         for (int g = 0; g < {group}; g++) {{
             for (int oc = 0; oc < {out_c_per_g}; oc++) {{
-                for (int oh = 0; oh < {output_h}; oh++) {{
-                    for (int ow = 0; ow < {output_w}; ow++) {{
-                        *output_ptr = *bias_ptr;
-                        output_ptr++;
-                    }}
+                const float bias = *bias_ptr;
+                for (int o = 0; o < {output_h} * {output_w}; o++) {{
+                    output_ptr[o] = bias;
                 }}
+                output_ptr += {output_h} * {output_w};
                 bias_ptr++;
             }}
         }}
@@ -535,7 +534,7 @@ struct timespec now() {{
             for (int fx = 0; fx < {kernel_w}; fx++) {{
                 for (int oh = 0; oh < {output_h}; oh++) {{
                     float *col = &col_ptr[oh * {output_h}];
-                    int ih = fy + oh * {stride_h};
+                    const int ih = fy + oh * {stride_h};
 
                     if ({pad_t} > ih || ih >= {input_h} + {pad_t}) {{
                         for (int i = 0; i < {output_w}; i++) {{
@@ -552,7 +551,7 @@ struct timespec now() {{
                         ow += 1;
                     }}
 
-                    int c = (ih - {pad_t}) * {input_w};
+                    const int c = (ih - {pad_t}) * {input_w};
                     iw = fx + (ow * {stride_w});
                     while (iw < {input_w} + {pad_l}) {{
                         int jw = c + iw - {pad_l};

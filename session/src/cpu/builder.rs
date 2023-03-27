@@ -691,7 +691,8 @@ free(col);",
 
         let kernel = if inputs[0].dims == inputs[1].dims {
             format!(
-                "#pragma clang loop vectorize(enable)
+                "#pragma omp parallel for
+#pragma clang loop vectorize(enable)
 for (int i = 0; i < {size}; i++) {{
     {output}[i] = {input_0}[i] {op} {input_1}[i];
 }}",
@@ -1221,6 +1222,7 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
 
         let kernel = if num_elems_in_block == 1 {
             format!("int src_indices[{num_blocks}] = {{ {indices} }};
+#pragma omp parallel for
 for (int i = 0; i < {num_blocks}; i++) {{
     {out}[i] = {in}[src_indices[i]];
 }}",
@@ -1235,8 +1237,8 @@ for (int i = 0; i < {num_blocks}; i++) {{
             )
         } else {
             format!("int src_indices[{num_blocks}] = {{ {indices} }};
+#pragma omp parallel for
 for (int i = 0; i < {num_blocks}; i++) {{
-    int src_idx = src_indices[i];
     memcpy({out} + i * {num_elems_in_block},
             {in} + src_indices[i],
             sizeof(float) * {num_elems_in_block});
@@ -1410,7 +1412,8 @@ for (int i = 0; i < {num_blocks}; i++) {{
         let axis_len = *input.dims.last().unwrap();
 
         let kernel = format!(
-            "for (int i = 0; i < {batch}; i++) {{
+            "#pragma omp parallel for
+for (int i = 0; i < {batch}; i++) {{
     float sum = 0.0;
     const float *input = {input_name} + i * {axis_len};
     float *output = {output_name} + i * {axis_len};
@@ -1459,7 +1462,8 @@ for (int i = 0; i < {num_blocks}; i++) {{
         let axis_len = *data.dims.last().unwrap();
 
         let kernel = format!(
-            "for (int i = 0; i < {batch}; i++) {{
+            "#pragma omp parallel for
+for (int i = 0; i < {batch}; i++) {{
     float sum = 0.0;
     const float *data = {data_name} + i * {axis_len};
     float *output = {output_name} + i * {axis_len};
@@ -1504,7 +1508,8 @@ for (int i = 0; i < {num_blocks}; i++) {{
         const C: f32 = 0.035677408136300125f32; // 0.044715 * sqrt(2.0 / PI)
 
         let kernel = format!(
-            "for (int i = 0; i < {size}; i++) {{
+            "#pragma omp parallel for
+for (int i = 0; i < {size}; i++) {{
     const float x = {input_name}[i];
     {output_name}[i] = 0.5 * x * (1.0 + tanhf(x * ({C} * x * x + {B})));
 }}",

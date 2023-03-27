@@ -9,8 +9,8 @@ use altius_core::{
     model::Model,
     node::{Node, NodeId},
     op::{
-        Conv2d, Flatten, Gemm, HardSigmoid, LayerNormalization, MaxPool, Op, ReduceMean, Softmax,
-        Transpose,
+        Concat, Conv2d, Flatten, Gather, Gemm, HardSigmoid, LayerNormalization, MaxPool, Op,
+        ReduceMean, Softmax, Transpose,
     },
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
@@ -368,8 +368,8 @@ struct timespec now() {{
             Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, &outputs)?,
             Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, &outputs)?,
             Op::Transpose(ref t) => self.translate_transpose(t, &args, &inputs, &outputs)?,
-            Op::Concat(_) => format!("assert(0 && \"concat\");"),
-            Op::Gather(_) => format!("assert(0 && \"gather\");"),
+            Op::Concat(ref c) => self.translate_concat(c, &args, &inputs, &outputs)?,
+            Op::Gather(ref g) => self.translate_gather(g, &args, &inputs, &outputs)?,
             Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, &outputs)?,
             Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, &outputs)?,
             Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, &outputs)?,
@@ -1222,6 +1222,99 @@ for (int i = 0; i < {num_blocks}; i++) {{
         };
 
         Ok(kernel)
+    }
+
+    fn translate_concat(
+        &mut self,
+        concat: &Concat,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_names = &args[0..inputs.len()];
+        let output_name = &args[inputs.len()];
+        let output = &outputs[0];
+
+        assert!(output.elem_ty.is_f32());
+        let axis = if concat.axis < 0 {
+            (output.dims.len() as i64 + concat.axis) as usize
+        } else {
+            concat.axis as usize
+        };
+        assert!(axis < output.dims.len());
+
+        let mut kernel = String::new();
+        let mut offset = 0;
+        for (i, input) in inputs.iter().enumerate() {
+            assert!(input.elem_ty.is_f32());
+            assert_eq!(input.dims.len(), output.dims.len());
+            assert_eq!(input.dims[0..axis], output.dims[0..axis]);
+            assert_eq!(input.dims[axis + 1..], output.dims[axis + 1..]);
+
+            let num_elems = input.dims[axis..].iter().product::<usize>();
+            kernel.push_str(&format!(
+                "memcpy({out} + {offset}, {in}, sizeof(float) * {num_elems});\n",
+                out = output_name,
+                in = input_names[i],
+                offset = offset,
+                num_elems = num_elems
+            ));
+            offset += num_elems;
+        }
+
+        Ok(kernel)
+    }
+
+    fn translate_gather(
+        &mut self,
+        gather: &Gather,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let data = inputs[0];
+        let indices = inputs[1];
+        let _output = &outputs[0];
+        let data_name = &args[0];
+        let indices_name = &args[1];
+        let output_name = &args[inputs.len()..][0];
+
+        assert!(gather.axis >= 0);
+        assert!(
+            indices.dims.is_scalar() || (indices.dims.len() == 2 && indices.dims[0] == 1),
+            "Unsupported indices shape: {:?}",
+            indices.dims
+        );
+
+        if indices.dims.is_scalar() {
+            let axis = gather.axis as usize;
+            assert_eq!(axis, 1);
+            assert_eq!(data.dims.len(), 3);
+            assert_eq!(data.dims[0], 1);
+
+            let kernel = format!(
+                "memcpy({}, {} + {} * ({}[0]), sizeof(float) * {});",
+                output_name,
+                data_name,
+                data.dims.strides()[axis],
+                indices_name,
+                data.dims[2]
+            );
+            Ok(kernel)
+        } else {
+            todo!()
+            // let axis = gather.axis as usize;
+            // assert_eq!(axis, 0);
+            //
+            // let indices = indices.data::<i64>();
+            // for (&i, o) in indices
+            //     .iter()
+            //     .zip(output.data_mut::<f32>().chunks_mut(data.dims()[1]))
+            // {
+            //     assert!(i >= 0);
+            //     o.copy_from_slice(&data.slice_at::<f32>(&[i as usize])[..data.dims()[1]]);
+            // }
+        }
     }
 
     fn translate_reduce_mean(

@@ -351,10 +351,10 @@ struct timespec now() {{
         let kernel = match op {
             Op::Conv2d(ref c) => self.translate_conv2d(c, &args, &inputs, &outputs)?,
             Op::HardSigmoid(ref h) => self.translate_hard_sigmoid(h, &args, &inputs, &outputs)?,
-            Op::Add => self.translate_add(&args, &inputs, &outputs)?,
-            Op::Sub => String::new(),
-            Op::Mul => self.translate_mul(&args, &inputs, &outputs)?,
-            Op::Div => String::new(),
+            Op::Add => self.translate_bin_op("+", &args, &inputs, &outputs)?,
+            Op::Sub => self.translate_bin_op("-", &args, &inputs, &outputs)?,
+            Op::Mul => self.translate_bin_op("*", &args, &inputs, &outputs)?,
+            Op::Div => self.translate_bin_op("/", &args, &inputs, &outputs)?,
             Op::Pow => String::new(),
             Op::Sqrt => String::new(),
             Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
@@ -650,8 +650,9 @@ free(col);",
         Ok(kernel)
     }
 
-    fn translate_add(
+    fn translate_bin_op(
         &mut self,
+        op: &str,
         args: &[String],
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
@@ -662,7 +663,7 @@ free(col);",
         let kernel = if inputs[0].dims == inputs[1].dims {
             format!(
                 "for (int i = 0; i < {size}; i++) {{
-    {output}[i] = {input_0}[i] + {input_1}[i];
+    {output}[i] = {input_0}[i] {op} {input_1}[i];
 }}",
                 input_0 = input_names[0],
                 input_1 = input_names[1],
@@ -692,7 +693,7 @@ free(col);",
                 if i == rank - 1 {
                     kernel = format!(
                         "for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
-    *output_ptr = *input_0_ptr_{i} + *input_1_ptr_{i};
+    *output_ptr = *input_0_ptr_{i} {op} *input_1_ptr_{i};
     input_0_ptr_{i} += {i0str};
     input_1_ptr_{i} += {i1str};
     output_ptr += 1;
@@ -723,86 +724,7 @@ float *output_ptr = {};\n",
                 }
             }
 
-            indent_all_by(4, kernel)
-        };
-
-        Ok(kernel)
-    }
-
-    fn translate_mul(
-        &mut self,
-        args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
-    ) -> Result<String, SessionError> {
-        let input_names = &args[..inputs.len()];
-        let output_name = &args[inputs.len()..][0];
-
-        let kernel = if inputs[0].dims == inputs[1].dims {
-            format!(
-                "for (int i = 0; i < {size}; i++) {{
-    {output}[i] = {input_0}[i] * {input_1}[i];
-}}",
-                input_0 = input_names[0],
-                input_1 = input_names[1],
-                size = outputs[0].dims.total_elems(),
-                output = output_name,
-            )
-        } else {
-            let rank = outputs[0].dims.len();
-            let input_0_strides = inputs[0]
-                .dims
-                .strides_for_broadcasting_to(&outputs[0].dims)
-                .unwrap();
-            let input_1_strides = inputs[1]
-                .dims
-                .strides_for_broadcasting_to(&outputs[0].dims)
-                .unwrap();
-
-            let mut kernel = String::new();
-            for (i, ((odim, i0str), i1str)) in outputs[0]
-                .dims
-                .iter()
-                .zip(input_0_strides.iter())
-                .zip(input_1_strides.iter())
-                .enumerate()
-                .rev()
-            {
-                if i == rank - 1 {
-                    kernel = format!(
-                        "for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
-    *output_ptr = *input_0_ptr_{i} * *input_1_ptr_{i};
-    input_0_ptr_{i} += {i0str};
-    input_1_ptr_{i} += {i1str};
-    output_ptr += 1;
-}}"
-                    );
-                } else {
-                    kernel = format!(
-                        "{}for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
-    float *input_0_ptr_{iplus1} = input_0_ptr_{i};
-    float *input_1_ptr_{iplus1} = input_1_ptr_{i};
-{}
-    input_0_ptr_{i} += {i0str};
-    input_1_ptr_{i} += {i1str};
-}}",
-                        if i == 0 {
-                            format!(
-                                "float *input_0_ptr_0 = (float *){};
-float *input_1_ptr_0 = (float *){};
-float *output_ptr = {};\n",
-                                input_names[0], input_names[1], output_name
-                            )
-                        } else {
-                            "".to_string()
-                        },
-                        indent_all_by(4, kernel),
-                        iplus1 = i + 1,
-                    );
-                }
-            }
-
-            indent_all_by(4, kernel)
+            kernel
         };
 
         Ok(kernel)

@@ -702,7 +702,8 @@ for (int i = 0; i < {size}; i++) {{
             {
                 if i == rank - 1 {
                     kernel = format!(
-                        "for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
+                        "#pragma clang loop vectorize(enable)
+for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
     *output_ptr = *input_0_ptr_{i} {op} *input_1_ptr_{i};
     input_0_ptr_{i} += {i0str};
     input_1_ptr_{i} += {i1str};

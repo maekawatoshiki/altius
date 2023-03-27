@@ -107,6 +107,7 @@ struct Translator<'a> {
     created_tmp_values: Vec<String>,
     created_calls: Vec<String>,
     created_file_paths: Vec<PathBuf>,
+    reshaped_values: FxHashSet<ValueId>,
     used_op_names: FxHashSet<String>,
     target_dir: PathBuf,
     enable_profiling: bool,
@@ -136,6 +137,7 @@ impl<'a> Translator<'a> {
             created_tmp_values: Vec::new(),
             created_calls: Vec::new(),
             created_file_paths: Vec::new(),
+            reshaped_values: FxHashSet::default(),
             used_op_names: FxHashSet::default(),
             target_dir,
             enable_profiling: false,
@@ -193,12 +195,16 @@ impl<'a> Translator<'a> {
         let mut writer = BufWriter::new(main_file);
 
         for plan in execution_plans {
+            let node = &self.model.nodes[plan.node_id];
             // Allocate temporary tensors.
-            for output in self.model.nodes[plan.node_id]
+            for output in node
                 .outputs
                 .iter()
                 .filter(|id| !self.model.outputs.contains(id))
             {
+                if matches!(node.op, Op::Reshape) {
+                    continue;
+                }
                 self.created_calls.push(format!(
                     "{name} = (float *)malloc(sizeof(float) * ({size}));",
                     name = self.value_name(*output),
@@ -210,6 +216,9 @@ impl<'a> Translator<'a> {
 
             // Free tensors.
             for free in plan.free_vals.iter() {
+                if self.reshaped_values.contains(free) {
+                    continue;
+                }
                 self.created_calls
                     .push(format!("free({});", self.value_name(*free)));
             }
@@ -346,7 +355,7 @@ struct timespec now() {{
             .clone()
             .unwrap_or_else(|| format!("{}_noname_{}", node.op.name(), node_id.index()));
         let node_name = escape_name(node_name);
-        log::debug!("Translating node: {}", node_name);
+        // log::debug!("Translating node: {}", node_name);
 
         let args = node
             .inputs
@@ -354,8 +363,19 @@ struct timespec now() {{
             .chain(node.outputs.iter())
             .map(|id| self.value_name(*id))
             .collect::<Vec<_>>();
-        self.created_calls
-            .push(format!("{node_name}({});", args.join(", ")));
+
+        if matches!(op, Op::Reshape) {
+            // TODO: Support 'Flatten'.
+            self.reshaped_values.insert(node.inputs[0]);
+            self.created_calls.push(format!(
+                "{} = (float *){};",
+                args[inputs.len()..][0],
+                args[0]
+            ))
+        } else {
+            self.created_calls
+                .push(format!("{node_name}({});", args.join(", ")));
+        }
 
         let kernel = match op {
             Op::Conv2d(ref c) => self.translate_conv2d(c, &args, &inputs, &outputs)?,

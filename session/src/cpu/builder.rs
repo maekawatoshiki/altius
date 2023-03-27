@@ -149,8 +149,11 @@ impl<'a> Translator<'a> {
     }
 
     fn compile(&self) -> Result<(), SessionError> {
+        log::debug!("Compiling the model...");
+
         let newer_hash = get_file_sha1("/tmp/model/main.c");
         if newer_hash.is_some() && newer_hash == self.prev_code_hash {
+            log::debug!("Skipped compiling!");
             return Ok(());
         }
 
@@ -176,6 +179,9 @@ impl<'a> Translator<'a> {
         if !status.success() {
             return Err(SessionError::Message("Failed to compile model".into()));
         }
+
+        log::debug!("Finished compiling the model.");
+
         Ok(())
     }
 

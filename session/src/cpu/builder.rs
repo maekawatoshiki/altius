@@ -8,7 +8,7 @@ use altius_core::{
     analysis::shape::infer_shapes,
     model::Model,
     node::{Node, NodeId},
-    op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op, Transpose},
+    op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op, ReduceMean, Transpose},
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
 };
@@ -367,7 +367,7 @@ struct timespec now() {{
             Op::Transpose(ref t) => self.translate_transpose(t, &args, &inputs, &outputs)?,
             Op::Concat(_) => format!("assert(0 && \"concat\");"),
             Op::Gather(_) => format!("assert(0 && \"gather\");"),
-            Op::ReduceMean(_) => format!("assert(0 && \"reduce_mean\");"),
+            Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, &outputs)?,
             Op::Softmax(_) => format!("assert(0 && \"softmax\");"),
             Op::LayerNormalization(_) => format!("assert(0 && \"layer_norm\");"),
             Op::Gelu => format!("assert(0 && \"gelu\");"),
@@ -1217,6 +1217,53 @@ for (int i = 0; i < {num_blocks}; i++) {{
                 indices = indices
             )
         };
+
+        Ok(kernel)
+    }
+
+    fn translate_reduce_mean(
+        &mut self,
+        rmean: &ReduceMean,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input = inputs[0];
+        let output = &outputs[0];
+        let input_name = &args[0];
+        let output_name = &args[1];
+
+        let axes = rmean
+            .axes
+            .iter()
+            .map(|&axis| {
+                if axis < 0 {
+                    (input.dims.len() as i64 + axis) as usize
+                } else {
+                    axis as usize
+                }
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(axes.len(), 1);
+
+        let axis = axes[0];
+        assert_eq!(input.dims.len(), 3);
+        assert_eq!(axis, 2);
+        assert!(rmean.keep_dims);
+
+        let axis_len = input.dims[2];
+        let r_axis_len = 1.0 / axis_len as f32;
+
+        let kernel = format!(
+            "for (int i = 0; i < {batch}; i++) {{ 
+    float sum = 0.0;
+    for (int j = 0; j < {axis_len}; j++) {{
+        sum += {input_name}[i * {axis_len} + j];
+    }}
+    {output_name}[i] = sum * {r_axis_len};
+}}",
+            batch = output.dims.total_elems()
+        );
 
         Ok(kernel)
     }

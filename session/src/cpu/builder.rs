@@ -8,7 +8,7 @@ use altius_core::{
     analysis::shape::infer_shapes,
     model::Model,
     node::{Node, NodeId},
-    op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op},
+    op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op, Transpose},
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
 };
@@ -364,13 +364,13 @@ struct timespec now() {{
             Op::MatMul => self.translate_mat_mul(&args, &inputs, &outputs)?,
             Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, &outputs)?,
             Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, &outputs)?,
-            Op::Transpose(_) => String::new(),
-            Op::Concat(_) => String::new(),
-            Op::Gather(_) => String::new(),
-            Op::ReduceMean(_) => String::new(),
-            Op::Softmax(_) => String::new(),
-            Op::LayerNormalization(_) => String::new(),
-            Op::Gelu => String::new(),
+            Op::Transpose(ref t) => self.translate_transpose(t, &args, &inputs, &outputs)?,
+            Op::Concat(_) => format!("assert(0 && \"concat\");"),
+            Op::Gather(_) => format!("assert(0 && \"gather\");"),
+            Op::ReduceMean(_) => format!("assert(0 && \"reduce_mean\");"),
+            Op::Softmax(_) => format!("assert(0 && \"softmax\");"),
+            Op::LayerNormalization(_) => format!("assert(0 && \"layer_norm\");"),
+            Op::Gelu => format!("assert(0 && \"gelu\");"),
             _ => todo!("Translation not implemented for {:?}", op),
         };
 
@@ -1086,6 +1086,137 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
             ldb = if gemm.trans_b { k } else { n },
             out = output_names[0]
         );
+
+        Ok(kernel)
+    }
+
+    fn translate_transpose(
+        &mut self,
+        transpose: &Transpose,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_name = &args[0];
+        let output_name = &args[1];
+        let input = inputs[0];
+        let output = &outputs[0];
+
+        assert!(input.elem_ty.is_f32());
+        assert!(output.elem_ty.is_f32());
+        assert_eq!(input.dims.len(), output.dims.len());
+
+        struct PermIter {
+            num_axes: usize,
+            index: Vec<usize>,
+            upper_bound: Vec<usize>,
+            stride: Vec<usize>,
+        }
+
+        fn next_index(perm: &mut PermIter, mut index: usize) -> usize {
+            let mut pos = perm.num_axes - 1;
+            index += perm.stride[pos];
+            perm.index[pos] += 1;
+            if perm.index[pos] < perm.upper_bound[pos] {
+                return index;
+            }
+
+            index -= perm.stride[pos] * perm.index[pos];
+            perm.index[pos] = 0;
+            if pos == 0 {
+                return index;
+            }
+
+            loop {
+                pos -= 1;
+                index += perm.stride[pos];
+                perm.index[pos] += 1;
+                if perm.index[pos] < perm.upper_bound[pos] {
+                    break;
+                }
+                index -= perm.stride[pos] * perm.index[pos];
+                perm.index[pos] = 0;
+                if pos == 0 {
+                    break;
+                }
+            }
+            index
+        }
+
+        let in_dims = &input.dims;
+        let in_strides = input.dims.strides();
+        let out_dims = &output.dims;
+        let num_axes = in_dims.len();
+        let new_strides = transpose
+            .perm
+            .iter()
+            .map(|&axis| in_strides[axis as usize])
+            .collect::<Vec<_>>();
+
+        let mut num_blocks = 1;
+        let mut num_elems_in_block = 1;
+        let mut suffix = true;
+        let mut reduced_num_axes = 0;
+
+        for i in (0..num_axes).rev() {
+            let input_axis = transpose.perm[i] as usize;
+            if suffix && input_axis == i {
+                num_elems_in_block *= in_dims[input_axis];
+            } else {
+                suffix = false;
+                num_blocks *= in_dims[input_axis];
+                reduced_num_axes += 1;
+            }
+        }
+
+        let mut perm = PermIter {
+            num_axes: reduced_num_axes,
+            index: vec![0; reduced_num_axes],
+            upper_bound: out_dims[0..reduced_num_axes].to_vec(),
+            stride: new_strides[0..reduced_num_axes].to_vec(),
+        };
+
+        let mut src_idx = 0;
+        let mut indices = vec![];
+        for _ in 0..num_blocks {
+            indices.push(src_idx);
+            src_idx = next_index(&mut perm, src_idx);
+        }
+        let indices = indices
+            .iter()
+            .map(|&idx| idx.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let kernel = if num_elems_in_block == 1 {
+            format!("int src_indices[{num_blocks}] = {{ {indices} }};
+for (int i = 0; i < {num_blocks}; i++) {{
+    {out}[i] = {in}[src_indices[i]];
+}}",
+                out = output_name,
+                in = input_name,
+                indices = indices
+            )
+        } else if num_blocks == 1 {
+            format!(
+                "memcpy({}, {}, sizeof(float) * {});",
+                output_name, input_name, num_elems_in_block
+            )
+        } else {
+            format!("int src_indices[{num_blocks}] = {{ {indices} }};
+for (int i = 0; i < {num_blocks}; i++) {{
+    int src_idx = src_indices[i];
+    memcpy({out} + i * {num_elems_in_block},
+            {in} + src_indices[i],
+            sizeof(float) * {num_elems_in_block});
+}}",
+                out = output_name,
+                in = input_name,
+                num_blocks = num_blocks,
+                num_elems_in_block = num_elems_in_block,
+                indices = indices
+            )
+        };
 
         Ok(kernel)
     }

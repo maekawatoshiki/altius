@@ -373,7 +373,7 @@ struct timespec now() {{
             Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, &outputs)?,
             Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, &outputs)?,
             Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, &outputs)?,
-            Op::Gelu => format!("assert(0 && \"gelu\");"),
+            Op::Gelu => self.translate_gelu(&args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
         };
 
@@ -1354,6 +1354,31 @@ for (int i = 0; i < {num_blocks}; i++) {{
             batch = data.dims.total_elems() / axis_len,
             inv_axis_len = (axis_len as f32).recip(),
             epsilon = ln.epsilon,
+        );
+
+        Ok(kernel)
+    }
+
+    fn translate_gelu(
+        &mut self,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_name = &args[0];
+        let output_name = &args[1];
+        let _input = inputs[0];
+        let output = &outputs[0];
+
+        const B: f32 = 0.7978845608028654f32; // sqrt(2.0 / PI)
+        const C: f32 = 0.035677408136300125f32; // 0.044715 * sqrt(2.0 / PI)
+
+        let kernel = format!(
+            "for (int i = 0; i < {size}; i++) {{
+    const float x = {input_name}[i];
+    {output_name}[i] = 0.5 * x * (1.0 + tanhf(x * ({C} * x * x + {B})));
+}}",
+            size = output.dims.total_elems(),
         );
 
         Ok(kernel)

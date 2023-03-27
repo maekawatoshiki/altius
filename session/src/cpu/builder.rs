@@ -7,7 +7,7 @@ use std::{
 use altius_core::{
     analysis::shape::infer_shapes,
     model::Model,
-    node::NodeId,
+    node::{Node, NodeId},
     op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op},
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
@@ -355,7 +355,7 @@ struct timespec now() {{
             Op::Sub => self.translate_bin_op("-", &args, &inputs, &outputs)?,
             Op::Mul => self.translate_bin_op("*", &args, &inputs, &outputs)?,
             Op::Div => self.translate_bin_op("/", &args, &inputs, &outputs)?,
-            Op::Pow => String::new(),
+            Op::Pow => self.translate_pow(&node, &args, &inputs, &outputs)?,
             Op::Sqrt => String::new(),
             Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
             Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, &outputs)?,
@@ -725,6 +725,53 @@ float *output_ptr = {};\n",
             }
 
             kernel
+        };
+
+        Ok(kernel)
+    }
+
+    fn translate_pow(
+        &mut self,
+        node: &Node,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_names = &args[..inputs.len()];
+        let output_name = &args[inputs.len()..][0];
+
+        let kernel = if inputs[0].dims == inputs[1].dims {
+            format!(
+                "for (int i = 0; i < {size}; i++) {{
+    {output_name}[i] = powf({input_0}[i], {input_1}[i]);
+}}",
+                input_0 = input_names[0],
+                input_1 = input_names[1],
+                size = outputs[0].dims.total_elems(),
+            )
+        } else if inputs[1].dims.is_scalar() {
+            match self.model.inits.get(&node.inputs[1]) {
+                Some(init) if init.data::<f32>()[0] == 2. => format!(
+                    "for (int i = 0; i < {size}; i++) {{
+    {output_name}[i] = {input_0}[i] * {input_0}[i];
+}}",
+                    input_0 = input_names[0],
+                    size = outputs[0].dims.total_elems(),
+                ),
+                _ => format!(
+                    "for (int i = 0; i < {size}; i++) {{
+    {output_name}[i] = powf({input_0}[i], {input_1}[0]);
+}}",
+                    input_0 = input_names[0],
+                    input_1 = input_names[1],
+                    size = outputs[0].dims.total_elems(),
+                ),
+            }
+        } else {
+            format!(
+                "assert(0 && \"TODO: in0.shape = {:?}, in1.shape = {:?}\");",
+                inputs[0].dims, inputs[1].dims
+            )
         };
 
         Ok(kernel)

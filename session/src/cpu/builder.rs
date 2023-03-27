@@ -8,7 +8,7 @@ use altius_core::{
     analysis::shape::infer_shapes,
     model::Model,
     node::{Node, NodeId},
-    op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op, ReduceMean, Transpose},
+    op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op, ReduceMean, Softmax, Transpose},
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
 };
@@ -368,7 +368,7 @@ struct timespec now() {{
             Op::Concat(_) => format!("assert(0 && \"concat\");"),
             Op::Gather(_) => format!("assert(0 && \"gather\");"),
             Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, &outputs)?,
-            Op::Softmax(_) => format!("assert(0 && \"softmax\");"),
+            Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, &outputs)?,
             Op::LayerNormalization(_) => format!("assert(0 && \"layer_norm\");"),
             Op::Gelu => format!("assert(0 && \"gelu\");"),
             _ => todo!("Translation not implemented for {:?}", op),
@@ -1263,6 +1263,40 @@ for (int i = 0; i < {num_blocks}; i++) {{
     {output_name}[i] = sum * {r_axis_len};
 }}",
             batch = output.dims.total_elems()
+        );
+
+        Ok(kernel)
+    }
+
+    fn translate_softmax(
+        &mut self,
+        softmax: &Softmax,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input = inputs[0];
+        let output = &outputs[0];
+        let input_name = &args[0];
+        let output_name = &args[1];
+
+        assert!(softmax.axis == -1 || softmax.axis == (input.dims.len() - 1) as i64);
+
+        let axis_len = *input.dims.last().unwrap();
+
+        let kernel = format!(
+            "for (int i = 0; i < {batch}; i++) {{
+    float sum = 0.0;
+    for (int j = 0; j < {axis_len}; j++) {{
+        {output_name}[i * {axis_len} + j] = exp({input_name}[i * {axis_len} + j]);
+        sum += exp({input_name}[i * {axis_len} + j]);
+    }}
+    float recip_sum = 1.0 / sum;
+    for (int j = 0; j < {axis_len}; j++) {{
+        {output_name}[i * {axis_len} + j] = {output_name}[i * {axis_len} + j] * recip_sum;
+    }}
+}}",
+            batch = output.dims.total_elems() / axis_len,
         );
 
         Ok(kernel)

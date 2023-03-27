@@ -1361,6 +1361,7 @@ for (int i = 0; i < {num_blocks}; i++) {{
         let kernel = format!(
             "for (int i = 0; i < {batch}; i++) {{ 
     float sum = 0.0;
+#pragma clang loop vectorize(enable)
     for (int j = 0; j < {axis_len}; j++) {{
         sum += {input_name}[i * {axis_len} + j];
     }}

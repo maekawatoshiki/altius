@@ -1222,7 +1222,6 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
 
         let kernel = if num_elems_in_block == 1 {
             format!("int src_indices[{num_blocks}] = {{ {indices} }};
-#pragma omp parallel for
 for (int i = 0; i < {num_blocks}; i++) {{
     {out}[i] = {in}[src_indices[i]];
 }}",
@@ -1237,7 +1236,6 @@ for (int i = 0; i < {num_blocks}; i++) {{
             )
         } else {
             format!("int src_indices[{num_blocks}] = {{ {indices} }};
-#pragma omp parallel for
 for (int i = 0; i < {num_blocks}; i++) {{
     memcpy({out} + i * {num_elems_in_block},
             {in} + src_indices[i],

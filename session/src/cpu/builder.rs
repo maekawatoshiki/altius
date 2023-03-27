@@ -63,7 +63,8 @@ impl CPUSessionBuilder {
 
         let mut profile_symbols = FxHashMap::default();
         let mut translator = Translator::new(&self.model, &inferred_shapes, &value_shapes)?
-            .with_profiling_enabled(self.enable_profiling);
+            .with_profiling_enabled(self.enable_profiling)
+            .with_intra_op_num_threads(self.intra_op_num_threads);
         {
             translator.translate_into_c(&execution_plans)?;
             translator.compile()?;
@@ -111,6 +112,7 @@ struct Translator<'a> {
     used_op_names: FxHashSet<String>,
     target_dir: PathBuf,
     enable_profiling: bool,
+    intra_op_num_threads: usize,
     prev_code_hash: Option<[u8; 20]>,
 }
 
@@ -141,12 +143,18 @@ impl<'a> Translator<'a> {
             used_op_names: FxHashSet::default(),
             target_dir,
             enable_profiling: false,
+            intra_op_num_threads: 1,
             prev_code_hash,
         })
     }
 
     fn with_profiling_enabled(mut self, enable_profiling: bool) -> Self {
         self.enable_profiling = enable_profiling;
+        self
+    }
+
+    fn with_intra_op_num_threads(mut self, intra_op_num_threads: usize) -> Self {
+        self.intra_op_num_threads = intra_op_num_threads;
         self
     }
 
@@ -691,11 +699,12 @@ free(col);",
 
         let kernel = if inputs[0].dims == inputs[1].dims {
             format!(
-                "#pragma omp parallel for
+                "#pragma omp parallel for num_threads({th})
 #pragma clang loop vectorize(enable)
 for (int i = 0; i < {size}; i++) {{
     {output}[i] = {input_0}[i] {op} {input_1}[i];
 }}",
+                th = self.intra_op_num_threads,
                 input_0 = input_names[0],
                 input_1 = input_names[1],
                 size = outputs[0].dims.total_elems(),
@@ -1410,7 +1419,7 @@ for (int i = 0; i < {num_blocks}; i++) {{
         let axis_len = *input.dims.last().unwrap();
 
         let kernel = format!(
-            "#pragma omp parallel for
+            "#pragma omp parallel for num_threads({th})
 for (int i = 0; i < {batch}; i++) {{
     float sum = 0.0;
     const float *input = {input_name} + i * {axis_len};
@@ -1427,6 +1436,7 @@ for (int i = 0; i < {batch}; i++) {{
         output[j] = output[j] * recip_sum;
     }}
 }}",
+            th = self.intra_op_num_threads,
             batch = output.dims.total_elems() / axis_len,
         );
 
@@ -1460,7 +1470,7 @@ for (int i = 0; i < {batch}; i++) {{
         let axis_len = *data.dims.last().unwrap();
 
         let kernel = format!(
-            "#pragma omp parallel for
+            "#pragma omp parallel for num_threads({th})
 for (int i = 0; i < {batch}; i++) {{
     float sum = 0.0;
     const float *data = {data_name} + i * {axis_len};
@@ -1483,6 +1493,7 @@ for (int i = 0; i < {batch}; i++) {{
         output[j] = output[j] * inv_mean * {scale_name}[j] + {bias_name}[j];
     }}
 }}",
+            th = self.intra_op_num_threads,
             batch = data.dims.total_elems() / axis_len,
             inv_axis_len = (axis_len as f32).recip(),
             epsilon = ln.epsilon,
@@ -1506,11 +1517,12 @@ for (int i = 0; i < {batch}; i++) {{
         const C: f32 = 0.035677408136300125f32; // 0.044715 * sqrt(2.0 / PI)
 
         let kernel = format!(
-            "#pragma omp parallel for
+            "#pragma omp parallel for num_threads({th})
 for (int i = 0; i < {size}; i++) {{
     const float x = {input_name}[i];
     {output_name}[i] = 0.5 * x * (1.0 + tanhf(x * ({C} * x * x + {B})));
 }}",
+            th = self.intra_op_num_threads,
             size = output.dims.total_elems(),
         );
 

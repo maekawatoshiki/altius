@@ -974,6 +974,46 @@ for (int outer = 0; outer < {outer}; outer++) {{
             );
 
             Ok(kernel)
+        } else if input_0.dims.len() == 3 && input_1.dims.len() == 2 {
+            let [batch, m, _k] = input_0.dims.to_fixed_dims::<3>();
+            let [k, n] = input_1.dims.to_fixed_dims::<2>();
+
+            let kernel = format!(
+                "cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+    {batchm}, {n}, {k}, 1.,
+    {in0}, {k}, {in1}, {n}, 0., {out}, {n});",
+                batchm = batch * m,
+                in0 = input_names[0],
+                in1 = input_names[1],
+                out = output_names[0],
+            );
+
+            Ok(kernel)
+        } else if input_0.dims.len() == 4 && input_1.dims.len() == 4 {
+            let [one, batch, m, _k] = input_0.dims.to_fixed_dims::<4>();
+            let [one_, batch_, k, n] = input_1.dims.to_fixed_dims::<4>();
+            assert_eq!(one, 1);
+            assert_eq!(one_, 1);
+            assert_eq!(batch, batch_);
+
+            let kernel = format!(
+                "float *input_0_ptr = (float *){input_0};
+float *input_1_ptr = (float *){input_1};
+float *output_ptr = (float *){output};
+for (int i = 0; i < {batch}; i++) {{
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        {m}, {n}, {k}, 1.,
+        input_0_ptr, {k}, input_1_ptr, {n}, 0., output_ptr, {n});
+    input_0_ptr += {m} * {k};
+    input_1_ptr += {k} * {n};
+    output_ptr += {m} * {n};
+}}",
+                input_0 = input_names[0],
+                input_1 = input_names[1],
+                output = output_names[0],
+            );
+
+            Ok(kernel)
         } else {
             Ok(format!(
                 "assert(0 && \"TODO: in0.shape={:?}, in1.shape={:?}\");",

@@ -352,7 +352,11 @@ struct timespec now() {{
             Op::Conv2d(ref c) => self.translate_conv2d(c, &args, &inputs, &outputs)?,
             Op::HardSigmoid(ref h) => self.translate_hard_sigmoid(h, &args, &inputs, &outputs)?,
             Op::Add => self.translate_add(&args, &inputs, &outputs)?,
+            Op::Sub => String::new(),
             Op::Mul => self.translate_mul(&args, &inputs, &outputs)?,
+            Op::Div => String::new(),
+            Op::Pow => String::new(),
+            Op::Sqrt => String::new(),
             Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
             Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, &outputs)?,
             Op::MaxPool(ref m) => self.translate_max_pool(m, &args, &inputs, &outputs)?,
@@ -360,6 +364,13 @@ struct timespec now() {{
             Op::MatMul => self.translate_mat_mul(&args, &inputs, &outputs)?,
             Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, &outputs)?,
             Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, &outputs)?,
+            Op::Transpose(_) => String::new(),
+            Op::Concat(_) => String::new(),
+            Op::Gather(_) => String::new(),
+            Op::ReduceMean(_) => String::new(),
+            Op::Softmax(_) => String::new(),
+            Op::LayerNormalization(_) => String::new(),
+            Op::Gelu => String::new(),
             _ => todo!("Translation not implemented for {:?}", op),
         };
 
@@ -957,23 +968,27 @@ for (int outer = 0; outer < {outer}; outer++) {{
         let input_1 = inputs[1];
         let output = &outputs[0];
 
-        assert_eq!(input_0.dims.len(), 2);
-        assert_eq!(input_1.dims.len(), 2);
-        assert_eq!(output.dims.len(), 2);
+        if input_0.dims.len() == 2 && input_1.dims.len() == 2 {
+            assert_eq!(output.dims.len(), 2);
+            let [m, _k] = input_0.dims.to_fixed_dims::<2>();
+            let [k, n] = input_1.dims.to_fixed_dims::<2>();
 
-        let [m, _k] = input_0.dims.to_fixed_dims::<2>();
-        let [k, n] = input_1.dims.to_fixed_dims::<2>();
-
-        let kernel = format!(
-            "cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            let kernel = format!(
+                "cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
     {m}, {n}, {k}, 1.,
     {in0}, {k}, {in1}, {n}, 0., {out}, {n});",
-            in0 = input_names[0],
-            in1 = input_names[1],
-            out = output_names[0],
-        );
+                in0 = input_names[0],
+                in1 = input_names[1],
+                out = output_names[0],
+            );
 
-        Ok(kernel)
+            Ok(kernel)
+        } else {
+            Ok(format!(
+                "assert(0 && \"TODO: in0.shape={:?}, in1.shape={:?}\");",
+                input_0.dims, input_1.dims
+            ))
+        }
     }
 
     fn translate_flatten(
@@ -1063,10 +1078,19 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
 }
 
 fn escape_name(s: impl Into<String>) -> String {
-    s.into()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '_' })
-        .collect()
+    fn add_prefix(s: String) -> String {
+        if s.starts_with(|c: char| c.is_ascii_digit()) {
+            format!("_{}", s)
+        } else {
+            s.to_string()
+        }
+    }
+    add_prefix(
+        s.into()
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '_' })
+            .collect(),
+    )
 }
 
 fn get_file_sha1(path: impl AsRef<Path>) -> Option<[u8; 20]> {

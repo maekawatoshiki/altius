@@ -671,7 +671,8 @@ free(col);",
 
         let kernel = if inputs[0].dims == inputs[1].dims {
             format!(
-                "for (int i = 0; i < {size}; i++) {{
+                "#pragma clang loop vectorize(enable)
+for (int i = 0; i < {size}; i++) {{
     {output}[i] = {input_0}[i] {op} {input_1}[i];
 }}",
                 input_0 = input_names[0],
@@ -1389,13 +1390,18 @@ for (int i = 0; i < {num_blocks}; i++) {{
         let kernel = format!(
             "for (int i = 0; i < {batch}; i++) {{
     float sum = 0.0;
+    const float *input = {input_name} + i * {axis_len};
+    float *output = {output_name} + i * {axis_len};
+// #pragma clang loop vectorize(enable)
     for (int j = 0; j < {axis_len}; j++) {{
-        {output_name}[i * {axis_len} + j] = exp({input_name}[i * {axis_len} + j]);
-        sum += exp({input_name}[i * {axis_len} + j]);
+        const float x = exp(input[j]);
+        output[j] = x;
+        sum += x;
     }}
     float recip_sum = 1.0 / sum;
+#pragma clang loop vectorize(enable)
     for (int j = 0; j < {axis_len}; j++) {{
-        {output_name}[i * {axis_len} + j] = {output_name}[i * {axis_len} + j] * recip_sum;
+        output[j] = output[j] * recip_sum;
     }}
 }}",
             batch = output.dims.total_elems() / axis_len,
@@ -1431,23 +1437,26 @@ for (int i = 0; i < {num_blocks}; i++) {{
         let axis_len = *data.dims.last().unwrap();
 
         let kernel = format!(
-"for (int i = 0; i < {batch}; i++) {{
+            "for (int i = 0; i < {batch}; i++) {{
     float sum = 0.0;
+    const float *data = {data_name} + i * {axis_len};
+    float *output = {output_name} + i * {axis_len};
+#pragma clang loop vectorize(enable)
     for (int j = 0; j < {axis_len}; j++) {{
-        sum += {data_name}[i * {axis_len} + j];
+        sum = sum + data[j];
     }}
-    float mean = sum * {inv_axis_len};
-    for (int j = 0; j < {axis_len}; j++) {{
-        {output_name}[i * {axis_len} + j] = {data_name}[i * {axis_len} + j] - mean;
-    }}
+    const float mean = sum * {inv_axis_len};
     float sum_squares = 0.0;
+#pragma clang loop vectorize(enable)
     for (int j = 0; j < {axis_len}; j++) {{
-        const float x = {output_name}[i * {axis_len} + j];
+        const float x = data[j] - mean;
+        output[j] = x;
         sum_squares += x * x;
     }}
-    float inv_mean = 1.0 / sqrtf(sum_squares * {inv_axis_len} + {epsilon});
+    const float inv_mean = 1.0 / sqrtf(sum_squares * {inv_axis_len} + {epsilon});
+#pragma clang loop vectorize(enable)
     for (int j = 0; j < {axis_len}; j++) {{
-        {output_name}[i * {axis_len} + j] = {output_name}[i * {axis_len} + j] * inv_mean * {scale_name}[j] + {bias_name}[j];
+        output[j] = output[j] * inv_mean * {scale_name}[j] + {bias_name}[j];
     }}
 }}",
             batch = data.dims.total_elems() / axis_len,

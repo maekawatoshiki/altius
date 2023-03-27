@@ -8,7 +8,10 @@ use altius_core::{
     analysis::shape::infer_shapes,
     model::Model,
     node::{Node, NodeId},
-    op::{Conv2d, Flatten, Gemm, HardSigmoid, MaxPool, Op, ReduceMean, Softmax, Transpose},
+    op::{
+        Conv2d, Flatten, Gemm, HardSigmoid, LayerNormalization, MaxPool, Op, ReduceMean, Softmax,
+        Transpose,
+    },
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
 };
@@ -369,7 +372,7 @@ struct timespec now() {{
             Op::Gather(_) => format!("assert(0 && \"gather\");"),
             Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, &outputs)?,
             Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, &outputs)?,
-            Op::LayerNormalization(_) => format!("assert(0 && \"layer_norm\");"),
+            Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, &outputs)?,
             Op::Gelu => format!("assert(0 && \"gelu\");"),
             _ => todo!("Translation not implemented for {:?}", op),
         };
@@ -1297,6 +1300,60 @@ for (int i = 0; i < {num_blocks}; i++) {{
     }}
 }}",
             batch = output.dims.total_elems() / axis_len,
+        );
+
+        Ok(kernel)
+    }
+
+    fn translate_layer_norm(
+        &mut self,
+        ln: &LayerNormalization,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let data = inputs[0];
+        let _scale = inputs[1];
+        let _bias = inputs[2];
+        let output = &outputs[0];
+        let data_name = &args[0];
+        let scale_name = &args[1];
+        let bias_name = &args[2];
+        let output_name = &args[inputs.len()..][0];
+
+        assert!(
+            ln.axis == -1 || ln.axis == *data.dims.last().unwrap() as i64,
+            "Axis must be the last dimension."
+        );
+        assert!(ln.stash_type == 1, "Stash type must be 1.");
+        assert!(data.elem_ty.is_f32(), "Input data type must be f32.");
+        assert_eq!(data.dims.total_elems(), output.dims.total_elems());
+
+        let axis_len = *data.dims.last().unwrap();
+
+        let kernel = format!(
+"for (int i = 0; i < {batch}; i++) {{
+    float sum = 0.0;
+    for (int j = 0; j < {axis_len}; j++) {{
+        sum += {data_name}[i * {axis_len} + j];
+    }}
+    float mean = sum * {inv_axis_len};
+    for (int j = 0; j < {axis_len}; j++) {{
+        {output_name}[i * {axis_len} + j] = {data_name}[i * {axis_len} + j] - mean;
+    }}
+    float sum_squares = 0.0;
+    for (int j = 0; j < {axis_len}; j++) {{
+        const float x = {output_name}[i * {axis_len} + j];
+        sum_squares += x * x;
+    }}
+    float inv_mean = 1.0 / sqrtf(sum_squares * {inv_axis_len} + {epsilon});
+    for (int j = 0; j < {axis_len}; j++) {{
+        {output_name}[i * {axis_len} + j] = {output_name}[i * {axis_len} + j] * inv_mean * {scale_name}[j] + {bias_name}[j];
+    }}
+}}",
+            batch = data.dims.total_elems() / axis_len,
+            inv_axis_len = (axis_len as f32).recip(),
+            epsilon = ln.epsilon,
         );
 
         Ok(kernel)

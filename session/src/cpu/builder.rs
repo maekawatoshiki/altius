@@ -356,7 +356,7 @@ struct timespec now() {{
             Op::Mul => self.translate_bin_op("*", &args, &inputs, &outputs)?,
             Op::Div => self.translate_bin_op("/", &args, &inputs, &outputs)?,
             Op::Pow => self.translate_pow(&node, &args, &inputs, &outputs)?,
-            Op::Sqrt => String::new(),
+            Op::Sqrt => self.translate_sqrt(&args, &inputs, &outputs)?,
             Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
             Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, &outputs)?,
             Op::MaxPool(ref m) => self.translate_max_pool(m, &args, &inputs, &outputs)?,
@@ -773,6 +773,28 @@ float *output_ptr = {};\n",
                 inputs[0].dims, inputs[1].dims
             )
         };
+
+        Ok(kernel)
+    }
+
+    fn translate_sqrt(
+        &mut self,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_name = &args[0];
+        let output_name = &args[1];
+
+        assert_eq!(inputs[0].dims, outputs[0].dims);
+
+        let kernel = format!(
+            "for (int i = 0; i < {size}; i++) {{
+    {output_name}[i] = sqrtf({input_name}[i]);
+}}",
+            input_name = input_name,
+            size = outputs[0].dims.total_elems(),
+        );
 
         Ok(kernel)
     }

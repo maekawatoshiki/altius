@@ -109,6 +109,7 @@ struct Translator<'a> {
     created_calls: Vec<String>,
     created_file_paths: Vec<PathBuf>,
     reshaped_values: FxHashSet<ValueId>,
+    propagated_inits: FxHashSet<ValueId>,
     used_op_names: FxHashSet<String>,
     target_dir: PathBuf,
     enable_profiling: bool,
@@ -140,6 +141,7 @@ impl<'a> Translator<'a> {
             created_calls: Vec::new(),
             created_file_paths: Vec::new(),
             reshaped_values: FxHashSet::default(),
+            propagated_inits: FxHashSet::default(),
             used_op_names: FxHashSet::default(),
             target_dir,
             enable_profiling: false,
@@ -224,7 +226,7 @@ impl<'a> Translator<'a> {
 
             // Free tensors.
             for free in plan.free_vals.iter() {
-                if self.reshaped_values.contains(free) {
+                if self.reshaped_values.contains(free) || self.propagated_inits.contains(free) {
                     continue;
                 }
                 self.created_calls
@@ -375,6 +377,11 @@ struct timespec now() {{
         if matches!(op, Op::Reshape) {
             // TODO: Support 'Flatten'.
             self.reshaped_values.insert(node.inputs[0]);
+            if self.model.inits.contains_key(&node.inputs[0])
+                || self.propagated_inits.contains(&node.inputs[0])
+            {
+                self.propagated_inits.insert(node.outputs[0]);
+            }
             self.created_calls.push(format!(
                 "{} = (float *){};",
                 args[inputs.len()..][0],

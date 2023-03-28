@@ -1069,16 +1069,13 @@ for (int outer = 0; outer < {outer}; outer++) {{
             assert_eq!(batch, batch_);
 
             let kernel = format!(
-                "float *input_0_ptr = (float *){input_0};
-float *input_1_ptr = (float *){input_1};
-float *output_ptr = (float *){output};
-for (int i = 0; i < {batch}; i++) {{
+                "for (int i = 0; i < {batch}; i++) {{
+    const float *input_0_ptr = {input_0} + i * ({m} * {k});
+    const float *input_1_ptr = {input_1} + i * ({k} * {n});
+    float *output_ptr = {output} + i * ({m} * {n});
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
         {m}, {n}, {k}, 1.,
         input_0_ptr, {k}, input_1_ptr, {n}, 0., output_ptr, {n});
-    input_0_ptr += {m} * {k};
-    input_1_ptr += {k} * {n};
-    output_ptr += {m} * {n};
 }}",
                 input_0 = input_names[0],
                 input_1 = input_names[1],

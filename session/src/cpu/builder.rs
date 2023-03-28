@@ -190,7 +190,12 @@ impl<'a> Translator<'a> {
         .unwrap();
 
         #[cfg(target_os = "macos")]
-        let args = &["-framework", "Accelerate", "-L/opt/homebrew/opt/libomp/lib"];
+        let args = &[
+            "-framework",
+            "Accelerate",
+            "-L/opt/homebrew/opt/libomp/lib",
+            mimalloc_obj.to_str().unwrap(),
+        ];
         #[cfg(target_os = "linux")]
         let args = &["-march=native", "-lblis", mimalloc_obj.to_str().unwrap()];
 

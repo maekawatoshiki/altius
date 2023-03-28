@@ -1541,14 +1541,50 @@ for (int i = 0; i < {batch}; i++) {{
         let _input = inputs[0];
         let output = &outputs[0];
 
-        const B: f32 = 0.7978845608028654f32; // sqrt(2.0 / PI)
-        const C: f32 = 0.035677408136300125f32; // 0.044715 * sqrt(2.0 / PI)
-
         let kernel = format!(
-            "#pragma omp parallel for num_threads({th})
+            "
+const float B           = 0.7978845608028654;   // sqrt(2.0 / PI)
+const float C           = 0.035677408136300125; // 0.044715 * sqrt(2.0 / PI)
+const float LOWER_RANGE = -9;
+const float UPPER_RANGE = 9;
+const float ALPHA_13    = -2.76076847742355e-16;
+const float ALPHA_11    = 2.00018790482477e-13;
+const float ALPHA_9     = -8.60467152213735e-11;
+const float ALPHA_7     = 5.12229709037114e-08;
+const float ALPHA_5     = 1.48572235717979e-05;
+const float ALPHA_3     = 6.37261928875436e-04;
+const float ALPHA_1     = 4.89352455891786e-03;
+const float BETA_6      = 1.19825839466702e-06;
+const float BETA_4      = 1.18534705686654e-04;
+const float BETA_2      = 2.26843463243900e-03;
+const float BETA_0      = 4.89352518554385e-03;
+
+#pragma omp parallel for num_threads({th})
+#pragma clang loop vectorize(enable)
 for (int i = 0; i < {size}; i++) {{
+#define clamp(x, min, max) fminf(fmaxf(x, min), max)
     const float x = {input_name}[i];
-    {output_name}[i] = 0.5 * x * (1.0 + tanhf(x * ({C} * x * x + {B})));
+    const float y =
+        clamp(x * (C * x * x + B), LOWER_RANGE, UPPER_RANGE);
+    const float y_squared = y * y;
+
+    float p = y_squared * ALPHA_13 + ALPHA_11;
+    p = p * y_squared + ALPHA_9;
+    p = p * y_squared + ALPHA_7;
+    p = p * y_squared + ALPHA_5;
+    p = p * y_squared + ALPHA_3;
+    p = p * y_squared + ALPHA_1;
+    p = p * y;
+
+    float q = y_squared * BETA_6 + BETA_4;
+    q = q * y_squared + BETA_2;
+    q = q * y_squared + BETA_0;
+
+    float z = p / q;
+    z = (z + 1.) * (x * 0.5);
+
+    {output_name}[i] = z;
+#undef clamp
 }}",
             th = self.intra_op_num_threads,
             size = output.dims.total_elems(),

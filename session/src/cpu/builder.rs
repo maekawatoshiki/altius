@@ -1418,16 +1418,16 @@ for (int i = 0; i < {num_blocks}; i++) {{
         assert!(rmean.keep_dims);
 
         let axis_len = input.dims[2];
-        let r_axis_len = 1.0 / axis_len as f32;
 
         let kernel = format!(
             "for (int i = 0; i < {batch}; i++) {{ 
-    float sum = 0.0;
+    const float *input_ptr = {input_name} + i * {axis_len};
+    float sum = 0.f;
 #pragma clang loop vectorize(enable)
     for (int j = 0; j < {axis_len}; j++) {{
-        sum += {input_name}[i * {axis_len} + j];
+        sum += input_ptr[j];
     }}
-    {output_name}[i] = sum * {r_axis_len};
+    {output_name}[i] = sum * (1.f / {axis_len});
 }}",
             batch = output.dims.total_elems()
         );

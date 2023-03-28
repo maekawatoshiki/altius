@@ -70,6 +70,11 @@ impl CPUSessionBuilder {
             translator.compile()?;
         }
         let lib = unsafe { libloading::Library::new(translator.target_dir.join("model.so")) }?;
+        {
+            let initializer: libloading::Symbol<unsafe extern "C" fn()> =
+                unsafe { lib.get(b"initialize")? };
+            unsafe { initializer() };
+        }
         let entry: libloading::Symbol<unsafe extern "C" fn()> = unsafe { lib.get(b"model_entry")? };
         let entry = unsafe { entry.into_raw().into_raw() };
 
@@ -326,6 +331,12 @@ struct timespec now() {{
                 writer.write_all(b"\n")?;
             }
             writer.write_all(b"\n")?;
+
+            #[cfg(target_os = "macos")]
+            let init_blis = "// blis not used on macOS";
+            #[cfg(not(target_os = "macos"))]
+            let init_blis = format!("bli_thread_set_num_threads({});", self.intra_op_num_threads);
+            writer.write_all(format!("void initialize() {{    {init_blis}\n}}\n\n",).as_bytes())?;
 
             writer.write_all(
                 format!(

@@ -89,6 +89,7 @@ dependencies = [
  "env_logger",
  "fastapprox",
  "futures-intrusive",
+ "glob",
  "image",
  "indent",
  "libloading",

@@ -65,7 +65,7 @@ impl CPUSession {
             durations.sort_by(|(_, b), (_, a)| a.partial_cmp(b).unwrap());
             let width = durations.iter().map(|(op, _)| op.len()).max().unwrap();
             for (op, duration) in durations {
-                log::debug!("| {op:width$}: {duration:.5} [ms]");
+                log::info!("| {op:width$}: {duration:.5} [ms]");
             }
         }
 

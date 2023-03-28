@@ -171,10 +171,28 @@ impl<'a> Translator<'a> {
 
         let mut cmd = std::process::Command::new("clang");
 
+        #[cfg(debug_assertions)]
+        let mimalloc_path = "target/debug/build/libmimalloc-sys-*/out/c_src/mimalloc/src/static.o";
+        #[cfg(not(debug_assertions))]
+        let mimalloc_path =
+            "target/release/build/libmimalloc-sys-*/out/c_src/mimalloc/src/static.o";
+        // TODO: Remove unwraps.
+        let mimalloc_obj = glob::glob(
+            get_project_root()
+                .unwrap()
+                .join(mimalloc_path)
+                .to_str()
+                .unwrap(),
+        )
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap();
+
         #[cfg(target_os = "macos")]
         let args = &["-framework", "Accelerate", "-L/opt/homebrew/opt/libomp/lib"];
         #[cfg(target_os = "linux")]
-        let args = &["-march=native", "-lblis"];
+        let args = &["-march=native", "-lblis", mimalloc_obj.to_str().unwrap()];
 
         cmd.arg("-O3")
             .arg("-o")
@@ -264,6 +282,12 @@ impl<'a> Translator<'a> {
 #include <stdlib.h>
 #include <assert.h>
 #include <time.h>
+
+#define malloc mi_malloc
+#define free mi_free
+
+void *mi_malloc(size_t size);
+void mi_free(void *ptr);
 
 struct timespec now() {{
     struct timespec ts;
@@ -1585,4 +1609,20 @@ fn get_c_type(ty: TensorElemType) -> &'static str {
         TensorElemType::I64 => "int64_t",
         TensorElemType::Bool => "unsigned char",
     }
+}
+
+fn get_project_root() -> Option<PathBuf> {
+    let path = std::env::current_dir().ok()?;
+    let path_ancestors = path.as_path().ancestors();
+
+    for p in path_ancestors {
+        let has_cargo = std::fs::read_dir(p)
+            .ok()?
+            .any(|p| p.unwrap().file_name() == *"Cargo.lock");
+        if has_cargo {
+            return Some(PathBuf::from(p));
+        }
+    }
+
+    None
 }

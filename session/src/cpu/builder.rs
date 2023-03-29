@@ -198,6 +198,7 @@ impl<'a> Translator<'a> {
         let args = &[
             "-framework",
             "Accelerate",
+            "-fno-math-errno",
             "-L/opt/homebrew/opt/libomp/lib",
             mimalloc_obj.to_str().unwrap(),
         ];
@@ -1482,31 +1483,28 @@ for (int i = 0; i < {batch}; i++) {{
     const float *input = {input_name} + i * {axis_len};
     float *output = {output_name} + i * {axis_len};
 
-    float max = input[0];
-    for (int j = 1; j < {axis_len}; j++) {{
-        const float x = input[j];
-        if (x > max) {{
-            max = x;
-        }}
+    float max = -INFINITY;
+    for (int j = 0; j < {axis_len}; j++) {{
+        max = fmaxf(input[j], max);
     }}
 
     float sum = 0.0;
     #pragma clang loop vectorize(enable)
     for (int j = 0; j < {axis_len}; j++) {{
         const float val0 = fmaxf(input[j] - max, LOWER_RANGE);
-        const float biased = val0 * LOG2RECIPROCAL + ROUNDING_BIAS;
+        const float biased = fmaf(val0, LOG2RECIPROCAL, ROUNDING_BIAS);
         const float m = biased - ROUNDING_BIAS;
-        const float val1 = m * LOG2HIGH + val0;
-        const float val2 = m * LOG2LOW + val1;
+        const float val1 = fmaf(m, LOG2HIGH, val0);
+        const float val2 = fmaf(m, LOG2LOW, val1);
         const int32_t normal = (*(int *)&biased) << 23;
         const int32_t normal2 = normal + MAXIMUM_EXPONENT;
         const float p0 = POLY_0;
-        const float p1 = p0 * val2 + POLY_1;
-        const float p2 = p1 * val2 + POLY_2;
-        const float p3 = p2 * val2 + POLY_3;
-        const float p4 = p3 * val2 + POLY_4;
-        const float p5 = p4 * val2 + POLY_56;
-        const float p6 = p5 * val2 + POLY_56;
+        const float p1 = fmaf(p0, val2, POLY_1);
+        const float p2 = fmaf(p1, val2, POLY_2);
+        const float p3 = fmaf(p2, val2, POLY_3);
+        const float p4 = fmaf(p3, val2, POLY_4);
+        const float p5 = fmaf(p4, val2, POLY_56);
+        const float p6 = fmaf(p5, val2, POLY_56);
         const float p7 = p6 * (*(float *)&normal2);
         sum += p7;
         output[j] = p7;
@@ -1617,25 +1615,26 @@ const float BETA_0      = 4.89352518554385e-03;
 #pragma clang loop vectorize(enable)
 for (int i = 0; i < {size}; i++) {{
 #define clamp(x, min, max) fminf(fmaxf(x, min), max)
+// #define clamp(x, min, max) (x)
     const float x = {input_name}[i];
     const float y =
-        clamp(x * (C * x * x + B), LOWER_RANGE, UPPER_RANGE);
+        clamp(x * fmaf(C * x, x, B), LOWER_RANGE, UPPER_RANGE);
     const float y_squared = y * y;
 
-    float p = y_squared * ALPHA_13 + ALPHA_11;
-    p = p * y_squared + ALPHA_9;
-    p = p * y_squared + ALPHA_7;
-    p = p * y_squared + ALPHA_5;
-    p = p * y_squared + ALPHA_3;
-    p = p * y_squared + ALPHA_1;
+    float p = fmaf(y_squared, ALPHA_13, ALPHA_11);
+    p = fmaf(p, y_squared, ALPHA_9);
+    p = fmaf(p, y_squared, ALPHA_7);
+    p = fmaf(p, y_squared, ALPHA_5);
+    p = fmaf(p, y_squared, ALPHA_3);
+    p = fmaf(p, y_squared, ALPHA_1);
     p = p * y;
 
-    float q = y_squared * BETA_6 + BETA_4;
-    q = q * y_squared + BETA_2;
-    q = q * y_squared + BETA_0;
+    float q = fmaf(y_squared, BETA_6, BETA_4);
+    q = fmaf(q, y_squared, BETA_2);
+    q = fmaf(q, y_squared, BETA_0);
 
     float z = p / q;
-    z = (z + 1.) * (x * 0.5);
+    z = (z + 1.f) * (x * 0.5f);
 
     {output_name}[i] = z;
 #undef clamp

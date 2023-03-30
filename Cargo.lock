@@ -96,6 +96,7 @@ dependencies = [
  "log",
  "matrixmultiply",
  "ndarray",
+ "num_cpus",
  "opencl3",
  "paste",
  "pollster",

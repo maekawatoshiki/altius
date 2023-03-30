@@ -1,7 +1,11 @@
 use std::{
     fs::{self, create_dir_all, remove_file, File},
     io::{BufWriter, Write as _},
-    path::{Path, PathBuf},
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 use altius_core::{
@@ -109,10 +113,10 @@ struct Translator<'a> {
     inferred_shapes: &'a FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     value_shapes: &'a FxHashMap<ValueId, TypedShape>,
     created_kernels: Vec<String>,
+    created_kernel_protos: Vec<String>,
     created_extern_values: Vec<String>,
     created_tmp_values: Vec<String>,
     created_calls: Vec<String>,
-    created_file_paths: Vec<PathBuf>,
     reshaped_values: FxHashSet<ValueId>,
     propagated_inits: FxHashSet<ValueId>,
     used_op_names: FxHashSet<String>,
@@ -129,10 +133,18 @@ impl<'a> Translator<'a> {
         value_shapes: &'a FxHashMap<ValueId, TypedShape>,
     ) -> Result<Self, SessionError> {
         let target_dir = PathBuf::from("/tmp/model");
+        #[allow(unused_mut)]
         let mut prev_code_hash = None;
         if target_dir.as_path().exists() {
-            prev_code_hash = get_file_sha1("/tmp/model/main.c");
-            let _ = remove_file("/tmp/model/main.c");
+            let files = glob::glob(target_dir.join("*.c").as_path().to_str().unwrap())
+                .unwrap()
+                .into_iter()
+                .map(Result::unwrap)
+                .collect::<Vec<_>>();
+            prev_code_hash = compute_sha1_from_files(&files);
+            for f in files {
+                let _ = remove_file(f);
+            }
         }
         create_dir_all(&target_dir)?;
 
@@ -141,10 +153,10 @@ impl<'a> Translator<'a> {
             inferred_shapes,
             value_shapes,
             created_kernels: Vec::new(),
+            created_kernel_protos: Vec::new(),
             created_extern_values: Vec::new(),
             created_tmp_values: Vec::new(),
             created_calls: Vec::new(),
-            created_file_paths: Vec::new(),
             reshaped_values: FxHashSet::default(),
             propagated_inits: FxHashSet::default(),
             used_op_names: FxHashSet::default(),
@@ -168,8 +180,14 @@ impl<'a> Translator<'a> {
     fn compile(&self) -> Result<(), SessionError> {
         log::debug!("Compiling the model...");
 
-        let newer_hash = get_file_sha1("/tmp/model/main.c");
-        if newer_hash.is_some() && newer_hash == self.prev_code_hash {
+        let new_hash = compute_sha1_from_files(
+            &glob::glob(self.target_dir.join("*.c").as_path().to_str().unwrap())
+                .unwrap()
+                .into_iter()
+                .map(Result::unwrap)
+                .collect::<Vec<_>>(),
+        );
+        if new_hash.is_some() && new_hash == self.prev_code_hash {
             log::debug!("Skipped compiling!");
             return Ok(());
         }
@@ -205,10 +223,56 @@ impl<'a> Translator<'a> {
         #[cfg(target_os = "linux")]
         let args = &["-march=native", "-lblis", mimalloc_obj.to_str().unwrap()];
 
+        let num_compilied_kernels = Arc::new(AtomicUsize::new(0));
+        let num_kernels_to_compile = self.created_kernels.len();
+        let objects = self
+            .created_kernels
+            .chunks(self.created_kernels.len() / num_cpus::get() + 1)
+            .enumerate()
+            .map(|(i, chunks)| {
+                let num_kernels = chunks.len();
+                let target_dir = self.target_dir.clone();
+                let num_compilied_kernels = num_compilied_kernels.clone();
+                let thread = std::thread::spawn(move || -> Result<(), SessionError> {
+                    let mut cmd = std::process::Command::new("clang");
+                    cmd.arg("-O3")
+                        .arg("-c")
+                        .arg("-o")
+                        .arg(target_dir.join(format!("kernels-{i:05}.o")))
+                        .arg(target_dir.join(format!("kernels-{i:05}.c")))
+                        .arg("-fno-math-errno")
+                        .arg("-fopenmp")
+                        .arg("-fvectorize")
+                        .arg("-fPIC");
+                    #[cfg(target_os = "linux")]
+                    cmd.arg("-march=native");
+                    if !cmd.status()?.success() {
+                        return Err(SessionError::Message("Failed to compile the model".into()));
+                    }
+                    num_compilied_kernels.fetch_add(num_kernels, Ordering::SeqCst);
+                    log::info!(
+                        "Compiled {}/{} kernels",
+                        num_compilied_kernels.load(Ordering::SeqCst),
+                        num_kernels_to_compile
+                    );
+                    Ok(())
+                });
+                (thread, self.target_dir.join(format!("kernels-{i:05}.o")))
+            })
+            .into_iter()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|(t, file)| {
+                t.join().unwrap()?;
+                Ok(file)
+            })
+            .collect::<Result<Vec<_>, SessionError>>()?;
+
         cmd.arg("-O3")
             .arg("-o")
             .arg(self.target_dir.join("model.so"))
             .arg(self.target_dir.join("main.c"))
+            .args(objects)
             .args(args)
             .arg("-fopenmp")
             .arg("-fvectorize")
@@ -300,31 +364,62 @@ impl<'a> Translator<'a> {
 void *mi_malloc(size_t size);
 void mi_free(void *ptr);
 
-struct timespec now() {{
+static struct timespec now() {{
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts;
-}}
-
-{profile}
-
-",
-                profile = if self.enable_profiling {
-                    self.used_op_names
-                        .iter()
-                        .map(|name| format!("double elapsed_{} = 0.0;", name))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                } else {
-                    String::new()
-                }
+}}\n\n",
             );
             writer.write_all(headers.as_bytes())?;
-
-            for kernel in &self.created_kernels {
-                writer.write_all(kernel.as_bytes())?;
-                writer.write_all(b"\n\n")?;
+            if self.enable_profiling {
+                writer.write_all(
+                    format!(
+                        "{profile}\n\n",
+                        profile = self
+                            .used_op_names
+                            .iter()
+                            .map(|name| format!("double elapsed_{};", name))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )
+                    .as_bytes(),
+                )?;
             }
+
+            for (i, chunk) in self
+                .created_kernels
+                .chunks(self.created_kernels.len() / num_cpus::get() + 1)
+                .enumerate()
+            {
+                let main_file = self.create_file(format!("kernels-{i:05}.c").as_str())?;
+                let mut writer = BufWriter::new(main_file);
+                writer.write_all(headers.as_bytes())?;
+                if self.enable_profiling {
+                    writer.write_all(
+                        format!(
+                            "{profile}\n\n",
+                            profile = self
+                                .used_op_names
+                                .iter()
+                                .map(|name| format!("extern double elapsed_{};", name))
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        )
+                        .as_bytes(),
+                    )?;
+                }
+                for kernel in chunk {
+                    writer.write_all(kernel.as_bytes())?;
+                    writer.write_all(b"\n\n")?;
+                }
+                writer.flush()?;
+            }
+
+            for proto in &self.created_kernel_protos {
+                writer.write_all(proto.as_bytes())?;
+                writer.write_all(b"\n")?;
+            }
+            writer.write_all(b"\n")?;
 
             for value in &self.created_extern_values {
                 writer.write_all(b"")?;
@@ -459,12 +554,8 @@ struct timespec now() {{
             _ => todo!("Translation not implemented for {:?}", op),
         };
 
-        let kernel = format!(
-            "void {node_name}({args}) {{
-{start_profiling}
-{body}
-{end_profiling}
-}}",
+        let decl = format!(
+            "void {node_name}({args})",
             args = inputs
                 .iter()
                 .map(|i| ("const ", *i))
@@ -475,7 +566,16 @@ struct timespec now() {{
                     ty = get_c_type(shape.elem_ty)
                 ))
                 .collect::<Vec<_>>()
-                .join(", "),
+                .join(", ")
+        );
+        self.created_kernel_protos.push(format!("{decl};"));
+
+        let kernel = format!(
+            "{decl} {{
+{start_profiling}
+{body}
+{end_profiling}
+}}",
             body = indent_all_by(4, kernel),
             start_profiling = if self.enable_profiling {
                 indent_all_by(4, format!("const struct timespec _start = now();"))
@@ -1646,10 +1746,9 @@ for (int i = 0; i < {size}; i++) {{
         Ok(kernel)
     }
 
-    fn create_file(&mut self, name: &str) -> Result<File, SessionError> {
+    fn create_file(&self, name: &str) -> Result<File, SessionError> {
         let path = self.target_dir.join(name);
         let file = fs::File::create(&path)?;
-        self.created_file_paths.push(path);
         Ok(file)
     }
 
@@ -1680,10 +1779,12 @@ fn escape_name(s: impl Into<String>) -> String {
     )
 }
 
-fn get_file_sha1(path: impl AsRef<Path>) -> Option<[u8; 20]> {
-    let mut file = fs::File::open(path).ok()?;
+fn compute_sha1_from_files(paths: &[PathBuf]) -> Option<[u8; 20]> {
     let mut hasher = Sha1::new();
-    std::io::copy(&mut file, &mut hasher).ok()?;
+    for path in paths {
+        let mut file = fs::File::open(path).ok()?;
+        std::io::copy(&mut file, &mut hasher).ok()?;
+    }
     let hash = hasher.finalize();
     hash.get(..20)?.try_into().ok()
 }

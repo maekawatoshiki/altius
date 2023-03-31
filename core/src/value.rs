@@ -1,3 +1,5 @@
+use std::ops::{Index, IndexMut};
+
 use id_arena::{Arena, Id};
 
 use crate::tensor::TypedShape;
@@ -45,5 +47,19 @@ impl ValueArena {
 
     pub fn inner_mut(&mut self) -> &mut Arena<Value> {
         &mut self.0
+    }
+}
+
+impl Index<ValueId> for ValueArena {
+    type Output = Value;
+
+    fn index(&self, index: ValueId) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<ValueId> for ValueArena {
+    fn index_mut(&mut self, index: ValueId) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }

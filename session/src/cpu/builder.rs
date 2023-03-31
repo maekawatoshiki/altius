@@ -853,8 +853,11 @@ free(col);",
         let alpha = hs.alpha;
         let beta = hs.beta;
         let size = inputs[0].dims.total_elems();
+        let num_threads = self.intra_op_num_threads;
         let kernel = format!(
-            "for (int i = 0; i < {size}; i++) {{
+            "#pragma omp parallel for num_threads({num_threads})
+#pragma clang loop vectorize(enable)
+for (int i = 0; i < {size}; i++) {{
     const float x = {input_name}[i];
     {output_name}[i] = fminf(1.0, fmaxf(0.0, x * {alpha} + {beta}));
 }}"

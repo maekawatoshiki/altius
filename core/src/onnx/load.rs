@@ -199,6 +199,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                     strides,
                     group,
                     padding,
+                    activation: None,
                 })
             }
             "LeakyRelu" => Op::LeakyReLU(LeakyReLU {

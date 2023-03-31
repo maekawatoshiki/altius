@@ -53,7 +53,7 @@ pub enum Op {
     Constant(Constant),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Conv2d {
     pub auto_pad: String,
     pub dilations: Dimensions,
@@ -61,6 +61,13 @@ pub struct Conv2d {
     pub kernel_shape: Dimensions,
     pub strides: Dimensions,
     pub padding: Dimensions,
+    pub activation: Option<FusedActivation>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FusedActivation {
+    Relu,
+    HardSigmoid(HardSigmoid),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -71,7 +78,7 @@ pub struct MaxPool {
     pub padding: Dimensions,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct HardSigmoid {
     pub alpha: f32,
     pub beta: f32,

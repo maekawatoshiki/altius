@@ -13,8 +13,8 @@ use altius_core::{
     model::Model,
     node::{Node, NodeId},
     op::{
-        Concat, Conv2d, Flatten, Gather, Gemm, HardSigmoid, LayerNormalization, MaxPool, Op,
-        ReduceMean, Softmax, Transpose,
+        Concat, Conv2d, Flatten, FusedActivation, Gather, Gemm, HardSigmoid, LayerNormalization,
+        MaxPool, Op, ReduceMean, Softmax, Transpose,
     },
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
@@ -781,6 +781,30 @@ static struct timespec now() {{
         let weight_name = &input_names[1];
         let output_name = &output_names[0];
 
+        let activation = op.activation.as_ref().map_or("".to_string(), |act| {
+            let num_threads = self.intra_op_num_threads;
+            let activation = match act {
+                FusedActivation::Relu => "fmaxf(output_ptr[i], 0.0f)".to_string(),
+                FusedActivation::HardSigmoid(HardSigmoid { alpha, beta }) => {
+                    format!("fmaxf(0.0f, fminf(1.0f, output_ptr[i] * {alpha} + {beta}))")
+                }
+            };
+            let size = output.dims.total_elems();
+            indent_all_by(
+                4,
+                format!(
+                    "{{
+    float *output_ptr = (float *){output_name};
+    #pragma omp parallel for num_threads({num_threads})
+    #pragma clang loop vectorize(enable)
+    for (int i = 0; i < {size}; i++) {{
+        output_ptr[i] = {activation};
+    }}
+}}"
+                ),
+            )
+        });
+
         let code_gemm = format!(
             "{{
     float *weight_ptr = (float *){weight_name}; 
@@ -798,6 +822,8 @@ static struct timespec now() {{
         col_ptr += {col_stride};
         outer--;
     }} while (outer > 0);
+
+    {activation}
 }}"
         );
 

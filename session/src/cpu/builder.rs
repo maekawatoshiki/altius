@@ -1174,18 +1174,22 @@ for (int outer = 0; outer < {outer}; outer++) {{
 
     fn translate_reshape(
         &mut self,
-        args: &[String],
-        inputs: &[&TypedShape],
+        _args: &[String],
+        _inputs: &[&TypedShape],
         _outputs: &[TypedShape],
     ) -> Result<String, SessionError> {
-        let input_name = &args[..inputs.len()][0];
-        let output_name = &args[inputs.len()..][0];
-        assert!(inputs[0].elem_ty.is_f32());
-        let kernel = format!(
-            "memcpy({output_name}, {input_name}, {size} * sizeof(float));",
-            size = inputs[0].dims.total_elems()
-        );
-        Ok(kernel)
+        // `Reshape`s are handled as nop.
+        Ok(String::new())
+
+        // Old implementation:
+        // let input_name = &args[..inputs.len()][0];
+        // let output_name = &args[inputs.len()..][0];
+        // let ty = get_c_type(inputs[0].elem_ty);
+        // let kernel = format!(
+        //     "memcpy({output_name}, {input_name}, {size} * sizeof({ty}));",
+        //     size = inputs[0].dims.total_elems()
+        // );
+        // Ok(kernel)
     }
 
     fn translate_mat_mul(

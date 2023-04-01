@@ -14,7 +14,7 @@ use altius_core::{
     node::{Node, NodeId},
     op::{
         Cast, Concat, Conv2d, Flatten, FusedActivation, Gather, Gemm, HardSigmoid,
-        LayerNormalization, MaxPool, Op, ReduceMean, Softmax, Transpose,
+        LayerNormalization, MaxPool, Op, ReduceMean, Softmax, Split, Transpose,
     },
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
@@ -553,8 +553,8 @@ static struct timespec now() {{
             Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, &outputs)?,
             Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, &outputs)?,
             Op::Gelu => self.translate_gelu(&args, &inputs, &outputs)?,
-            Op::Unsqueeze(_) => String::new(),
-            Op::Split(_) => String::new(),
+            Op::Unsqueeze(_) => String::new(), // nop
+            Op::Split(ref s) => self.translate_split(s, &args, &inputs, &outputs)?,
             Op::Where => String::new(),
             Op::Cast(ref c) => self.translate_cast(c, &args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
@@ -1825,6 +1825,50 @@ for (int i = 0; i < {size}; i++) {{
             th = self.intra_op_num_threads,
             size = output.dims.total_elems(),
         );
+
+        Ok(kernel)
+    }
+
+    fn translate_split(
+        &mut self,
+        split: &Split,
+        args: &[String],
+        inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let opset_version = self.model.opset_version;
+
+        assert!(split.axis >= 0);
+        let axis = split.axis as usize;
+        assert_eq!(axis, inputs[0].dims.len() - 1);
+        assert!(inputs[0].elem_ty.is_f32());
+        let axis_len = *inputs[0].dims.as_slice().last().unwrap();
+
+        let kernel = if opset_version >= 13 {
+            let input_name = &args[0];
+            let split_name = &args[1];
+            let output_names = &args[inputs.len()..];
+            let size = inputs[0].dims.total_elems();
+            let split_len = inputs[1].dims.total_elems();
+
+            format!(
+                "int offsets[{split_len}] = {{0}};
+float *outputs[] = {{ {outputs} }};
+for (int i = 0; i < {size} / {axis_len}; i++) {{
+    int s = 0;
+    for (int j = 0; j < {split_len}; j++) {{
+        const int sp = {split_name}[j];
+        float *output = outputs[j];
+        memcpy(output + offsets[j], {input_name} + i * {axis_len} + s, sp * sizeof(float));
+        offsets[j] += sp;
+        s += sp;
+    }}
+}}",
+                outputs = output_names.join(", "),
+            )
+        } else {
+            todo!("Not yet implemented: opset < 13")
+        };
 
         Ok(kernel)
     }

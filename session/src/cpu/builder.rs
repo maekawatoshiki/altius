@@ -1539,6 +1539,7 @@ for (int i = 0; i < {num_blocks}; i++) {{
         let indices_name = &args[1];
         let output_name = &args[inputs.len()..][0];
 
+        assert!(data.elem_ty.is_f32());
         assert!(gather.axis >= 0);
         assert!(
             indices.dims.is_scalar() || (indices.dims.len() == 2 && indices.dims[0] == 1),
@@ -1562,18 +1563,18 @@ for (int i = 0; i < {num_blocks}; i++) {{
             );
             Ok(kernel)
         } else {
-            todo!()
-            // let axis = gather.axis as usize;
-            // assert_eq!(axis, 0);
-            //
-            // let indices = indices.data::<i64>();
-            // for (&i, o) in indices
-            //     .iter()
-            //     .zip(output.data_mut::<f32>().chunks_mut(data.dims()[1]))
-            // {
-            //     assert!(i >= 0);
-            //     o.copy_from_slice(&data.slice_at::<f32>(&[i as usize])[..data.dims()[1]]);
-            // }
+            let axis = gather.axis as usize;
+            assert_eq!(axis, 0);
+
+            let len = indices.dims.total_elems();
+            let size = data.dims[1];
+            let stride = data.dims.strides()[axis];
+            let kernel = format!(
+                "for (int i = 0; i < {len}; i++) {{
+    memcpy({output_name} + i * {size}, {data_name} + {stride} * ({indices_name}[i]), sizeof(float) * {size});
+}}"
+            );
+            Ok(kernel)
         }
     }
 

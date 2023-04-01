@@ -5,7 +5,10 @@ use altius_core::optimize;
 use altius_core::tensor::{TensorElemType, TensorElemTypeExt};
 use altius_core::value::ValueId;
 use altius_core::{model::Model, tensor::Tensor};
+#[cfg(feature = "cpu")]
+use altius_session::cpu::{CPUSession, CPUSessionBuilder};
 use altius_session::interpreter::{InterpreterSession, InterpreterSessionBuilder};
+use altius_session::SessionError;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 
 use numpy::ndarray::ArrayD;
@@ -18,7 +21,12 @@ pub struct PyModel(pub Model);
 
 #[pyclass]
 #[repr(transparent)]
-pub struct PySession(pub InterpreterSession);
+pub struct PyInterpreterSession(pub InterpreterSession);
+
+#[cfg(feature = "cpu")]
+#[pyclass]
+#[repr(transparent)]
+pub struct PyCPUSession(pub CPUSession);
 
 #[pyfunction]
 fn load(path: String) -> PyResult<PyModel> {
@@ -32,27 +40,55 @@ fn load(path: String) -> PyResult<PyModel> {
     )
 }
 
-#[pyfunction(enable_profiling = false, intra_op_num_threads = 1)]
+#[pyfunction(
+    enable_profiling = false,
+    intra_op_num_threads = 1,
+    backend = "\"interpreter\".to_string()"
+)]
 fn session(
+    py: Python,
     model: PyModel,
     enable_profiling: bool,
     intra_op_num_threads: usize,
-) -> PyResult<PySession> {
+    backend: String,
+) -> PyResult<Py<PyAny>> {
     let mut model = model.0;
     optimize::layer_norm_fusion::fuse_layer_norm(&mut model);
     optimize::gelu_fusion::fuse_gelu(&mut model);
-    Ok(PySession(
-        InterpreterSessionBuilder::new(model)
-            .with_profiling_enabled(enable_profiling)
-            .with_intra_op_num_threads(intra_op_num_threads)
-            .build()
+
+    match backend.as_str() {
+        "interpreter" => Ok(PyInterpreterSession(
+            py.allow_threads(|| {
+                InterpreterSessionBuilder::new(model)
+                    .with_profiling_enabled(enable_profiling)
+                    .with_intra_op_num_threads(intra_op_num_threads)
+                    .build()
+            })
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
-    ))
+        )
+        .into_py(py)),
+        #[cfg(feature = "cpu")]
+        "cpu" => Ok(PyCPUSession(
+            py.allow_threads(|| {
+                CPUSessionBuilder::new(model)
+                    .with_profiling_enabled(enable_profiling)
+                    .with_intra_op_num_threads(intra_op_num_threads)
+                    .build()
+            })
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
+        )
+        .into_py(py)),
+        _ => PyResult::Err(PyRuntimeError::new_err(format!(
+            "Unknown backend: {backend}"
+        ))),
+    }
 }
 
-#[pymethods]
-impl PySession {
-    pub fn run(&mut self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
+trait Session {
+    fn model(&self) -> &Model;
+    fn run_(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError>;
+
+    fn run(&mut self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
         fn create_input<T: Element + TensorElemTypeExt>(
             model: &Model,
             name: String,
@@ -75,22 +111,22 @@ impl PySession {
         let mut new_inputs = vec![];
         for (i, item) in inputs.items().iter().enumerate() {
             if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<f32>)>() {
-                new_inputs.push(create_input(self.0.model(), name, val)?);
+                new_inputs.push(create_input(self.model(), name, val)?);
                 continue;
             }
 
             if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<i64>)>() {
-                new_inputs.push(create_input(self.0.model(), name, val)?);
+                new_inputs.push(create_input(self.model(), name, val)?);
                 continue;
             }
 
             if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<i32>)>() {
-                new_inputs.push(create_input(self.0.model(), name, val)?);
+                new_inputs.push(create_input(self.model(), name, val)?);
                 continue;
             }
 
             if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<bool>)>() {
-                new_inputs.push(create_input(self.0.model(), name, val)?);
+                new_inputs.push(create_input(self.model(), name, val)?);
                 continue;
             }
 
@@ -101,8 +137,7 @@ impl PySession {
 
         let mut outputs = vec![];
         for out in self
-            .0
-            .run(new_inputs)
+            .run_(new_inputs)
             .map_err(|e| PyRuntimeError::new_err(format!("Inference failed: {e}")))?
         {
             macro_rules! arr {
@@ -127,6 +162,42 @@ impl PySession {
             outputs.push(arr);
         }
         Ok(outputs)
+    }
+}
+
+impl Session for PyInterpreterSession {
+    fn model(&self) -> &Model {
+        self.0.model()
+    }
+
+    fn run_(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
+        self.0.run(inputs)
+    }
+}
+
+#[cfg(feature = "cpu")]
+impl Session for PyCPUSession {
+    fn model(&self) -> &Model {
+        self.0.model()
+    }
+
+    fn run_(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
+        self.0.run(inputs)
+    }
+}
+
+#[pymethods]
+impl PyInterpreterSession {
+    fn run(&mut self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
+        Session::run(self, py, inputs)
+    }
+}
+
+#[cfg(feature = "cpu")]
+#[pymethods]
+impl PyCPUSession {
+    fn run(&mut self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
+        Session::run(self, py, inputs)
     }
 }
 

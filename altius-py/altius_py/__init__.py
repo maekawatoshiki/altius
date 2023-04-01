@@ -6,10 +6,10 @@ class InferenceSession:
     ``InferenceSession`` is the class used to run a model.
     """
 
-    def __init__(self, model_path, enable_profile=False, intra_op_num_threads=1):
+    def __init__(self, model_path, enable_profile=False, intra_op_num_threads=1, backend="interpreter"):
         self.model_path = model_path
         self.model = load(model_path)
-        self.session = session(self.model, enable_profile, intra_op_num_threads)
+        self.session = session(self.model, enable_profile, intra_op_num_threads, backend)
 
     def run(self, output, input):
         """

@@ -540,6 +540,7 @@ static struct timespec now() {{
             Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
             Op::Erf => self.translate_erf(&args, &inputs, &outputs)?,
             Op::Tanh => self.translate_tanh(&args, &inputs, &outputs)?,
+            Op::Where => self.translate_where(&args, &inputs, &outputs)?,
             Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, &outputs)?,
             Op::MaxPool(ref m) => self.translate_max_pool(m, &args, &inputs, &outputs)?,
             Op::Reshape => self.translate_reshape(&args, &inputs, &outputs)?,
@@ -555,7 +556,6 @@ static struct timespec now() {{
             Op::Gelu => self.translate_gelu(&args, &inputs, &outputs)?,
             Op::Unsqueeze(_) => String::new(), // nop
             Op::Split(ref s) => self.translate_split(s, &args, &inputs, &outputs)?,
-            Op::Where => String::new(),
             Op::Cast(ref c) => self.translate_cast(c, &args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
         };
@@ -1081,6 +1081,101 @@ for (int i = 0; i < {size}; i++) {{
     {output_name}[i] = tanhf(x);
 }}"
         );
+        Ok(kernel)
+    }
+
+    fn translate_where(
+        &mut self,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_names = &args[..inputs.len()];
+        let output_name = &args[inputs.len()..][0];
+
+        // TODO: The following code is almost a copy of translate_bin_op.
+        let kernel = if inputs[0].dims == inputs[1].dims && inputs[1].dims == inputs[2].dims {
+            format!(
+                "#pragma omp parallel for num_threads({th})
+#pragma clang loop vectorize(enable)
+for (int i = 0; i < {size}; i++) {{
+    {output}[i] = {condition}[i] ? {input_0}[i] : {input_1}[i];
+}}",
+                th = self.intra_op_num_threads,
+                condition = input_names[0],
+                input_0 = input_names[1],
+                input_1 = input_names[2],
+                size = outputs[0].dims.total_elems(),
+                output = output_name,
+            )
+        } else {
+            let rank = outputs[0].dims.len();
+
+            let condition_strides = inputs[0]
+                .dims
+                .strides_for_broadcasting_to(&outputs[0].dims)
+                .unwrap();
+            let input_0_strides = inputs[1]
+                .dims
+                .strides_for_broadcasting_to(&outputs[0].dims)
+                .unwrap();
+            let input_1_strides = inputs[2]
+                .dims
+                .strides_for_broadcasting_to(&outputs[0].dims)
+                .unwrap();
+
+            let mut kernel = String::new();
+            for (i, (((odim, condstr), i0str), i1str)) in outputs[0]
+                .dims
+                .iter()
+                .zip(condition_strides.iter())
+                .zip(input_0_strides.iter())
+                .zip(input_1_strides.iter())
+                .enumerate()
+                .rev()
+            {
+                if i == rank - 1 {
+                    kernel = format!(
+                        "// #pragma clang loop vectorize(enable) // TODO: Is this really impossible?
+for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
+    *output_ptr = *cond_ptr_{i} ? *input_0_ptr_{i} : *input_1_ptr_{i};
+    cond_ptr_{i} += {condstr};
+    input_0_ptr_{i} += {i0str};
+    input_1_ptr_{i} += {i1str};
+    output_ptr += 1;
+}}"
+                    );
+                } else {
+                    kernel = format!(
+                        "{}for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
+    unsigned char *cond_ptr_{iplus1} = cond_ptr_{i};
+    float *input_0_ptr_{iplus1} = input_0_ptr_{i};
+    float *input_1_ptr_{iplus1} = input_1_ptr_{i};
+{}
+    cond_ptr_{i} += {condstr};
+    input_0_ptr_{i} += {i0str};
+    input_1_ptr_{i} += {i1str};
+}}",
+                        if i == 0 {
+                            format!(
+                                "unsigned char *cond_ptr_0 = (unsigned char *){};
+float *input_0_ptr_0 = (float *){};
+float *input_1_ptr_0 = (float *){};
+float *output_ptr = {};\n",
+                                input_names[0], input_names[1], input_names[2], output_name
+                            )
+                        } else {
+                            "".to_string()
+                        },
+                        indent_all_by(4, kernel),
+                        iplus1 = i + 1,
+                    );
+                }
+            }
+
+            kernel
+        };
+
         Ok(kernel)
     }
 

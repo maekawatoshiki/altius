@@ -305,7 +305,7 @@ impl<'a> Translator<'a> {
                 .iter()
                 .filter(|id| !self.model.outputs.contains(id))
             {
-                if matches!(node.op, Op::Reshape) {
+                if matches!(node.op, Op::Reshape | Op::Unsqueeze(_)) {
                     continue;
                 }
                 self.created_calls.push(format!(
@@ -510,7 +510,7 @@ static struct timespec now() {{
             .map(|id| self.value_name(*id))
             .collect::<Vec<_>>();
 
-        if matches!(op, Op::Reshape) {
+        if matches!(op, Op::Reshape | Op::Unsqueeze(_)) {
             // TODO: Support 'Flatten'.
             self.reshaped_values.insert(node.inputs[0]);
             if self.model.inits.contains_key(&node.inputs[0])

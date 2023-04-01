@@ -29,11 +29,9 @@ impl CPUSession {
     }
 
     pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
-        assert_eq!(inputs.len(), 1);
+        assert!(matches!(inputs.len(), 1 | 2));
+        assert_eq!(self.model.outputs.len(), 1);
 
-        let entry = unsafe {
-            std::mem::transmute::<_, unsafe extern "C" fn(*const f32, *mut f32)>(self.entry)
-        };
         let mut outputs = self
             .model
             .outputs
@@ -45,11 +43,27 @@ impl CPUSession {
             .collect::<Vec<_>>();
 
         let start = Instant::now();
-        let _ = unsafe {
-            entry(
-                inputs[0].1.data().as_ptr(),
-                outputs[0].data_mut().as_mut_ptr(),
-            )
+        unsafe {
+            match (inputs.len(), outputs.len()) {
+                (1, 1) => {
+                    let entry = std::mem::transmute::<_, unsafe extern "C" fn(*const u8, *mut u8)>(
+                        self.entry,
+                    );
+                    entry(inputs[0].1.data_as_ptr(), outputs[0].data_as_mut_ptr());
+                }
+                (2, 1) => {
+                    let entry = std::mem::transmute::<
+                        _,
+                        unsafe extern "C" fn(*const u8, *const u8, *mut u8),
+                    >(self.entry);
+                    entry(
+                        inputs[0].1.data_as_ptr(),
+                        inputs[1].1.data_as_ptr(),
+                        outputs[0].data_as_mut_ptr(),
+                    );
+                }
+                _ => unreachable!(),
+            }
         };
 
         if self.enable_profiling {

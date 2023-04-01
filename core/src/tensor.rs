@@ -306,6 +306,10 @@ impl Tensor {
         self.data.as_ptr()
     }
 
+    pub fn data_as_mut_ptr(&mut self) -> *mut u8 {
+        self.data.as_ptr() as *mut u8
+    }
+
     pub fn data_as_bytes(&self) -> &[u8] {
         self.data.as_ref()
     }

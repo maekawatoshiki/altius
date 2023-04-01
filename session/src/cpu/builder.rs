@@ -250,7 +250,7 @@ impl<'a> Translator<'a> {
                         return Err(SessionError::Message("Failed to compile the model".into()));
                     }
                     num_compilied_kernels.fetch_add(num_kernels, Ordering::SeqCst);
-                    log::info!(
+                    log::debug!(
                         "Compiled {}/{} kernels",
                         num_compilied_kernels.load(Ordering::SeqCst),
                         num_kernels_to_compile

@@ -20,6 +20,9 @@ pub struct CPUSession {
     pub(super) profile_symbols: FxHashMap<String, *const f64>,
 }
 
+// TODO: Is this really safe?
+unsafe impl Send for CPUSession {}
+
 impl CPUSession {
     pub fn model(&self) -> &Model {
         &self.model

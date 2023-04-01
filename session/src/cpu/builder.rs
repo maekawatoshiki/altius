@@ -13,8 +13,8 @@ use altius_core::{
     model::Model,
     node::{Node, NodeId},
     op::{
-        Concat, Conv2d, Flatten, FusedActivation, Gather, Gemm, HardSigmoid, LayerNormalization,
-        MaxPool, Op, ReduceMean, Softmax, Transpose,
+        Cast, Concat, Conv2d, Flatten, FusedActivation, Gather, Gemm, HardSigmoid,
+        LayerNormalization, MaxPool, Op, ReduceMean, Softmax, Transpose,
     },
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
@@ -553,6 +553,10 @@ static struct timespec now() {{
             Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, &outputs)?,
             Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, &outputs)?,
             Op::Gelu => self.translate_gelu(&args, &inputs, &outputs)?,
+            Op::Unsqueeze(_) => String::new(),
+            Op::Split(_) => String::new(),
+            Op::Where => String::new(),
+            Op::Cast(ref c) => self.translate_cast(c, &args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
         };
 
@@ -1820,6 +1824,31 @@ for (int i = 0; i < {size}; i++) {{
 }}",
             th = self.intra_op_num_threads,
             size = output.dims.total_elems(),
+        );
+
+        Ok(kernel)
+    }
+
+    fn translate_cast(
+        &mut self,
+        cast: &Cast,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_name = &args[0];
+        let output_name = &args[1];
+        let input = inputs[0];
+        let output = &outputs[0];
+        assert_eq!(input.dims.total_elems(), output.dims.total_elems());
+
+        let to = get_c_type(cast.to);
+        let size = output.dims.total_elems();
+
+        let kernel = format!(
+            "for (int i = 0; i < {size}; i++) {{
+    {output_name}[i] = ({to}){input_name}[i];
+}}"
         );
 
         Ok(kernel)

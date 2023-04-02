@@ -32,7 +32,7 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Download large files
       working-directory: ./models
-      run: ./download.sh
+      run: ./download.sh CI
     - name: Add llvm-tools-preview
       run: rustup component add llvm-tools-preview
     - name: Install grcov

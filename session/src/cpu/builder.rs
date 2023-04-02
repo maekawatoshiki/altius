@@ -308,8 +308,10 @@ impl<'a> Translator<'a> {
                 if matches!(node.op, Op::Reshape | Op::Unsqueeze(_)) {
                     continue;
                 }
+                let shape = &self.value_shapes[output];
+                let ty = get_c_type(shape.elem_ty);
                 self.created_calls.push(format!(
-                    "{name} = (float *)malloc(sizeof(float) * ({size}));",
+                    "{name} = ({ty} *)malloc(sizeof({ty}) * ({size}));",
                     name = self.value_name(*output),
                     size = self.value_shapes[output].dims.total_elems(),
                 ));
@@ -443,11 +445,15 @@ static struct timespec now() {{
                         .filter(|&id| !self.model.inits.contains_key(id))
                         .map(|&id| {
                             let name = self.value_name(id);
-                            format!("const float *{}", name)
+                            let shape = &self.value_shapes[&id];
+                            let ty = get_c_type(shape.elem_ty);
+                            format!("const {ty} *{name}")
                         })
                         .chain(self.model.outputs.iter().map(|&id| {
                             let name = self.value_name(id);
-                            format!("float *{}", name)
+                            let shape = &self.value_shapes[&id];
+                            let ty = get_c_type(shape.elem_ty);
+                            format!("{ty} *{name}")
                         }))
                         .collect::<Vec<_>>()
                         .join(", ")
@@ -513,13 +519,15 @@ static struct timespec now() {{
         if matches!(op, Op::Reshape | Op::Unsqueeze(_)) {
             // TODO: Support 'Flatten'.
             self.reshaped_values.insert(node.inputs[0]);
-            if self.model.inits.contains_key(&node.inputs[0])
+            if self.model.inputs.contains(&node.inputs[0])
+                || self.model.inits.contains_key(&node.inputs[0])
                 || self.propagated_inits.contains(&node.inputs[0])
             {
                 self.propagated_inits.insert(node.outputs[0]);
             }
+            let ty = get_c_type(inputs[0].elem_ty);
             self.created_calls.push(format!(
-                "{} = (float *){};",
+                "{} = ({ty} *){};",
                 args[inputs.len()..][0],
                 args[0]
             ))

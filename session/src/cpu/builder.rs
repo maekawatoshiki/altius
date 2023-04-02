@@ -972,9 +972,12 @@ float *output_ptr = {};\n",
         let input_names = &args[..inputs.len()];
         let output_name = &args[inputs.len()..][0];
 
+        let num_threads = self.intra_op_num_threads;
         let kernel = if inputs[0].dims == inputs[1].dims {
             format!(
-                "for (int i = 0; i < {size}; i++) {{
+                "#pragma omp parallel for num_threads({num_threads})
+#pragma clang loop vectorize(enable)
+for (int i = 0; i < {size}; i++) {{
     {output_name}[i] = powf({input_0}[i], {input_1}[i]);
 }}",
                 input_0 = input_names[0],
@@ -984,14 +987,18 @@ float *output_ptr = {};\n",
         } else if inputs[1].dims.is_scalar() {
             match self.model.inits.get(&node.inputs[1]) {
                 Some(init) if init.data::<f32>()[0] == 2. => format!(
-                    "for (int i = 0; i < {size}; i++) {{
+                    "#pragma omp parallel for num_threads({num_threads})
+#pragma clang loop vectorize(enable)
+for (int i = 0; i < {size}; i++) {{
     {output_name}[i] = {input_0}[i] * {input_0}[i];
 }}",
                     input_0 = input_names[0],
                     size = outputs[0].dims.total_elems(),
                 ),
                 _ => format!(
-                    "for (int i = 0; i < {size}; i++) {{
+                    "#pragma omp parallel for num_threads({num_threads})
+#pragma clang loop vectorize(enable)
+for (int i = 0; i < {size}; i++) {{
     {output_name}[i] = powf({input_0}[i], {input_1}[0]);
 }}",
                     input_0 = input_names[0],

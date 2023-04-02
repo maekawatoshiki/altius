@@ -88,7 +88,7 @@ trait Session {
     fn model(&self) -> &Model;
     fn run_(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError>;
 
-    fn run(&mut self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
+    fn run(&self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
         fn create_input<T: Element + TensorElemTypeExt>(
             model: &Model,
             name: String,
@@ -188,7 +188,7 @@ impl Session for PyCPUSession {
 
 #[pymethods]
 impl PyInterpreterSession {
-    fn run(&mut self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
+    fn run(&self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
         Session::run(self, py, inputs)
     }
 }
@@ -196,7 +196,7 @@ impl PyInterpreterSession {
 #[cfg(feature = "cpu")]
 #[pymethods]
 impl PyCPUSession {
-    fn run(&mut self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
+    fn run(&self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
         Session::run(self, py, inputs)
     }
 }

@@ -557,6 +557,7 @@ static struct timespec now() {{
             Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, &outputs)?,
             Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, &outputs)?,
             Op::Transpose(ref t) => self.translate_transpose(t, &args, &inputs, &outputs)?,
+            Op::Expand => self.translate_expand(&args, &inputs, &outputs)?,
             Op::Concat(ref c) => self.translate_concat(c, &args, &inputs, &outputs)?,
             Op::Gather(ref g) => self.translate_gather(g, &args, &inputs, &outputs)?,
             Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, &outputs)?,
@@ -1615,6 +1616,33 @@ for (int i = 0; i < {num_blocks}; i++) {{
                 indices = indices
             )
         };
+
+        Ok(kernel)
+    }
+
+    fn translate_expand(
+        &mut self,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input = inputs[0];
+        let output = &outputs[0];
+        let input_name = &args[0];
+        let output_name = &args[inputs.len()];
+
+        assert!(input.dims.len() == 4);
+        assert!(input.dims[0..3] == [1, 1, 1]);
+        assert!(output.dims.len() == 4);
+        assert!(input.elem_ty.is_i64());
+
+        let kernel = format!(
+            "for (int i = 0; i < {out_size}; i++) {{
+    {output_name}[i] = {input_name}[i % {in_size}];
+}}",
+            out_size = output.dims.total_elems(),
+            in_size = input.dims.total_elems(),
+        );
 
         Ok(kernel)
     }

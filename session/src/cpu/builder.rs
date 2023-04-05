@@ -547,6 +547,7 @@ static struct timespec now() {{
             Op::Sqrt => self.translate_sqrt(&args, &inputs, &outputs)?,
             Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
             Op::Erf => self.translate_erf(&args, &inputs, &outputs)?,
+            Op::Sigmoid => self.translate_sigmoid(&args, &inputs, &outputs)?,
             Op::Tanh => self.translate_tanh(&args, &inputs, &outputs)?,
             Op::Where => self.translate_where(&args, &inputs, &outputs)?,
             Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, &outputs)?,
@@ -1074,6 +1075,26 @@ for (int i = 0; i < {size}; i++) {{
 for (int i = 0; i < {size}; i++) {{
     const float x = {input_name}[i];
     {output_name}[i] = erff(x);
+}}"
+        );
+        Ok(kernel)
+    }
+
+    fn translate_sigmoid(
+        &mut self,
+        args: &[String],
+        inputs: &[&TypedShape],
+        _outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_name = &args[..inputs.len()][0];
+        let output_name = &args[inputs.len()..][0];
+        let size = inputs[0].dims.total_elems();
+        let num_threads = self.intra_op_num_threads;
+        let kernel = format!(
+            "#pragma omp parallel for num_threads({num_threads})
+for (int i = 0; i < {size}; i++) {{
+    const float x = {input_name}[i];
+    {output_name}[i] = 1.0 / (1.0 + expf(-x));
 }}"
         );
         Ok(kernel)

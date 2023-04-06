@@ -1392,6 +1392,26 @@ for (int outer = 0; outer < {outer}; outer++) {{
             );
 
             Ok(kernel)
+        } else if input_0.dims.len() == 3 && input_1.dims.len() == 3 {
+            let [batch, m, _k] = input_0.dims.to_fixed_dims::<3>();
+            let [batch_, k, n] = input_1.dims.to_fixed_dims::<3>();
+            assert_eq!(batch, batch_);
+
+            let kernel = format!(
+                "for (int i = 0; i < {batch}; i++) {{
+    const float *input_0_ptr = {input_0} + i * ({m} * {k});
+    const float *input_1_ptr = {input_1} + i * ({k} * {n});
+    float *output_ptr = {output} + i * ({m} * {n});
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        {m}, {n}, {k}, 1.,
+        input_0_ptr, {k}, input_1_ptr, {n}, 0., output_ptr, {n});
+}}",
+                input_0 = input_names[0],
+                input_1 = input_names[1],
+                output = output_names[0],
+            );
+
+            Ok(kernel)
         } else if input_0.dims.len() == 4 && input_1.dims.len() == 4 {
             let [one, batch, m, _k] = input_0.dims.to_fixed_dims::<4>();
             let [one_, batch_, k, n] = input_1.dims.to_fixed_dims::<4>();

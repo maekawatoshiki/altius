@@ -9,7 +9,7 @@ from transformers import pipeline
 from transformers import MarianTokenizer
 import onnxruntime as ort
 import numpy as np
-import altius_py
+
 import torch
 from torch.nn import functional as F
 
@@ -23,12 +23,30 @@ def translate_baseline(text_en):
 def translate_onnx(text_en):
     tokenizer = MarianTokenizer.from_pretrained("staka/fugumt-en-ja")
 
-    encoder = ort.InferenceSession(
-        "./fugu/encoder_model2.onnx", providers=["CPUExecutionProvider"]
-    )
-    decoder = ort.InferenceSession(
-        "./fugu/decoder_model2.onnx", providers=["CPUExecutionProvider"]
-    )
+    use_altius = False
+    if use_altius:
+        import altius_py
+
+        os.environ["GOMP_CPU_AFFINITY"] = "0-7"
+        encoder = altius_py.InferenceSession(
+            "./fugumt-en-ja/encoder_model.onnx",
+            intra_op_num_threads=8,
+            enable_profile=True,
+            # backend="cpu"
+        )
+        decoder = altius_py.InferenceSession(
+            "./fugumt-en-ja/decoder_model.onnx",
+            intra_op_num_threads=8,
+            enable_profile=True,
+            # backend="cpu"
+        )
+    else:
+        encoder = ort.InferenceSession(
+            "./fugumt-en-ja/encoder_model.onnx", providers=["CPUExecutionProvider"]
+        )
+        decoder = ort.InferenceSession(
+            "./fugumt-en-ja/decoder_model.onnx", providers=["CPUExecutionProvider"]
+        )
 
     max_tokens = 100
     text = text_en
@@ -52,7 +70,7 @@ def translate_onnx(text_en):
         input[0, : inputs[name].shape[1]] = inputs[name]
         inputs[name] = input
 
-    last_hidden_state = encoder.run(["last_hidden_state"], dict(inputs))[0]
+    last_hidden_state = encoder.run(None, dict(inputs))[0]
 
     translated_text = "<pad>"
     for i in range(100):
@@ -71,7 +89,7 @@ def translate_onnx(text_en):
             decoder_text[name] = input
 
         outputs = decoder.run(
-            ["logits", "encoder_last_hidden_state"],
+            None,
             {
                 "encoder_attention_mask": inputs["attention_mask"],
                 "input_ids": decoder_text["input_ids"].reshape(1, -1),

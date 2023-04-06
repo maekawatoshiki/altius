@@ -29,7 +29,7 @@ impl CPUSession {
     }
 
     pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
-        assert!(matches!(inputs.len(), 1 | 2));
+        assert!(matches!(inputs.len(), 1 | 2 | 3));
         assert_eq!(self.model.outputs.len(), 1);
 
         let mut outputs = self
@@ -44,6 +44,7 @@ impl CPUSession {
 
         let start = Instant::now();
         unsafe {
+            // TODO: Use macro or something better.
             match (inputs.len(), outputs.len()) {
                 (1, 1) => {
                     let entry = std::mem::transmute::<_, unsafe extern "C" fn(*const u8, *mut u8)>(
@@ -59,6 +60,18 @@ impl CPUSession {
                     entry(
                         inputs[0].1.data_as_ptr(),
                         inputs[1].1.data_as_ptr(),
+                        outputs[0].data_as_mut_ptr(),
+                    );
+                }
+                (3, 1) => {
+                    let entry = std::mem::transmute::<
+                        _,
+                        unsafe extern "C" fn(*const u8, *const u8, *const u8, *mut u8),
+                    >(self.entry);
+                    entry(
+                        inputs[0].1.data_as_ptr(),
+                        inputs[1].1.data_as_ptr(),
+                        inputs[2].1.data_as_ptr(),
                         outputs[0].data_as_mut_ptr(),
                     );
                 }

@@ -1,10 +1,10 @@
 #!/bin/bash -eux
 
-pip install optimum
+pip install optimum==1.6.3
 
-DIR=fugumt-ja-en
+DIR=fugumt-en-ja
 
-python -m optimum.exporters.onnx --model "staka/fugumt-ja-en" --for-ort $DIR
+python -m optimum.exporters.onnx --model "staka/${DIR}" --for-ort $DIR
 
 onnxsim ./$DIR/encoder_model.onnx ./$DIR/encoder_model.onnx --overwrite-input-shape input_ids:1,100 attention_mask:1,100
 onnxsim ./$DIR/decoder_model.onnx ./$DIR/decoder_model.onnx --overwrite-input-shape encoder_attention_mask:1,100 input_ids:1,100 encoder_hidden_states:1,100,512

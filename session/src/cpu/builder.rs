@@ -199,18 +199,13 @@ impl<'a> Translator<'a> {
         #[cfg(not(debug_assertions))]
         let mimalloc_path =
             "target/release/build/libmimalloc-sys-*/out/c_src/mimalloc/src/static.o";
+        #[cfg(debug_assertions)]
+        let blis_path = "target/debug/build/blis-src-*/out";
+        #[cfg(not(debug_assertions))]
+        let blis_path = "target/release/build/blis-src-*/out";
         // TODO: Remove unwraps.
-        let mimalloc_obj = glob::glob(
-            get_project_root()
-                .unwrap()
-                .join(mimalloc_path)
-                .to_str()
-                .unwrap(),
-        )
-        .unwrap()
-        .next()
-        .unwrap()
-        .unwrap();
+        let mimalloc_obj = find_path_from_project_root(mimalloc_path).unwrap();
+        let blis_path = find_path_from_project_root(blis_path).unwrap();
 
         #[cfg(target_os = "macos")]
         let args = &[
@@ -232,6 +227,7 @@ impl<'a> Translator<'a> {
             .map(|(i, chunks)| {
                 let num_kernels = chunks.len();
                 let target_dir = self.target_dir.clone();
+                let blis_include_dir = blis_path.join("include").to_str().unwrap().to_string();
                 let num_compilied_kernels = num_compilied_kernels.clone();
                 let thread = std::thread::spawn(move || -> Result<(), SessionError> {
                     let mut cmd = std::process::Command::new("clang");
@@ -245,7 +241,10 @@ impl<'a> Translator<'a> {
                         .arg("-fvectorize")
                         .arg("-fPIC");
                     #[cfg(target_os = "linux")]
-                    cmd.arg("-march=native");
+                    {
+                        cmd.arg("-march=native");
+                        cmd.arg(format!("-I{}", blis_include_dir));
+                    }
                     if !cmd.status()?.success() {
                         return Err(SessionError::Message("Failed to compile the model".into()));
                     }
@@ -278,8 +277,15 @@ impl<'a> Translator<'a> {
             .arg("-fvectorize")
             .arg("-shared")
             .arg("-fPIC")
-            .arg("-lm")
-            .current_dir(&self.target_dir);
+            .arg("-lm");
+        #[cfg(target_os = "linux")]
+        for (flag, name) in [("-I", "include"), ("-L", "lib")].iter() {
+            cmd.arg(format!(
+                "{}{}",
+                flag,
+                blis_path.join(name).to_str().unwrap()
+            ));
+        }
         let status = cmd.status()?;
         if !status.success() {
             return Err(SessionError::Message("Failed to compile model".into()));
@@ -2143,4 +2149,11 @@ fn get_project_root() -> Option<PathBuf> {
     }
 
     None
+}
+
+fn find_path_from_project_root(path: &str) -> Option<PathBuf> {
+    glob::glob(get_project_root()?.join(path).to_str()?)
+        .ok()?
+        .next()?
+        .ok()
 }

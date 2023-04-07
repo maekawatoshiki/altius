@@ -3,3 +3,5 @@ rustflags = ["-Ctarget-cpu=native"]
 
 [env]
 RUST_LOG = "debug"
+CC = "clang"
+CXX = "clang++"

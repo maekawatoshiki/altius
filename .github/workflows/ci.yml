@@ -37,6 +37,8 @@ jobs:
       run: rustup component add llvm-tools-preview
     - name: Install grcov
       run: cargo install grcov
+    - name: Install dependencies
+      run: sudo apt install libomp-dev
     - name: Test
       run: |
         cargo test --release --features blis

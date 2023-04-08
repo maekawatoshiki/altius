@@ -104,6 +104,7 @@ dependencies = [
  "rustc-hash",
  "sha1",
  "structopt",
+ "tempfile",
  "thiserror",
  "thread_local",
  "threadpool",

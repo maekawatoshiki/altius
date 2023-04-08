@@ -132,7 +132,8 @@ impl<'a> Translator<'a> {
         inferred_shapes: &'a FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
         value_shapes: &'a FxHashMap<ValueId, TypedShape>,
     ) -> Result<Self, SessionError> {
-        let target_dir = PathBuf::from("/tmp/model");
+        // let target_dir = PathBuf::from("/tmp/model"); // For debugging
+        let target_dir = tempfile::TempDir::new()?.into_path();
         #[allow(unused_mut)]
         let mut prev_code_hash = None;
         if target_dir.as_path().exists() {

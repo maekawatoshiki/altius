@@ -199,12 +199,15 @@ impl<'a> Translator<'a> {
         #[cfg(not(debug_assertions))]
         let mimalloc_path =
             "target/release/build/libmimalloc-sys-*/out/c_src/mimalloc/src/static.o";
+        #[cfg(target_os = "linux")]
         #[cfg(debug_assertions)]
         let blis_path = "target/debug/build/blis-src-*/out";
+        #[cfg(target_os = "linux")]
         #[cfg(not(debug_assertions))]
         let blis_path = "target/release/build/blis-src-*/out";
         // TODO: Remove unwraps.
         let mimalloc_obj = find_path_from_project_root(mimalloc_path).unwrap();
+        #[cfg(target_os = "linux")]
         let blis_path = find_path_from_project_root(blis_path).unwrap();
 
         #[cfg(target_os = "macos")]
@@ -227,6 +230,7 @@ impl<'a> Translator<'a> {
             .map(|(i, chunks)| {
                 let num_kernels = chunks.len();
                 let target_dir = self.target_dir.clone();
+                #[cfg(target_os = "linux")]
                 let blis_include_dir = blis_path.join("include").to_str().unwrap().to_string();
                 let num_compilied_kernels = num_compilied_kernels.clone();
                 let thread = std::thread::spawn(move || -> Result<(), SessionError> {

@@ -554,6 +554,7 @@ static struct timespec now() {{
             Op::Sub => self.translate_bin_op("-", &args, &inputs, &outputs)?,
             Op::Mul => self.translate_bin_op("*", &args, &inputs, &outputs)?,
             Op::Div => self.translate_bin_op("/", &args, &inputs, &outputs)?,
+            Op::Greater => self.translate_bin_op(">", &args, &inputs, &outputs)?,
             Op::Pow => self.translate_pow(&node, &args, &inputs, &outputs)?,
             Op::Sqrt => self.translate_sqrt(&args, &inputs, &outputs)?,
             Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
@@ -947,24 +948,29 @@ for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
                 } else {
                     kernel = format!(
                         "{}for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
-    float *input_0_ptr_{iplus1} = input_0_ptr_{i};
-    float *input_1_ptr_{iplus1} = input_1_ptr_{i};
+    {in_ty} *input_0_ptr_{iplus1} = input_0_ptr_{i};
+    {in_ty} *input_1_ptr_{iplus1} = input_1_ptr_{i};
 {}
     input_0_ptr_{i} += {i0str};
     input_1_ptr_{i} += {i1str};
 }}",
                         if i == 0 {
                             format!(
-                                "float *input_0_ptr_0 = (float *){};
-float *input_1_ptr_0 = (float *){};
-float *output_ptr = {};\n",
-                                input_names[0], input_names[1], output_name
+                                "{in_ty} *input_0_ptr_0 = ({in_ty} *){};
+{in_ty} *input_1_ptr_0 = ({in_ty} *){};
+{out_ty} *output_ptr = {};\n",
+                                input_names[0],
+                                input_names[1],
+                                output_name,
+                                in_ty = get_c_type(inputs[0].elem_ty),
+                                out_ty = get_c_type(outputs[0].elem_ty),
                             )
                         } else {
                             "".to_string()
                         },
                         indent_all_by(4, kernel),
                         iplus1 = i + 1,
+                        in_ty = get_c_type(inputs[0].elem_ty),
                     );
                 }
             }

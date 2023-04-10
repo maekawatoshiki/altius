@@ -180,7 +180,9 @@ def op_bin(
 
     onnx.save(model, filepath)
     ort_sess = ort.InferenceSession(filepath, providers=["CPUExecutionProvider"])
-    altius_sess = altius_py.InferenceSession(filepath)
+    altius_sess = altius_py.InferenceSession(
+        filepath, backend=os.getenv("ALTIUS_BACKEND", "interpreter")
+    )
 
     x = np.random.random_sample(shape_x).astype(np.float32)
     y = np.random.random_sample(shape_y).astype(np.float32)

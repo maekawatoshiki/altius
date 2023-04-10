@@ -14,7 +14,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  interpreter-backend:
 
     runs-on: ubuntu-latest
 
@@ -65,3 +65,41 @@ jobs:
       env:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
+
+  cpu-backend:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Download large files
+      working-directory: ./models
+      run: ./download.sh CI
+    - name: Install dependencies
+      run: sudo apt install libomp-dev
+    - name: Test
+      run: |
+        cargo test --release --features blis,cpu-backend
+      env:
+        RUSTFLAGS: -Cinstrument-coverage
+        LLVM_PROFILE_FILE: coverage-%p-%m.profraw
+        ALTIUSPY_FEATURES: blis,cpu
+        ALTIUS_BACKEND: cpu
+    - name: Run examples
+      run: |
+        (cd altius-py && source .env/bin/activate && python deit.py)
+        cargo run --release --features blis,cpu --example mnist
+        cargo run --release --features blis,cpu --example mobilenet
+        cargo run --release --features blis,cpu --example deit
+        # cargo run --release --features blis --example vit
+        # cargo run --release --features blis --example infer -- ./models/mnist-8.onnx

@@ -14,9 +14,9 @@ export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 if [ ${1:-nobuild} = "build" ]; then
   if [ -z "${GITHUB_ACTIONS}" ]; then
-    maturin develop -r --target-dir ./target --features blis
+    maturin develop -r --target-dir ./target --features "${ALTIUSPY_FEATURES:-blis}"
   else
-    maturin develop -r --features blis
+    maturin develop -r --features "${ALTIUSPY_FEATURES:-blis}"
   fi
 fi
 

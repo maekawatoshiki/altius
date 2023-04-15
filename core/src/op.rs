@@ -61,7 +61,7 @@ pub struct Conv2d {
     pub kernel_shape: Dimensions,
     pub strides: Dimensions,
     pub padding: Dimensions,
-    pub activation: Option<FusedActivation>,
+    pub activation: Option<FusedActivation>, // This is not part of the ONNX spec.
 }
 
 #[derive(Debug, Clone, PartialEq)]

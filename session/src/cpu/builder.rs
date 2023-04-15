@@ -316,7 +316,7 @@ impl<'a> Translator<'a> {
                 .iter()
                 .filter(|id| !self.model.outputs.contains(id))
             {
-                if matches!(node.op, Op::Reshape | Op::Unsqueeze(_)) {
+                if matches!(node.op, Op::Reshape | Op::Squeeze(_) | Op::Unsqueeze(_)) {
                     continue;
                 }
                 let shape = &self.value_shapes[output];
@@ -527,7 +527,7 @@ static struct timespec now() {{
             .map(|id| self.value_name(*id))
             .collect::<Vec<_>>();
 
-        if matches!(op, Op::Reshape | Op::Unsqueeze(_)) {
+        if matches!(op, Op::Reshape | Op::Squeeze(_) | Op::Unsqueeze(_)) {
             // TODO: Support 'Flatten'.
             self.reshaped_values.insert(node.inputs[0]);
             if self.model.inputs.contains(&node.inputs[0])
@@ -577,6 +577,7 @@ static struct timespec now() {{
             Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, &outputs)?,
             Op::Gelu => self.translate_gelu(&args, &inputs, &outputs)?,
             Op::Unsqueeze(_) => String::new(), // nop
+            Op::Squeeze(_) => String::new(),   // nop
             Op::Split(ref s) => self.translate_split(s, &args, &inputs, &outputs)?,
             Op::Cast(ref c) => self.translate_cast(c, &args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),

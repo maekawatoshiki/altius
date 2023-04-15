@@ -1492,19 +1492,37 @@ for (int outer = 0; outer < {outer}; outer++) {{
 
         assert!(input_0.dims.len() == 2);
         assert!(input_1.dims.len() == 2);
-        assert!(input_2.dims.len() == 1);
+        assert!(matches!(input_2.dims.len(), 1 | 2));
 
         let m = input_0.dims[gemm.trans_a as usize];
         let k = input_0.dims[1 - gemm.trans_a as usize];
         let n = input_1.dims[1 - gemm.trans_b as usize];
 
-        let kernel = format!(
-            "for (int i = 0; i < {output_size}; i += {n}) {{
+        let bias = match input_2.dims.len() {
+            1 => format!(
+                "for (int i = 0; i < {output_size}; i += {n}) {{
     memcpy({out} + i, {in2}, {n} * sizeof(float));
-}}
+}}",
+                output_size = output.dims.total_elems(),
+                in2 = input_names[2],
+                out = output_names[0]
+            ),
+            2 => {
+                assert_eq!(output.dims.total_elems(), m * n);
+                format!(
+                    "memcpy({out}, {bias}, {n} * sizeof(float));",
+                    bias = input_names[2],
+                    out = output_names[0]
+                )
+            }
+            _ => unreachable!(),
+        };
+        let kernel = format!(
+            "{bias}
 cblas_sgemm(CblasRowMajor, {transa}, {transb},
     {m}, {n}, {k}, 1.,
     {in0}, {lda}, {in1}, {ldb}, 1., {out}, {n});",
+            bias = bias,
             transa = if gemm.trans_a {
                 "CblasTrans"
             } else {
@@ -1515,10 +1533,8 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
             } else {
                 "CblasNoTrans"
             },
-            output_size = output.dims.total_elems(),
             in0 = input_names[0],
             in1 = input_names[1],
-            in2 = input_names[2],
             lda = if gemm.trans_a { m } else { k },
             ldb = if gemm.trans_b { k } else { n },
             out = output_names[0]

@@ -703,7 +703,7 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     assert!(input_a.dims().len() == 2);
     assert!(input_b.dims().len() == 2);
-    assert!(input_c.dims().len() == 1);
+    assert!(matches!(input_c.dims().len(), 1 | 2));
 
     #[cfg(feature = "cblas")]
     {
@@ -715,8 +715,18 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let b = input_b.data();
         let c = output.data_mut::<f32>();
 
-        c.chunks_mut(input_c.dims()[0])
-            .for_each(|o| o.copy_from_slice(input_c.data::<f32>()));
+        match input_c.dims().len() {
+            1 => {
+                c.chunks_mut(input_c.dims()[0])
+                    .for_each(|o| o.copy_from_slice(input_c.data::<f32>()));
+            }
+            2 => {
+                assert_eq!(input_c.dims()[0], m);
+                assert_eq!(input_c.dims()[1], n);
+                c.copy_from_slice(input_c.data::<f32>());
+            }
+            _ => unreachable!(),
+        }
 
         sgemm2(
             gemm.trans_a,
@@ -746,11 +756,17 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let a = if gemm.trans_a { a.t() } else { a.view() };
         let b = if gemm.trans_b { b.t() } else { b.view() };
 
-        let c = Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
-            .unwrap()
-            .broadcast(output.fixed_dims::<2>())
-            .unwrap()
-            .into_owned();
+        let c = match input_c.dims().len() {
+            1 => Array2::from_shape_vec([1, input_c.dims()[0]], input_c.data::<f32>().to_vec())
+                .unwrap()
+                .broadcast(output.fixed_dims::<2>())
+                .unwrap()
+                .into_owned(),
+            2 => Array2::from_shape_vec(input_c.fixed_dims::<2>(), input_c.data::<f32>().to_vec())
+                .unwrap()
+                .into_owned(),
+            _ => unreachable!(),
+        };
         let mut c = c.as_standard_layout();
 
         let m = a.shape()[0];

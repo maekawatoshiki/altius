@@ -32,29 +32,32 @@ softmax2(const std::vector<int8_t> &input, const float scale) {
   assert(input.size() > 0);
 
   // constexpr int n = 2;
-  const int8_t max = *std::max_element(input.begin(), input.end());
-  std::vector<int32_t> exp(input.size());
+  const int32_t max = *std::max_element(input.begin(), input.end());
+  std::vector<int64_t> exp(input.size());
   std::vector<int8_t> output(input.size());
   // const float scale_exp = scale / (1 << n);
 
 #define P(x) std::cout << #x << " = " << (int)x << std::endl;
 
   const float a = 0.3585, b = 0.969632 / a, c = 1. / a; // 0.344;
-  const float scale_exp = scale * (a * a);
-  const float scale_exp_2 = scale_exp / (float)(1 << 10);
-  auto poly = [&](int32_t q, float scale) -> std::tuple<int32_t, float> {
-    const int32_t q_b = b / scale;
-    const int32_t q_c = c / (scale * scale);
+  // const float scale_exp = scale * (a * a);
+  // const float scale_exp_2 = scale_exp / (float)(1 << 10);
+  auto poly = [&](int64_t q, float scale) -> std::tuple<int64_t, float> {
+    const int64_t q_b = b / scale;
+    const int64_t q_c = c / (scale * scale);
     const float scale_out = a * scale * scale;
-    const int32_t q_out = (q + q_b) * q + q_c;
+    const int64_t q_out = (q + q_b) * q + q_c;
     return std::make_tuple(q_out, scale_out);
   };
 
-  int n = 10;
+  int n = 30;
   float scale_out;
   for (int i = 0; i < input.size(); i++) {
     const int32_t x_ln2 = floor(-log(2) / scale);
-    const int32_t x = (input[i] - max) > n * x_ln2 ? (input[i] - max) : n * x_ln2;
+    const int32_t in = input[i];
+    // printf("in = %d\n", in);
+    const int32_t x = (in - max) > n * x_ln2 ? (in - max) : n * x_ln2;
+    printf("x = %d\n", x);
     const int32_t q = x / x_ln2;
     const int32_t r = x - x_ln2 * q;
     // P(q);
@@ -62,32 +65,32 @@ softmax2(const std::vector<int8_t> &input, const float scale) {
     // P(r);
     // const int32_t x_p = x + z * x_ln2;
     const auto [q_l, scale_l] = poly(r, scale);
-    const int32_t x_exp = q_l << (n - q);
+    const int64_t x_exp = q_l << (n - q);
     // printf("q_l = %d\n", q_l);
     // P(q_l);
     // P(10 - q);
     // P(q_l << (10 - q));
     // P(z);
     // P(x_p);
-    exp[i] = x_exp;
+    exp[i] = x_exp;// * (int)(1. / scale_l);
     // printf("scale_l = %f\n", scale_l);
-    // printf("exp[i] = %d\n", x_exp);
+    printf("exp[i] = %ld\n", exp[i]);
     // printf("exp[i] = %d\n", exp[i]);
   }
   // P(scale_out);
 
-  int32_t sum = 0;
+  int64_t sum = 0;
   for (int i = 0; i < input.size(); i++) {
     sum += exp[i];
   }
-  const int factor = (1ull << 32) / sum;
+  const int factor = (1ull << 60) / sum;
   printf("sum = %d\n", sum);
   printf("factor = %d\n", factor);
 
   constexpr int m = 8;
 
   for (int i = 0; i < input.size(); i++) {
-    output[i] = (int)exp[i] * (int)factor / (1 << (32 - 7));// / sum;
+    output[i] = (long)exp[i] * (long)factor / (1ll << (60 - 7));// / sum;
     P(output[i]);
   }
 
@@ -214,7 +217,9 @@ int main() {
   }
   {
     std::cout << "# QOp" << std::endl;
-    const auto output = softmax2(quantize(input, scale), scale);
+    const auto qin = quantize(input, scale);
+    // const std::vector<int8_t> qin = {-128, -77, -52, -26, 127 };
+    const auto output = softmax2(qin, scale);
     print("input", input);
     print("output", dequantize(std::get<0>(output), std::get<1>(output)));
   }

@@ -18,7 +18,7 @@ std::vector<int8_t> quantize(const std::vector<float> &x, float scale) {
   return output;
 }
 
-std::vector<float> dequantize(const std::vector<int8_t> &x, float scale) {
+std::vector<float> dequantize(const std::vector<int8_t> &x, const float scale) {
   std::vector<float> output(x.size());
   for (int i = 0; i < x.size(); i++) {
     output[i] = (float)x[i] * scale;
@@ -31,15 +31,17 @@ std::tuple<std::vector<int8_t>, float>
 softmax2(const std::vector<int8_t> &input, const float scale) {
   assert(input.size() > 0);
 
-  constexpr int n = 2;
+  // constexpr int n = 2;
   const int8_t max = *std::max_element(input.begin(), input.end());
-  std::vector<int8_t> exp(input.size());
+  std::vector<int32_t> exp(input.size());
   std::vector<int8_t> output(input.size());
-  const float scale_exp = scale / (1 << n);
+  // const float scale_exp = scale / (1 << n);
 
 #define P(x) std::cout << #x << " = " << (int)x << std::endl;
 
-  const float a = 0.3585, b = 1.353, c = 0.344;
+  const float a = 0.3585, b = 0.969632 / a, c = 1. / a; // 0.344;
+  const float scale_exp = scale * (a * a);
+  const float scale_exp_2 = scale_exp / (float)(1 << 10);
   auto poly = [&](int32_t q, float scale) -> std::tuple<int32_t, float> {
     const int32_t q_b = b / scale;
     const int32_t q_c = c / (scale * scale);
@@ -48,34 +50,48 @@ softmax2(const std::vector<int8_t> &input, const float scale) {
     return std::make_tuple(q_out, scale_out);
   };
 
+  int n = 10;
   float scale_out;
   for (int i = 0; i < input.size(); i++) {
-    const int32_t x = input[i] - max;
-    const int32_t x_ln2 = std::log(2.f) / scale;
-    const int32_t z = -x / x_ln2;
-    const int32_t x_p = x + z * x_ln2;
-    const auto [q_l, scale_l] = poly(x_p, scale);
-    scale_out = scale_l;
-    const int32_t x_exp = q_l >> z;
-    P(z);
-    P(x_p);
+    const int32_t x_ln2 = floor(-log(2) / scale);
+    const int32_t x = (input[i] - max) > n * x_ln2 ? (input[i] - max) : n * x_ln2;
+    const int32_t q = x / x_ln2;
+    const int32_t r = x - x_ln2 * q;
+    // P(q);
+    // printf("x = %d, x_ln2 = %d\n", input[i] - max, n * x_ln2);
+    // P(r);
+    // const int32_t x_p = x + z * x_ln2;
+    const auto [q_l, scale_l] = poly(r, scale);
+    const int32_t x_exp = q_l << (n - q);
+    // printf("q_l = %d\n", q_l);
+    // P(q_l);
+    // P(10 - q);
+    // P(q_l << (10 - q));
+    // P(z);
+    // P(x_p);
     exp[i] = x_exp;
-    P(exp[i]);
+    // printf("scale_l = %f\n", scale_l);
+    // printf("exp[i] = %d\n", x_exp);
+    // printf("exp[i] = %d\n", exp[i]);
   }
-  P(scale_out);
+  // P(scale_out);
 
   int32_t sum = 0;
   for (int i = 0; i < input.size(); i++) {
     sum += exp[i];
   }
-  P(sum);
+  const int factor = (1ull << 32) / sum;
+  printf("sum = %d\n", sum);
+  printf("factor = %d\n", factor);
 
   constexpr int m = 8;
 
   for (int i = 0; i < input.size(); i++) {
-    output[i] = exp[i] / sum;
+    output[i] = (int)exp[i] * (int)factor / (1 << (32 - 7));// / sum;
     P(output[i]);
   }
+
+  scale_out = 1. / 128.;
 
   return std::make_tuple(output, scale_out);
 }
@@ -172,8 +188,10 @@ void print(const std::string msg, const std::vector<float> data) {
 }
 
 int main() {
-  const std::vector<float> input = {-0.5, 0, 0.1, 0.15, 0.2, 0.3, 0.35, 0.9, 1.01};
-  const float scale = 0.04;
+  const std::vector<float> input = {-0.3, -0.1, -0.14, -0.1, 0, 0.1, 0.1, 0.15, 0.2, 0.3, 0.35, 0.5};
+  // const std::vector<float> input = {0, 0.1, 0.1, 0.15, 0.2, 0.3, 0.35, 0.5};
+  // const std::vector<float> input = {-0.3, -0.1, 0, 0.1, 0.1, 0.15, 0.2, 0.3, 0.35, 0.5};
+  const float scale = 1./128.;
   {
     print("input", input);
     auto output = softmax(input);
@@ -182,7 +200,7 @@ int main() {
   {
     print("input", input);
     print("input(int)", quantize(input, scale));
-    print("output", dequantize(quantize(input, scale), scale));
+    print("QDQ input", dequantize(quantize(input, scale), scale));
   }
   {
     std::cout << "# QDQ" << std::endl;
@@ -192,10 +210,11 @@ int main() {
                    1.f / (1 << 7));
     print("input", input);
     print("output", output);
+    print("q output", quantize(output, 1.f / (1 << 7)));
   }
   {
     std::cout << "# QOp" << std::endl;
-    const auto output = softmax(quantize(input, scale), scale);
+    const auto output = softmax2(quantize(input, scale), scale);
     print("input", input);
     print("output", dequantize(std::get<0>(output), std::get<1>(output)));
   }

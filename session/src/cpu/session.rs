@@ -32,6 +32,34 @@ impl CPUSession {
         assert!(matches!(inputs.len(), 1 | 2 | 3));
         assert_eq!(self.model.outputs.len(), 1);
 
+        // #[cfg(feature = "x64-fusion")]
+        use dynasm::dynasm;
+        // #[cfg(feature = "x64-fusion")]
+        // use dynasmrt::{x64::Assembler, DynasmApi};
+        use dynasmrt::{aarch64::Assembler, DynasmApi};
+
+        // #[cfg(feature = "x64-fusion")]
+        let mut ops = Assembler::new().unwrap();
+
+        // #[cfg(feature = "x64-fusion")]
+        let trampoline = ops.offset();
+        // #[cfg(feature = "x64-fusion")]
+        let q = 0;
+        dynasm!(ops
+            ; .arch aarch64
+            ; ldr x4, [x0, q]
+            ; mov x1, x1
+            ; bl (self.entry as u64)
+            ; ldr x5, [x2]
+            ; mov x3, x3
+            ; ret
+        );
+        // #[cfg(feature = "x64-fusion")]
+        let buf = ops.finalize().unwrap();
+        // #[cfg(feature = "x64-fusion")]
+        let trampoline: extern "C" fn(*const *const f32, u64, *const *mut f32, u64) =
+            unsafe { std::mem::transmute(buf.ptr(trampoline)) };
+
         let mut outputs = self
             .model
             .outputs

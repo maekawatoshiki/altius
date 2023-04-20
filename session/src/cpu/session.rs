@@ -4,6 +4,8 @@ use altius_core::{
     tensor::{Tensor, TypedShape},
     value::ValueId,
 };
+#[cfg(target_arch = "x86_64")]
+use dynasmrt::ExecutableBuffer;
 use rustc_hash::FxHashMap;
 
 use std::{path::PathBuf, time::Instant};
@@ -15,7 +17,14 @@ pub struct CPUSession {
     pub(super) value_shapes: FxHashMap<ValueId, TypedShape>,
     #[allow(dead_code)]
     pub(super) lib: libloading::Library,
+    #[cfg(target_arch = "x86_64")]
+    #[allow(dead_code)]
     pub(super) entry: *const std::ffi::c_void,
+    #[cfg(target_arch = "x86_64")]
+    #[allow(dead_code)]
+    pub(super) trampoline_buf: ExecutableBuffer,
+    #[cfg(target_arch = "x86_64")]
+    pub(super) trampoline: extern "C" fn(*const *const u8, *const *mut u8),
     pub(super) enable_profiling: bool,
     pub(super) profile_symbols: FxHashMap<String, *const f64>,
 }
@@ -45,51 +54,16 @@ impl CPUSession {
         let start = Instant::now();
 
         #[cfg(target_arch = "x86_64")]
-        if true {
-            use dynasm::dynasm;
-            use dynasmrt::{aarch64::Assembler, DynasmApi};
-
-            let mut ops = Assembler::new().unwrap();
-
-            let trampoline = ops.offset();
-            dynasm!(ops
-                ; .arch x64
-                ; push rbp
-                ; push r12
-                ; push r13
-                ; mov r12, rdi
-                ; mov r13, rsi
-            );
-            let param_regs = vec![7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
-            for i in 0..inputs.len() as i32 {
-                dynasm!(ops; mov Rq(param_regs[i as usize]), QWORD [r12+8*i]);
+        {
+            let mut inputs_ = Vec::with_capacity(inputs.len());
+            let mut outputs_ = Vec::with_capacity(outputs.len());
+            for (_, tensor) in inputs.iter() {
+                inputs_.push(tensor.data_as_ptr());
             }
-            for i in 0..outputs.len() as i32 {
-                dynasm!(ops; mov Rq(param_regs[inputs.len() + i as usize]), QWORD [r13+8*i]);
+            for tensor in outputs.iter_mut() {
+                outputs_.push(tensor.data_as_mut_ptr());
             }
-            dynasm!(ops
-                ; .arch x64
-                ; mov rax, QWORD self.entry as _
-                ; call rax
-                ; pop r13
-                ; pop r12
-                ; pop rbp
-                ; ret
-            );
-            let buf = ops.finalize().unwrap();
-            let trampoline: extern "C" fn(*const *const u8, *const *mut u8) =
-                unsafe { std::mem::transmute(buf.ptr(trampoline)) };
-
-            let inputs = inputs
-                .iter()
-                .map(|(_, tensor)| tensor.data_as_ptr())
-                .collect::<Vec<_>>();
-            let outputs = outputs
-                .iter_mut()
-                .map(|tensor| tensor.data_as_mut_ptr())
-                .collect::<Vec<_>>();
-
-            trampoline(inputs.as_ptr(), outputs.as_ptr());
+            (self.trampoline)(inputs_.as_ptr(), outputs_.as_ptr());
         }
 
         #[cfg(target_arch = "aarch64")]

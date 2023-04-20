@@ -96,12 +96,56 @@ impl CPUSessionBuilder {
             }
         }
 
+        #[cfg(target_arch = "x86_64")]
+        let (trampoline_buf, trampoline) = {
+            use dynasm::dynasm;
+            use dynasmrt::{aarch64::Assembler, DynasmApi};
+
+            let mut ops = Assembler::new().unwrap();
+
+            let trampoline = ops.offset();
+            dynasm!(ops
+                ; push rbp
+                ; push r12
+                ; push r13
+                ; mov r12, rdi
+                ; mov r13, rsi
+            );
+            let param_regs = vec![7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
+
+            for i in 0..self.model.get_num_actual_inputs() as i32 {
+                dynasm!(ops
+                    ; mov Rq(param_regs[i as usize]), QWORD [r12+8*i]);
+            }
+            for i in 0..self.model.outputs.len() as i32 {
+                dynasm!(ops
+                    ; mov Rq(param_regs[self.model.get_num_actual_inputs() + i as usize]), QWORD [r13+8*i]);
+            }
+            dynasm!(ops
+                ; mov rax, QWORD entry as _
+                ; call rax
+                ; pop r13
+                ; pop r12
+                ; pop rbp
+                ; ret
+            );
+            let buf = ops.finalize().unwrap();
+            let trampoline: extern "C" fn(*const *const u8, *const *mut u8) =
+                unsafe { std::mem::transmute(buf.ptr(trampoline)) };
+
+            (buf, trampoline)
+        };
+
         Ok(CPUSession {
             target_dir: translator.target_dir,
             model: self.model,
             lib,
             value_shapes,
             entry,
+            #[cfg(target_arch = "x86_64")]
+            trampoline_buf,
+            #[cfg(target_arch = "x86_64")]
+            trampoline,
             enable_profiling: self.enable_profiling,
             profile_symbols,
         })

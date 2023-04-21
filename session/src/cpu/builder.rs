@@ -965,7 +965,7 @@ for (int i = 0; i < {size}; i++) {{
                 .enumerate()
                 .rev()
             {
-                if i == rank - 1 {
+                if i == rank - 1 && rank > 1 {
                     kernel = format!(
                         "#pragma clang loop vectorize(enable)
 for (int i{i} = 0; i{i} < {odim}; i{i}++) {{

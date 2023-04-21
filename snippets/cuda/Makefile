@@ -11,7 +11,7 @@ main: main.c libcuda-gemm-act.so
 	$(CC) -O3 $(LDFLAGS) -o $@ main.c -L. -lcuda-gemm-act
 
 libcuda-gemm-act.so: cuda-gemm-act.cu
-	nvcc -shared -Xcompiler -fPIC -lcublas -o $@ $<
+	nvcc -O3 -shared -Xcompiler -fPIC -lcublas -lcurand -o $@ $<
 
 test: all
 	@./main

@@ -99,7 +99,7 @@ impl CPUSessionBuilder {
         #[cfg(target_arch = "x86_64")]
         let (trampoline_buf, trampoline) = {
             use dynasm::dynasm;
-            use dynasmrt::{aarch64::Assembler, DynasmApi};
+            use dynasmrt::{x64::Assembler, DynasmApi};
 
             let mut ops = Assembler::new().unwrap();
 
@@ -136,15 +136,57 @@ impl CPUSessionBuilder {
             (buf, trampoline)
         };
 
+        #[cfg(target_arch = "aarch64")]
+        let (trampoline_buf, trampoline) = {
+            use dynasm::dynasm;
+            use dynasmrt::DynasmLabelApi;
+            use dynasmrt::{aarch64::Assembler, DynasmApi};
+
+            let mut ops = Assembler::new().unwrap();
+
+            let trampoline = ops.offset();
+            dynasm!(ops
+                ; sub sp, sp, 32
+                ; stp x29, x30, [sp, 16]
+                ; stp x8, x9, [sp, 0]
+                ; mov x8, x0
+                ; mov x9, x1
+            );
+            let param_regs = vec![0, 1, 2, 3, 4, 5, 6, 7];
+
+            let input_len = self.model.get_num_actual_inputs();
+            for i in 0..input_len as u32 {
+                dynasm!(ops
+                    ; ldr X(param_regs[i as usize]), [x8, 8*i]);
+            }
+            for i in 0..self.model.outputs.len() as u32 {
+                dynasm!(ops
+                    ; ldr X(param_regs[input_len + i as usize]), [x9, 8*i]);
+            }
+            let label = ops.new_dynamic_label();
+            dynasm!(ops
+                ; ldr x8, =>label
+                ; blr x8
+                ; ldp x8, x9, [sp, 0]
+                ; ldp x29, x30, [sp, 16]
+                ; add sp, sp, 32
+                ; ret
+                ; =>label
+                ; .qword entry as _
+            );
+            let buf = ops.finalize().unwrap();
+            let trampoline: extern "C" fn(*const *const u8, *const *mut u8) =
+                unsafe { std::mem::transmute(buf.ptr(trampoline)) };
+
+            (buf, trampoline)
+        };
+
         Ok(CPUSession {
             target_dir: translator.target_dir,
             model: self.model,
             lib,
             value_shapes,
-            entry,
-            #[cfg(target_arch = "x86_64")]
             trampoline_buf,
-            #[cfg(target_arch = "x86_64")]
             trampoline,
             enable_profiling: self.enable_profiling,
             profile_symbols,

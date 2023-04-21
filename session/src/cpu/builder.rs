@@ -79,8 +79,9 @@ impl CPUSessionBuilder {
                 unsafe { lib.get(b"initialize")? };
             unsafe { initializer() };
         }
-        let entry: libloading::Symbol<unsafe extern "C" fn()> = unsafe { lib.get(b"model_entry")? };
-        let entry = unsafe { entry.into_raw().into_raw() };
+        let trampoline: libloading::Symbol<extern "C" fn(*const *const u8, *const *mut u8)> =
+            unsafe { lib.get(b"trampoline")? };
+        let trampoline = *trampoline;
 
         for (&val_id, tensor) in &self.model.inits {
             let name = translator.value_name(val_id);
@@ -96,97 +97,11 @@ impl CPUSessionBuilder {
             }
         }
 
-        #[cfg(target_arch = "x86_64")]
-        let (trampoline_buf, trampoline) = {
-            use dynasm::dynasm;
-            use dynasmrt::{x64::Assembler, DynasmApi};
-
-            let mut ops = Assembler::new().unwrap();
-
-            let trampoline = ops.offset();
-            dynasm!(ops
-                ; push rbp
-                ; push r12
-                ; push r13
-                ; mov r12, rdi
-                ; mov r13, rsi
-            );
-            let param_regs = vec![7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
-
-            for i in 0..self.model.get_num_actual_inputs() as i32 {
-                dynasm!(ops
-                    ; mov Rq(param_regs[i as usize]), QWORD [r12+8*i]);
-            }
-            for i in 0..self.model.outputs.len() as i32 {
-                dynasm!(ops
-                    ; mov Rq(param_regs[self.model.get_num_actual_inputs() + i as usize]), QWORD [r13+8*i]);
-            }
-            dynasm!(ops
-                ; mov rax, QWORD entry as _
-                ; call rax
-                ; pop r13
-                ; pop r12
-                ; pop rbp
-                ; ret
-            );
-            let buf = ops.finalize().unwrap();
-            let trampoline: extern "C" fn(*const *const u8, *const *mut u8) =
-                unsafe { std::mem::transmute(buf.ptr(trampoline)) };
-
-            (buf, trampoline)
-        };
-
-        #[cfg(target_arch = "aarch64")]
-        let (trampoline_buf, trampoline) = {
-            use dynasm::dynasm;
-            use dynasmrt::DynasmLabelApi;
-            use dynasmrt::{aarch64::Assembler, DynasmApi};
-
-            let mut ops = Assembler::new().unwrap();
-
-            let trampoline = ops.offset();
-            dynasm!(ops
-                ; sub sp, sp, 32
-                ; stp x29, x30, [sp, 16]
-                ; stp x8, x9, [sp, 0]
-                ; mov x8, x0
-                ; mov x9, x1
-            );
-            let param_regs = vec![0, 1, 2, 3, 4, 5, 6, 7];
-
-            let input_len = self.model.get_num_actual_inputs();
-            for i in 0..input_len as u32 {
-                dynasm!(ops
-                    ; ldr X(param_regs[i as usize]), [x8, 8*i]);
-            }
-            for i in 0..self.model.outputs.len() as u32 {
-                dynasm!(ops
-                    ; ldr X(param_regs[input_len + i as usize]), [x9, 8*i]);
-            }
-            let label = ops.new_dynamic_label();
-            dynasm!(ops
-                ; ldr x8, =>label
-                ; blr x8
-                ; ldp x8, x9, [sp, 0]
-                ; ldp x29, x30, [sp, 16]
-                ; add sp, sp, 32
-                ; ret
-                ; =>label
-                ; .qword entry as _
-            );
-            let buf = ops.finalize().unwrap();
-            let trampoline: extern "C" fn(*const *const u8, *const *mut u8) =
-                unsafe { std::mem::transmute(buf.ptr(trampoline)) };
-
-            (buf, trampoline)
-        };
-
         Ok(CPUSession {
             target_dir: translator.target_dir,
             model: self.model,
             lib,
             value_shapes,
-            trampoline_buf,
             trampoline,
             enable_profiling: self.enable_profiling,
             profile_symbols,
@@ -531,7 +446,8 @@ static struct timespec now() {{
             let init_blis = "// blis not used on macOS";
             #[cfg(not(target_os = "macos"))]
             let init_blis = format!("bli_thread_set_num_threads({});", self.intra_op_num_threads);
-            writer.write_all(format!("void initialize() {{    {init_blis}\n}}\n\n",).as_bytes())?;
+            writer
+                .write_all(format!("void initialize() {{\n    {init_blis}\n}}\n\n").as_bytes())?;
 
             writer.write_all(
                 format!(
@@ -578,7 +494,34 @@ static struct timespec now() {{
                 writer.write_all(b"\n")?;
             }
 
-            writer.write_all(b"}\n")?;
+            writer.write_all(b"}\n\n")?;
+
+            writer.write_all(
+                format!(
+                    "void trampoline(const void **ins, const void **outs) {{
+    model_entry({args});
+}}\n",
+                    args = self
+                        .model
+                        .inputs
+                        .iter()
+                        .filter(|&id| !self.model.inits.contains_key(id))
+                        .enumerate()
+                        .map(|(i, &id)| {
+                            let shape = &self.value_shapes[&id];
+                            let ty = get_c_type(shape.elem_ty);
+                            format!("(const {ty} *)ins[{i}]")
+                        })
+                        .chain(self.model.outputs.iter().enumerate().map(|(i, &id)| {
+                            let shape = &self.value_shapes[&id];
+                            let ty = get_c_type(shape.elem_ty);
+                            format!("({ty} *)outs[{i}]")
+                        }))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+                .as_bytes(),
+            )?;
         }
 
         writer.flush()?;

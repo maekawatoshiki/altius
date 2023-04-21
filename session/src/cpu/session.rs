@@ -4,7 +4,6 @@ use altius_core::{
     tensor::{Tensor, TypedShape},
     value::ValueId,
 };
-use dynasmrt::ExecutableBuffer;
 use rustc_hash::FxHashMap;
 
 use std::{path::PathBuf, time::Instant};
@@ -16,8 +15,6 @@ pub struct CPUSession {
     pub(super) value_shapes: FxHashMap<ValueId, TypedShape>,
     #[allow(dead_code)]
     pub(super) lib: libloading::Library,
-    #[allow(dead_code)]
-    pub(super) trampoline_buf: ExecutableBuffer,
     pub(super) trampoline: extern "C" fn(*const *const u8, *const *mut u8),
     pub(super) enable_profiling: bool,
     pub(super) profile_symbols: FxHashMap<String, *const f64>,

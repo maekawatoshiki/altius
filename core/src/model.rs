@@ -19,6 +19,12 @@ pub struct Model {
 }
 
 impl Model {
+    pub fn get_num_actual_inputs(&self) -> usize {
+        let mut inputs = self.inputs.clone();
+        inputs.retain(|i| !self.inits.contains_key(i));
+        inputs.len()
+    }
+
     pub fn add_node(&mut self, node: Node) -> NodeId {
         self.nodes.alloc(node)
     }

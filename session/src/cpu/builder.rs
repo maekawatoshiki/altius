@@ -775,16 +775,20 @@ static struct timespec now() {{
 ")
         } else if dilation_h == 1 && dilation_w == 1 {
             let input_name = &input_names[0];
+            let num_threads = self.intra_op_num_threads;
 
             format!("float *col =
-    (float *)malloc(sizeof(float) * {batch_size} * {group} * {out_c_per_g} * {output_h} * {output_w} * {kernel_h} * {kernel_w});
+    (float *)malloc(sizeof(float) * {batch_size} * {input_c} * {output_h} * {output_w} * {kernel_h} * {kernel_w});
 
 {{
     const int output_hw = {output_h} * {output_w};
-    float *input_ptr = (float *){input_name};
-    float *col_ptr = (float *)col;
-    
+    float *_input_ptr = (float *){input_name};
+    float *_col_ptr = (float *)col;
+   
+    #pragma omp parallel for num_threads({num_threads})
     for (int outer = 0; outer < {batch_size} * {input_c}; outer++) {{
+        float *input_ptr = _input_ptr + outer * {input_hw};
+        float *col_ptr = _col_ptr + outer * {output_hw} * {kernel_h} * {kernel_w};
         for (int fy = 0; fy < {kernel_h}; fy++) {{
             for (int fx = 0; fx < {kernel_w}; fx++) {{
                 for (int oh = 0; oh < {output_h}; oh++) {{
@@ -824,7 +828,6 @@ static struct timespec now() {{
                 col_ptr += {output_hw};
             }}
         }}
-        input_ptr += {input_hw};
     }}
 }}")
         } else {

@@ -14,7 +14,7 @@ use altius_core::{
     node::{Node, NodeId},
     op::{
         Cast, Concat, Conv2d, Flatten, FusedActivation, Gather, Gemm, HardSigmoid,
-        LayerNormalization, MaxPool, Op, ReduceMean, Softmax, Split, Transpose,
+        LayerNormalization, MaxPool, Op, ReduceMean, Resize, Softmax, Split, Transpose,
     },
     tensor::{TensorElemType, TypedShape},
     value::ValueId,
@@ -609,6 +609,7 @@ static struct timespec now() {{
             Op::Squeeze(_) => String::new(),   // nop
             Op::Split(ref s) => self.translate_split(s, &args, &inputs, &outputs)?,
             Op::Cast(ref c) => self.translate_cast(c, &args, &inputs, &outputs)?,
+            Op::Resize(ref r) => self.translate_resize(r, &args, &inputs, &outputs)?,
             _ => todo!("Translation not implemented for {:?}", op),
         };
 
@@ -2169,6 +2170,55 @@ for (int i = 0; i < {size} / {axis_len}; i++) {{
         );
 
         Ok(kernel)
+    }
+
+    fn translate_resize(
+        &mut self,
+        resize: &Resize,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_names = &args[0..inputs.len()];
+        let output_names = &args[inputs.len()..];
+
+        let input = inputs[0];
+        // let sizes = inputs[1];
+        let output = &outputs[0];
+
+        assert!(matches!(inputs.len(), 3 | 4));
+
+        let batch_size = input.dims[0];
+        let input_c = input.dims[1];
+        let input_h = input.dims[2];
+        let input_w = input.dims[3];
+        let output_h = output.dims[2];
+        let output_w = output.dims[3];
+        let input_hw = input_h * input_w;
+        let output_hw = output_h * output_w;
+        let outer = batch_size * input_c;
+
+        let scale = output_h as f32 / input_h as f32;
+
+        if resize.mode == "nearest" {
+            let kernel = format!("for (int i = 0; i < {outer}; i++) {{
+    for (int h = 0; h < {output_h}; h++) {{
+        const int ih = ((int)((float)h / (float){scale})) * {input_w};
+        for (int w = 0; w < {output_w}; w++) {{
+            const int iw = (float)w / (float){scale};
+            {output_name}[i * {output_hw} + h * {output_w} + w] = {input_name}[i * {input_hw} + ih + iw];
+        }}
+    }}
+}}",
+                input_name = input_names[0],
+                output_name = output_names[0]
+            );
+            Ok(kernel)
+        } else {
+            return Err(SessionError::Message(
+                format!("Resize: mode '{}' not supported", resize.mode).into(),
+            ));
+        }
     }
 
     fn create_file(&self, name: &str) -> Result<File, SessionError> {

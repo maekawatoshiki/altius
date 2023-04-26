@@ -2109,7 +2109,33 @@ for (int i = 0; i < {size} / {axis_len}; i++) {{
                 outputs = output_names.join(", "),
             )
         } else {
-            todo!("Not yet implemented: opset < 13")
+            let input_name = &args[0];
+            let output_names = &args[inputs.len()..];
+            let size = inputs[0].dims.total_elems();
+            let split_len = split.split.len();
+
+            format!(
+                "int offsets[{split_len}] = {{0}};
+int splits[{split_len}] = {{ {splits} }};
+float *outputs[] = {{ {outputs} }};
+for (int i = 0; i < {size} / {axis_len}; i++) {{
+    int s = 0;
+    for (int j = 0; j < {split_len}; j++) {{
+        const int sp = splits[j];
+        float *output = outputs[j];
+        memcpy(output + offsets[j], {input_name} + i * {axis_len} + s, sp * sizeof(float));
+        offsets[j] += sp;
+        s += sp;
+    }}
+}}",
+                outputs = output_names.join(", "),
+                splits = split
+                    .split
+                    .iter()
+                    .map(i64::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            )
         };
 
         Ok(kernel)

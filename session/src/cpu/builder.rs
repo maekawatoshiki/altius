@@ -1749,24 +1749,29 @@ for (int i = 0; i < {num_blocks}; i++) {{
         };
         assert!(axis < output.dims.len());
 
-        let mut kernel = String::new();
-        let mut offset = 0;
-        for (i, input) in inputs.iter().enumerate() {
-            assert!(input.elem_ty.is_f32());
-            assert_eq!(input.dims.len(), output.dims.len());
-            assert_eq!(input.dims[0..axis], output.dims[0..axis]);
-            assert_eq!(input.dims[axis + 1..], output.dims[axis + 1..]);
+        let sum_num_elems = inputs
+            .iter()
+            .map(|input| {
+                assert_eq!(input.dims.len(), output.dims.len());
+                assert_eq!(input.dims[0..axis], output.dims[0..axis]);
+                assert_eq!(input.dims[axis + 1..], output.dims[axis + 1..]);
+                input.dims[axis..].iter().product::<usize>()
+            })
+            .sum::<usize>();
+        let outer = output.dims.total_elems() / sum_num_elems;
 
-            let num_elems = input.dims[axis..].iter().product::<usize>();
-            kernel.push_str(&format!(
-                "memcpy({out} + {offset}, {in}, sizeof(float) * {num_elems});\n",
-                out = output_name,
-                in = input_names[i],
-                offset = offset,
-                num_elems = num_elems
-            ));
-            offset += num_elems;
-        }
+        let kernel = format!(
+            "int offset = 0;
+for (int i = 0; i < {outer}; i++) {{
+{memcpy}
+}}",
+            memcpy = indent_all_by(4, input_names.iter().zip(inputs.iter()).map(|(name, input)| {
+                let num_elems = input.dims[axis..].iter().product::<usize>();
+                let ty = get_c_type(output.elem_ty);
+                format!("memcpy({output_name} + offset, {name} + i * {num_elems}, sizeof({ty}) * {num_elems});\n\
+                         offset += {num_elems};")
+            }).collect::<Vec<_>>().join("\n"))
+        );
 
         Ok(kernel)
     }

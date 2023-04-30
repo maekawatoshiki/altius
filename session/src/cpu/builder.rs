@@ -1143,11 +1143,41 @@ for (int i = 0; i < {size}; i++) {{
         let size = inputs[0].dims.total_elems();
         let num_threads = self.intra_op_num_threads;
         let kernel = format!(
-            "#pragma omp parallel for num_threads({num_threads})
+            "
+const float LOWER_RANGE        = -88.37626;
+const float ROUNDING_BIAS      = 12582912.0;
+const float LOG2RECIPROCAL     = 1.44269504088896341;
+const float LOG2HIGH           = -6.93145752e-1;
+const float LOG2LOW            = -1.42860677e-6;
+const float POLY_0             = 0.0013780593872;
+const float POLY_1             = 0.0083731245250;
+const float POLY_2             = 0.0416695363820;
+const float POLY_3             = 0.1666647195816;
+const float POLY_4             = 0.4999998509884;
+const float POLY_56            = 1.0000000000000;
+const int32_t MAXIMUM_EXPONENT = 0x3F800000;
+
+#pragma omp parallel for num_threads({num_threads})
+#pragma clang loop vectorize(enable)
 for (int i = 0; i < {size}; i++) {{
-    const float x = {input_name}[i];
-    {output_name}[i] = 1.0 / (1.0 + expf(-x));
-}}"
+    const float val0 = fmaxf(-{input_name}[i], LOWER_RANGE);
+    const float biased = fmaf(val0, LOG2RECIPROCAL, ROUNDING_BIAS);
+    const float m = biased - ROUNDING_BIAS;
+    const float val1 = fmaf(m, LOG2HIGH, val0);
+    const float val2 = fmaf(m, LOG2LOW, val1);
+    const int32_t normal = (*(int *)&biased) << 23;
+    const int32_t normal2 = normal + MAXIMUM_EXPONENT;
+    const float p0 = POLY_0;
+    const float p1 = fmaf(p0, val2, POLY_1);
+    const float p2 = fmaf(p1, val2, POLY_2);
+    const float p3 = fmaf(p2, val2, POLY_3);
+    const float p4 = fmaf(p3, val2, POLY_4);
+    const float p5 = fmaf(p4, val2, POLY_56);
+    const float p6 = fmaf(p5, val2, POLY_56);
+    const float p7 = p6 * (*(float *)&normal2);
+    {output_name}[i] = 1.f / (1.f + p7);
+}}
+"
         );
         Ok(kernel)
     }

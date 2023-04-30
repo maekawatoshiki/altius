@@ -1,10 +1,13 @@
 use std::time::Instant;
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{model::Model, node::NodeId};
 
-pub fn fuse_elemwise_ops(model: &Model) -> Vec<Vec<NodeId>> {
+type EntryNode = NodeId;
+type Chain = Vec<NodeId>;
+
+pub fn fuse_elemwise_ops(model: &Model) -> FxHashMap<EntryNode, Chain> {
     let start = Instant::now();
     let nodes = model.topo_sort_nodes();
     let value_users = model.get_value_users();
@@ -14,6 +17,10 @@ pub fn fuse_elemwise_ops(model: &Model) -> Vec<Vec<NodeId>> {
     let mut visited: FxHashSet<NodeId> = FxHashSet::default();
 
     for node_id in nodes {
+        if visited.contains(&node_id) {
+            continue;
+        }
+
         let mut fusible_nodes = vec![];
         let mut last_node_id = None;
         let mut cur_node_id = node_id;
@@ -30,11 +37,14 @@ pub fn fuse_elemwise_ops(model: &Model) -> Vec<Vec<NodeId>> {
                         || (last_node_id.is_some() && Some(value_parents[id]) == last_node_id)
                         || last_node_id.is_none()
                 });
+            let end_of_chain = fusible && value_users[&node.outputs[0]].len() != 1;
             if fusible {
                 fusible_nodes.push(cur_node_id);
                 last_node_id = Some(cur_node_id);
                 cur_node_id = *value_users[&node.outputs[0]].iter().next().unwrap();
-                continue;
+                if !end_of_chain {
+                    continue;
+                }
             }
             break;
         }
@@ -63,5 +73,7 @@ pub fn fuse_elemwise_ops(model: &Model) -> Vec<Vec<NodeId>> {
 
     log::info!("fuse_elemwise_ops(): {:?}", start.elapsed());
 
-    list
+    list.into_iter()
+        .map(|nodes| (nodes[0], nodes))
+        .collect::<FxHashMap<_, _>>()
 }

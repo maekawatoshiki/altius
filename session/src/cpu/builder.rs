@@ -9,7 +9,7 @@ use std::{
 };
 
 use altius_core::{
-    analysis::shape::infer_shapes,
+    analysis::{elemwise_fusion::fuse_elemwise_ops, shape::infer_shapes},
     model::Model,
     node::{Node, NodeId},
     op::{
@@ -298,9 +298,30 @@ impl<'a> Translator<'a> {
         let main_file = self.create_file("main.c")?;
         let mut writer = BufWriter::new(main_file);
 
+        #[cfg(feature = "elemwise_fusion")]
+        let fusible_chains = fuse_elemwise_ops(&self.model);
         let execution_plans = create_execution_plan(&self.model);
+        #[cfg(feature = "elemwise_fusion")]
+        let mut visited: FxHashSet<NodeId> = FxHashSet::default();
+        #[cfg(feature = "elemwise_fusion")]
+        let mut no_fused_chains = true;
 
         for plan in execution_plans {
+            #[cfg(feature = "elemwise_fusion")]
+            if visited.contains(&plan.node_id) {
+                continue;
+            }
+
+            #[cfg(feature = "elemwise_fusion")]
+            if no_fused_chains {
+                if let Some(chain) = fusible_chains.get(&plan.node_id) {
+                    visited.extend(chain.iter());
+                    self.translate_fused_elemwise(chain)?;
+                    no_fused_chains = false;
+                    continue;
+                }
+            }
+
             let node = &self.model.nodes[plan.node_id];
             // Allocate temporary tensors.
             for output in node
@@ -654,6 +675,136 @@ static struct timespec now() {{
         Ok(())
     }
 
+    #[cfg(feature = "elemwise_fusion")]
+    fn translate_fused_elemwise(&mut self, chain: &[NodeId]) -> Result<(), SessionError> {
+        assert!(chain.len() >= 2);
+        let first_node_id = chain[0];
+        let last_node_id = chain[chain.len() - 1];
+
+        let first_node = &self.model.nodes[first_node_id];
+        let last_node = &self.model.nodes[last_node_id];
+
+        {
+            // Allocate temporary tensors.
+            for output in last_node
+                .outputs
+                .iter()
+                .filter(|id| !self.model.outputs.contains(id))
+            {
+                if matches!(
+                    last_node.op,
+                    Op::Reshape | Op::Squeeze(_) | Op::Unsqueeze(_)
+                ) {
+                    continue;
+                }
+                let shape = &self.value_shapes[output];
+                let ty = get_c_type(shape.elem_ty);
+                self.created_calls.push(format!(
+                    "{name} = ({ty} *)malloc(sizeof({ty}) * ({size}));",
+                    name = self.value_name(*output),
+                    size = self.value_shapes[output].dims.total_elems(),
+                ));
+            }
+        }
+
+        let mut input_values = Vec::new();
+        {
+            let mut prev = None;
+            for node_id in chain {
+                let node = &self.model.nodes[*node_id];
+                if let Some(prev) = prev {
+                    input_values.extend(
+                        node.inputs
+                            .iter()
+                            .filter(|i| !self.model.nodes[prev].outputs.contains(i)),
+                    );
+                } else {
+                    input_values.extend(node.inputs.iter());
+                }
+                prev = Some(*node_id);
+            }
+        }
+        let input_shapes = input_values
+            .iter()
+            .map(|value_id| &self.value_shapes[value_id])
+            .collect::<Vec<_>>();
+        let (op, outputs) = self.inferred_shapes.get(&last_node_id).map_or_else(
+            || todo!("Why is this node output shape not inferred?"),
+            |result| Ok::<&(Op, Vec<TypedShape>), SessionError>(result),
+        )?;
+        self.used_op_names.insert(op.name().into());
+
+        let node_name = first_node.name.clone().unwrap_or_else(|| {
+            format!("{}_noname_{}", first_node.op.name(), first_node_id.index())
+        });
+        let node_name = escape_name(node_name);
+        log::debug!("[FUSE] Translating node: {}", node_name);
+
+        let args = input_values
+            .iter()
+            .chain(last_node.outputs.iter())
+            .map(|id| self.value_name(*id))
+            .collect::<Vec<_>>();
+
+        if matches!(op, Op::Reshape | Op::Squeeze(_) | Op::Unsqueeze(_)) {
+            unreachable!();
+        } else {
+            self.created_calls
+                .push(format!("{node_name}({});", args.join(", ")));
+        }
+
+        let kernel = self.translate_fused_bin_op("+", &args, &input_shapes, &outputs)?;
+
+        let decl = format!(
+            "void {node_name}({args})",
+            args = input_shapes
+                .iter()
+                .map(|i| ("const ", *i))
+                .chain(outputs.iter().map(|o| ("", o)))
+                .zip(args.iter())
+                .map(|((prefix, shape), name)| format!(
+                    "{prefix}{ty} *{name}",
+                    ty = get_c_type(shape.elem_ty)
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        self.created_kernel_protos.push(format!("{decl};"));
+
+        let kernel = format!(
+            "{decl} {{
+{start_profiling}
+{body}
+{end_profiling}
+}}",
+            body = indent_all_by(4, kernel),
+            start_profiling = if self.enable_profiling {
+                indent_all_by(4, format!("const struct timespec _start = now();"))
+            } else {
+                String::new()
+            },
+            end_profiling = if self.enable_profiling {
+                indent_all_by(
+                    4,
+                    format!(
+                        "{{
+    const struct timespec _end = now();
+    const double start_in_sec = (double)_start.tv_sec + (double)_start.tv_nsec / 1e9;
+    const double end_in_sec = (double)_end.tv_sec + (double)_end.tv_nsec / 1e9;
+    elapsed_{} += end_in_sec - start_in_sec;
+}}",
+                        op.name(),
+                    ),
+                )
+            } else {
+                String::new()
+            },
+        );
+        self.created_kernels.push(kernel);
+
+        Ok(())
+    }
+
     fn translate_conv2d(
         &mut self,
         op: &Conv2d,
@@ -914,6 +1065,96 @@ for (int i = 0; i < {size}; i++) {{
     {output_name}[i] = fminf(1.0, fmaxf(0.0, x * {alpha} + {beta}));
 }}"
         );
+        Ok(kernel)
+    }
+
+    #[cfg(feature = "elemwise_fusion")]
+    fn translate_fused_bin_op(
+        &mut self,
+        op: &str,
+        args: &[String],
+        inputs: &[&TypedShape],
+        outputs: &[TypedShape],
+    ) -> Result<String, SessionError> {
+        let input_names = &args[..inputs.len()];
+        let output_name = &args[inputs.len()..][0];
+
+        let kernel = if inputs[0].dims == inputs[1].dims {
+            format!(
+                "#pragma omp parallel for num_threads({th})
+#pragma clang loop vectorize(enable)
+for (int i = 0; i < {size}; i++) {{
+    {output}[i] = {input_0}[i] {op} {input_1}[i];
+}}",
+                th = self.intra_op_num_threads,
+                input_0 = input_names[0],
+                input_1 = input_names[1],
+                size = outputs[0].dims.total_elems(),
+                output = output_name,
+            )
+        } else {
+            let rank = outputs[0].dims.len();
+            let input_0_strides = inputs[0]
+                .dims
+                .strides_for_broadcasting_to(&outputs[0].dims)
+                .unwrap();
+            let input_1_strides = inputs[1]
+                .dims
+                .strides_for_broadcasting_to(&outputs[0].dims)
+                .unwrap();
+
+            let mut kernel = String::new();
+            for (i, ((odim, i0str), i1str)) in outputs[0]
+                .dims
+                .iter()
+                .zip(input_0_strides.iter())
+                .zip(input_1_strides.iter())
+                .enumerate()
+                .rev()
+            {
+                if i == rank - 1 && rank > 1 {
+                    kernel = format!(
+                        "#pragma clang loop vectorize(enable)
+for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
+    *output_ptr = sqrtf(*input_0_ptr_{i} {op} *input_1_ptr_{i});
+    input_0_ptr_{i} += {i0str};
+    input_1_ptr_{i} += {i1str};
+    output_ptr += 1;
+}}"
+                    );
+                } else {
+                    kernel = format!(
+                        "{}for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
+    {in_ty} *input_0_ptr_{iplus1} = input_0_ptr_{i};
+    {in_ty} *input_1_ptr_{iplus1} = input_1_ptr_{i};
+{}
+    input_0_ptr_{i} += {i0str};
+    input_1_ptr_{i} += {i1str};
+}}",
+                        if i == 0 {
+                            format!(
+                                "{in_ty} *input_0_ptr_0 = ({in_ty} *){};
+{in_ty} *input_1_ptr_0 = ({in_ty} *){};
+{out_ty} *output_ptr = {};\n",
+                                input_names[0],
+                                input_names[1],
+                                output_name,
+                                in_ty = get_c_type(inputs[0].elem_ty),
+                                out_ty = get_c_type(outputs[0].elem_ty),
+                            )
+                        } else {
+                            "".to_string()
+                        },
+                        indent_all_by(4, kernel),
+                        iplus1 = i + 1,
+                        in_ty = get_c_type(inputs[0].elem_ty),
+                    );
+                }
+            }
+
+            kernel
+        };
+
         Ok(kernel)
     }
 

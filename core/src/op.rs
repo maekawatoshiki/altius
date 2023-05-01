@@ -1,6 +1,7 @@
 use crate::{
     dim::Dimensions,
     tensor::{Tensor, TensorElemType},
+    value::ValueId,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +52,7 @@ pub enum Op {
     LayerNormalization(LayerNormalization),
     HardSigmoid(HardSigmoid),
     Constant(Constant),
+    FusedElemwise(FusedElemwise), // This is not part of the ONNX spec.
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -204,6 +206,12 @@ pub struct LayerNormalization {
 pub struct Constant {
     pub value: Tensor,
     // TODO: Other attributes
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FusedElemwise {
+    pub input_map: Vec<ValueId>,
+    pub chain: Vec<(Op, Vec<ValueId>, Vec<ValueId>)>, // op, inputs, outputs
 }
 
 impl Op {
@@ -368,6 +376,7 @@ impl Op {
             Op::LayerNormalization(_) => "LayerNormalization",
             Op::HardSigmoid(_) => "HardSigmoid",
             Op::Constant(_) => "Constant",
+            Op::FusedElemwise(_) => "FusedElemwise",
         }
     }
 

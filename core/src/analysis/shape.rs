@@ -560,6 +560,41 @@ impl Op {
                 let input = inputs[0];
                 shapes.push(TypedShape::new(input.dims().clone(), cast.to));
             }
+            Op::FusedElemwise(ref mut f) => {
+                let mut map = FxHashMap::default();
+                for (i, val_id) in f.input_map.iter().enumerate() {
+                    map.insert(*val_id, inputs[i]);
+                }
+                let mut prev_output_shape = vec![];
+                let mut prev_output_id = None;
+                for (i, (op, inputs, output)) in f.chain.iter_mut().enumerate() {
+                    assert_eq!(output.len(), 1);
+                    if i == 0 {
+                        let ins = inputs.iter().map(|v| map[v]).collect::<Vec<_>>();
+                        prev_output_shape =
+                            op.compute_output_shapes(&ins, output.len(), opset_version)?;
+                    } else {
+                        let prev_output_dummy = Tensor::empty_of_type(
+                            prev_output_shape[0].elem_ty,
+                            prev_output_shape[0].dims.clone(),
+                        );
+                        prev_output_shape = op.compute_output_shapes(
+                            &inputs
+                                .iter()
+                                .map(|v| {
+                                    map.get(&v).copied().unwrap_or_else(|| {
+                                        assert_eq!(Some(*v), prev_output_id);
+                                        &prev_output_dummy
+                                    })
+                                })
+                                .collect::<Vec<_>>(),
+                            output.len(),
+                            opset_version,
+                        )?;
+                    }
+                    prev_output_id = Some(output[0]);
+                }
+            }
         }
 
         Ok(shapes)

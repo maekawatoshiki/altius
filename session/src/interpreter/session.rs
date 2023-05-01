@@ -273,6 +273,9 @@ impl InterpreterSession {
                     "Constant: Kernel not implemented".into(),
                 ))
             }
+            Op::FusedElemwise(_) => {
+                unreachable!()
+            }
         }
 
         #[cfg(not(target_arch = "wasm32"))]

@@ -594,6 +594,7 @@ impl Op {
                     }
                     prev_output_id = Some(output[0]);
                 }
+                shapes.extend(prev_output_shape.into_iter());
             }
         }
 

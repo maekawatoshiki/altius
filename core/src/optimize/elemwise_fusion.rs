@@ -2,19 +2,21 @@ use std::time::Instant;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::{analysis::shape::infer_shapes, model::Model, node::NodeId};
+use crate::{
+    analysis::shape::{infer_shapes, ShapeError},
+    model::Model,
+    node::{Node, NodeId},
+    op::{FusedElemwise, Op},
+};
 
-type EntryNode = NodeId;
-type Chain = Vec<NodeId>;
-
-pub fn fuse_elemwise_ops(model: &Model) -> FxHashMap<EntryNode, Chain> {
+pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
     let start = Instant::now();
     let nodes = model.topo_sort_nodes();
     let value_users = model.get_value_users();
     let value_parents = model.get_value_parents();
 
     let mut value_shapes = FxHashMap::default();
-    infer_shapes(model, &mut FxHashMap::default(), &mut value_shapes).unwrap(); // TODO
+    infer_shapes(model, &mut FxHashMap::default(), &mut value_shapes)?;
 
     let mut list = vec![];
     let mut visited: FxHashSet<NodeId> = FxHashSet::default();
@@ -83,9 +85,48 @@ pub fn fuse_elemwise_ops(model: &Model) -> FxHashMap<EntryNode, Chain> {
         );
     }
 
+    // let count = list.len();
+
+    for chain in list {
+        let mut input_map = Vec::new();
+        {
+            let mut prev_node_id = None;
+            for &node_id in &chain {
+                let node = &model.nodes[node_id];
+                if let Some(prev) = prev_node_id {
+                    input_map.extend(
+                        node.inputs
+                            .iter()
+                            .filter(|i| !model.nodes[prev].outputs.contains(i)),
+                    );
+                } else {
+                    input_map.extend(node.inputs.iter());
+                }
+                prev_node_id = Some(node_id);
+            }
+        }
+        let last_node = &model.nodes[*chain.last().unwrap()];
+
+        let fused_elemwise = Node::new(Op::FusedElemwise(FusedElemwise {
+            input_map: input_map.clone(),
+            chain: chain
+                .iter()
+                .map(|&id| {
+                    let node = &model.nodes[id];
+                    (node.op.clone(), node.inputs.clone(), node.outputs.clone())
+                })
+                .collect(),
+        }))
+        .with_ins(input_map)
+        .with_out(last_node.outputs[0]);
+        model.add_node(fused_elemwise);
+
+        for &node_id in &chain {
+            model.nodes[node_id].deleted = true;
+        }
+    }
+
     log::info!("fuse_elemwise_ops(): {:?}", start.elapsed());
 
-    list.into_iter()
-        .map(|nodes| (nodes[0], nodes))
-        .collect::<FxHashMap<_, _>>()
+    Ok(())
 }

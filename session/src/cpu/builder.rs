@@ -9,11 +9,11 @@ use std::{
 };
 
 use altius_core::{
-    analysis::{elemwise_fusion::fuse_elemwise_ops, shape::infer_shapes},
+    analysis::shape::infer_shapes,
     model::Model,
     node::{Node, NodeId},
     op::{
-        Cast, Concat, Conv2d, Flatten, FusedActivation, Gather, Gemm, HardSigmoid,
+        Cast, Concat, Conv2d, Flatten, FusedActivation, FusedElemwise, Gather, Gemm, HardSigmoid,
         LayerNormalization, MaxPool, Op, ReduceMean, Resize, Softmax, Split, Transpose,
     },
     tensor::{TensorElemType, TypedShape},
@@ -298,26 +298,9 @@ impl<'a> Translator<'a> {
         let main_file = self.create_file("main.c")?;
         let mut writer = BufWriter::new(main_file);
 
-        #[cfg(feature = "elemwise_fusion")]
-        let fusible_chains = fuse_elemwise_ops(&self.model);
         let execution_plans = create_execution_plan(&self.model);
-        #[cfg(feature = "elemwise_fusion")]
-        let mut visited: FxHashSet<NodeId> = FxHashSet::default();
 
         for plan in execution_plans {
-            #[cfg(feature = "elemwise_fusion")]
-            {
-                if visited.contains(&plan.node_id) {
-                    continue;
-                }
-
-                if let Some(chain) = fusible_chains.get(&plan.node_id) {
-                    self.translate_fused_elemwise(chain)?;
-                    visited.extend(chain.iter());
-                    continue;
-                }
-            }
-
             let node = &self.model.nodes[plan.node_id];
             // Allocate temporary tensors.
             for output in node
@@ -618,147 +601,15 @@ static struct timespec now() {{
             Op::Split(ref s) => self.translate_split(s, &args, &inputs, &outputs)?,
             Op::Cast(ref c) => self.translate_cast(c, &args, &inputs, &outputs)?,
             Op::Resize(ref r) => self.translate_resize(r, &args, &inputs, &outputs)?,
+            Op::FusedElemwise(ref f) => {
+                self.translate_fused_elemwise(f, &args, &inputs, &outputs)?
+            }
             _ => todo!("Translation not implemented for {:?}", op),
         };
 
         let decl = format!(
             "void {node_name}({args})",
             args = inputs
-                .iter()
-                .map(|i| ("const ", *i))
-                .chain(outputs.iter().map(|o| ("", o)))
-                .zip(args.iter())
-                .map(|((prefix, shape), name)| format!(
-                    "{prefix}{ty} *{name}",
-                    ty = get_c_type(shape.elem_ty)
-                ))
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
-        self.created_kernel_protos.push(format!("{decl};"));
-
-        let kernel = format!(
-            "{decl} {{
-{start_profiling}
-{body}
-{end_profiling}
-}}",
-            body = indent_all_by(4, kernel),
-            start_profiling = if self.enable_profiling {
-                indent_all_by(4, format!("const struct timespec _start = now();"))
-            } else {
-                String::new()
-            },
-            end_profiling = if self.enable_profiling {
-                indent_all_by(
-                    4,
-                    format!(
-                        "{{
-    const struct timespec _end = now();
-    const double start_in_sec = (double)_start.tv_sec + (double)_start.tv_nsec / 1e9;
-    const double end_in_sec = (double)_end.tv_sec + (double)_end.tv_nsec / 1e9;
-    elapsed_{} += end_in_sec - start_in_sec;
-}}",
-                        op.name(),
-                    ),
-                )
-            } else {
-                String::new()
-            },
-        );
-        self.created_kernels.push(kernel);
-
-        Ok(())
-    }
-
-    #[cfg(feature = "elemwise_fusion")]
-    fn translate_fused_elemwise(&mut self, chain: &[NodeId]) -> Result<(), SessionError> {
-        assert!(chain.len() >= 2);
-        let first_node_id = chain[0];
-        let last_node_id = chain[chain.len() - 1];
-
-        let first_node = &self.model.nodes[first_node_id];
-        let last_node = &self.model.nodes[last_node_id];
-
-        // TODO: Free temporary tensors.
-        {
-            // Allocate temporary tensors.
-            for output in last_node
-                .outputs
-                .iter()
-                .filter(|id| !self.model.outputs.contains(id))
-            {
-                if matches!(
-                    last_node.op,
-                    Op::Reshape | Op::Squeeze(_) | Op::Unsqueeze(_)
-                ) {
-                    continue;
-                }
-                let shape = &self.value_shapes[output];
-                let ty = get_c_type(shape.elem_ty);
-                self.created_calls.push(format!(
-                    "{name} = ({ty} *)malloc(sizeof({ty}) * ({size}));",
-                    name = self.value_name(*output),
-                    size = self.value_shapes[output].dims.total_elems(),
-                ));
-            }
-        }
-
-        let mut input_values = Vec::new();
-        {
-            let mut prev = None;
-            for node_id in chain {
-                let node = &self.model.nodes[*node_id];
-                if let Some(prev) = prev {
-                    input_values.extend(
-                        node.inputs
-                            .iter()
-                            .filter(|i| !self.model.nodes[prev].outputs.contains(i)),
-                    );
-                } else {
-                    input_values.extend(node.inputs.iter());
-                }
-                prev = Some(*node_id);
-            }
-        }
-        let input_shapes = input_values
-            .iter()
-            .map(|value_id| &self.value_shapes[value_id])
-            .collect::<Vec<_>>();
-        let (op, outputs) = self.inferred_shapes.get(&last_node_id).map_or_else(
-            || todo!("Why is this node output shape not inferred?"),
-            |result| Ok::<&(Op, Vec<TypedShape>), SessionError>(result),
-        )?;
-        self.used_op_names.insert(op.name().into());
-
-        let node_name = first_node.name.clone().unwrap_or_else(|| {
-            format!("{}_noname_{}", first_node.op.name(), first_node_id.index())
-        });
-        let node_name = escape_name(node_name);
-        log::debug!("[FUSE] Translating node: {}", node_name);
-
-        let args = input_values
-            .iter()
-            .chain(last_node.outputs.iter())
-            .map(|id| self.value_name(*id))
-            .collect::<Vec<_>>();
-
-        if matches!(op, Op::Reshape | Op::Squeeze(_) | Op::Unsqueeze(_)) {
-            unreachable!();
-        } else {
-            self.created_calls
-                .push(format!("{node_name}({});", args.join(", ")));
-        }
-
-        let ops = chain
-            .iter()
-            .map(|node_id| self.model.nodes[*node_id].op.name())
-            .collect::<Vec<_>>();
-        let kernel = self.translate_fused_bin_op(&ops, &args, &input_shapes, &outputs)?;
-
-        let decl = format!(
-            "void {node_name}({args})",
-            args = input_shapes
                 .iter()
                 .map(|i| ("const ", *i))
                 .chain(outputs.iter().map(|o| ("", o)))
@@ -1070,9 +921,9 @@ for (int i = 0; i < {size}; i++) {{
     }
 
     #[cfg(feature = "elemwise_fusion")]
-    fn translate_fused_bin_op(
+    fn translate_fused_elemwise(
         &mut self,
-        ops: &[&str],
+        op: &FusedElemwise,
         args: &[String],
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
@@ -1118,28 +969,16 @@ for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
                         expr = {
                             let mut out = format!("*input_0_ptr_{i}");
                             let mut opr_idx = 1;
-                            for &op in ops {
-                                match op {
-                                    "Add" | "Sub" | "Mul" | "Div" => {
-                                        out = format!(
-                                            "({out} {op} *input_{y}_ptr_{i})",
-                                            y = opr_idx,
-                                            op = match op {
-                                                "Add" => "+",
-                                                "Sub" => "-",
-                                                "Mul" => "*",
-                                                "Div" => "/",
-                                                _ => unreachable!(),
-                                            }
-                                        );
-                                        opr_idx += 1;
-                                    }
-                                    "Sqrt" => {
-                                        out = format!("sqrtf({out})");
-                                        opr_idx += 0;
-                                    }
-                                    e => todo!("{e}"),
-                                }
+                            for (op, inputs, _) in op.chain.iter() {
+                                out = match op {
+                                    Op::Add => format!("({out} + *input_{opr_idx}_ptr_{i})"),
+                                    Op::Sub => format!("({out} - *input_{opr_idx}_ptr_{i})"),
+                                    Op::Mul => format!("({out} * *input_{opr_idx}_ptr_{i})"),
+                                    Op::Div => format!("({out} / *input_{opr_idx}_ptr_{i})"),
+                                    Op::Sqrt => format!("sqrtf({out})"),
+                                    _ => todo!("{op:?}"),
+                                };
+                                opr_idx += inputs.len() - 1;
                             }
                             out
                         },

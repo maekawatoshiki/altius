@@ -49,7 +49,8 @@ struct NodeExecutionPlan {
     free_vals: Vec<ValueId>,
 }
 
-fn create_execution_plan(model: &Model, sorted_nodes: &[NodeId]) -> Vec<NodeExecutionPlan> {
+fn create_execution_plan(model: &Model) -> Vec<NodeExecutionPlan> {
+    let sorted_nodes = model.topo_sort_nodes();
     let node_order: FxHashMap<NodeId, usize> = sorted_nodes
         .iter()
         .enumerate()
@@ -59,7 +60,7 @@ fn create_execution_plan(model: &Model, sorted_nodes: &[NodeId]) -> Vec<NodeExec
     let mut node_to_free_vals = FxHashMap::default();
     let value_users = model.get_value_users();
 
-    for &node_id in sorted_nodes {
+    for node_id in sorted_nodes {
         let node = &model.nodes[node_id];
         new_sorted_nodes.push(NodeExecutionPlan {
             node_id,

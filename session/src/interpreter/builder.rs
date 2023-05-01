@@ -40,14 +40,8 @@ impl InterpreterSessionBuilder {
         let enable_profiling = self.enable_profiling;
         let intra_op_num_threads = self.intra_op_num_threads;
 
-        let sorted_nodes = model.topo_sort_nodes();
         let mut inferred_shapes = FxHashMap::default();
-        infer_shapes(
-            &model,
-            &sorted_nodes,
-            &mut inferred_shapes,
-            &mut FxHashMap::default(),
-        )?;
+        infer_shapes(&model, &mut inferred_shapes, &mut FxHashMap::default())?;
 
         #[cfg(feature = "blis")]
         {
@@ -60,7 +54,7 @@ impl InterpreterSessionBuilder {
         Ok(InterpreterSession {
             #[cfg(feature = "cuda")]
             cudnn_ctx: SafeCudnnContext(CudnnContext::new().expect("cudnn context init failed")),
-            execution_plans: create_execution_plan(&model, &sorted_nodes),
+            execution_plans: create_execution_plan(&model),
             model,
             inferred_shapes,
             enable_profiling,

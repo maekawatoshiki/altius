@@ -55,12 +55,7 @@ impl CPUSessionBuilder {
     pub fn build(self) -> Result<CPUSession, SessionError> {
         let mut inferred_shapes = FxHashMap::default();
         let mut value_shapes = FxHashMap::default();
-        infer_shapes(
-            &self.model,
-            &self.model.topo_sort_nodes(),
-            &mut inferred_shapes,
-            &mut value_shapes,
-        )?;
+        infer_shapes(&self.model, &mut inferred_shapes, &mut value_shapes)?;
 
         let mut profile_symbols = FxHashMap::default();
         let mut translator = Translator::new(&self.model, &inferred_shapes, &value_shapes)?
@@ -303,7 +298,7 @@ impl<'a> Translator<'a> {
         let main_file = self.create_file("main.c")?;
         let mut writer = BufWriter::new(main_file);
 
-        let execution_plans = create_execution_plan(&self.model, &self.model.topo_sort_nodes());
+        let execution_plans = create_execution_plan(&self.model);
 
         for plan in execution_plans {
             let node = &self.model.nodes[plan.node_id];

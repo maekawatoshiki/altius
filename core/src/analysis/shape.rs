@@ -570,10 +570,10 @@ impl Op {
 /// It skips to infer on nodes without information for inference.
 pub fn infer_shapes(
     model: &Model,
-    sorted_nodes: &[NodeId],
     shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
     value_shapes: &mut FxHashMap<ValueId, TypedShape>,
 ) -> Result<(), ShapeError> {
+    let sorted_nodes = model.topo_sort_nodes();
     let mut values = model.inits.clone();
 
     for &val_id in &model.inputs {
@@ -583,7 +583,7 @@ pub fn infer_shapes(
         values.insert(val_id, tensor);
     }
 
-    for &node in sorted_nodes {
+    for node in sorted_nodes {
         infer_shape(model, &mut values, shapes, node)?
     }
 

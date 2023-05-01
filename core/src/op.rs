@@ -372,27 +372,28 @@ impl Op {
     }
 
     pub fn is_elemwise(&self) -> bool {
+        // TODO: Support in the future
         matches!(
             self,
             Self::Add
                 | Self::Sub
                 | Self::Mul
                 | Self::Div
-                | Self::Pow
+                // | Self::Pow
                 | Self::Greater
                 | Self::Sqrt
                 | Self::ReLU
                 | Self::LeakyReLU(_)
-                | Self::Gelu
-                | Self::Sigmoid
-                | Self::Erf
-                | Self::Tanh
-                | Self::Clip
-                | Self::Where
-                | Self::Softmax(_)
-                | Self::Cast(_)
-                | Self::Round
-                | Self::Exp
+                // | Self::Gelu
+                // | Self::Sigmoid
+                // | Self::Erf
+                // | Self::Tanh
+                // | Self::Clip
+                // | Self::Where
+                // | Self::Softmax(_)
+                // | Self::Cast(_)
+                // | Self::Round
+                // | Self::Exp
                 | Self::HardSigmoid(_)
         )
     }

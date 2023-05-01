@@ -303,21 +303,17 @@ impl<'a> Translator<'a> {
         let execution_plans = create_execution_plan(&self.model);
         #[cfg(feature = "elemwise_fusion")]
         let mut visited: FxHashSet<NodeId> = FxHashSet::default();
-        #[cfg(feature = "elemwise_fusion")]
-        let mut no_fused_chains = true;
 
         for plan in execution_plans {
             #[cfg(feature = "elemwise_fusion")]
-            if visited.contains(&plan.node_id) {
-                continue;
-            }
+            {
+                if visited.contains(&plan.node_id) {
+                    continue;
+                }
 
-            #[cfg(feature = "elemwise_fusion")]
-            if no_fused_chains {
                 if let Some(chain) = fusible_chains.get(&plan.node_id) {
-                    visited.extend(chain.iter());
                     self.translate_fused_elemwise(chain)?;
-                    no_fused_chains = false;
+                    visited.extend(chain.iter());
                     continue;
                 }
             }
@@ -684,6 +680,7 @@ static struct timespec now() {{
         let first_node = &self.model.nodes[first_node_id];
         let last_node = &self.model.nodes[last_node_id];
 
+        // TODO: Free temporary tensors.
         {
             // Allocate temporary tensors.
             for output in last_node
@@ -753,7 +750,11 @@ static struct timespec now() {{
                 .push(format!("{node_name}({});", args.join(", ")));
         }
 
-        let kernel = self.translate_fused_bin_op("+", &args, &input_shapes, &outputs)?;
+        let ops = chain
+            .iter()
+            .map(|node_id| self.model.nodes[*node_id].op.name())
+            .collect::<Vec<_>>();
+        let kernel = self.translate_fused_bin_op(&ops, &args, &input_shapes, &outputs)?;
 
         let decl = format!(
             "void {node_name}({args})",
@@ -1071,7 +1072,7 @@ for (int i = 0; i < {size}; i++) {{
     #[cfg(feature = "elemwise_fusion")]
     fn translate_fused_bin_op(
         &mut self,
-        op: &str,
+        ops: &[&str],
         args: &[String],
         inputs: &[&TypedShape],
         outputs: &[TypedShape],
@@ -1080,74 +1081,132 @@ for (int i = 0; i < {size}; i++) {{
         let output_name = &args[inputs.len()..][0];
 
         let kernel = if inputs[0].dims == inputs[1].dims {
-            format!(
-                "#pragma omp parallel for num_threads({th})
-#pragma clang loop vectorize(enable)
-for (int i = 0; i < {size}; i++) {{
-    {output}[i] = {input_0}[i] {op} {input_1}[i];
-}}",
-                th = self.intra_op_num_threads,
-                input_0 = input_names[0],
-                input_1 = input_names[1],
-                size = outputs[0].dims.total_elems(),
-                output = output_name,
-            )
+            todo!()
+        //             format!(
+        //                 "#pragma omp parallel for num_threads({th})
+        // #pragma clang loop vectorize(enable)
+        // for (int i = 0; i < {size}; i++) {{
+        //     {output}[i] = {input_0}[i] {op} {input_1}[i];
+        // }}",
+        //                 th = self.intra_op_num_threads,
+        //                 input_0 = input_names[0],
+        //                 input_1 = input_names[1],
+        //                 size = outputs[0].dims.total_elems(),
+        //                 output = output_name,
+        //             )
         } else {
             let rank = outputs[0].dims.len();
-            let input_0_strides = inputs[0]
-                .dims
-                .strides_for_broadcasting_to(&outputs[0].dims)
-                .unwrap();
-            let input_1_strides = inputs[1]
-                .dims
-                .strides_for_broadcasting_to(&outputs[0].dims)
-                .unwrap();
+            let input_stride_list = inputs
+                .iter()
+                .map(|i| {
+                    i.dims
+                        .strides_for_broadcasting_to(&outputs[0].dims)
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
 
             let mut kernel = String::new();
-            for (i, ((odim, i0str), i1str)) in outputs[0]
-                .dims
-                .iter()
-                .zip(input_0_strides.iter())
-                .zip(input_1_strides.iter())
-                .enumerate()
-                .rev()
-            {
+            for (i, odim) in outputs[0].dims.iter().enumerate().rev() {
                 if i == rank - 1 && rank > 1 {
                     kernel = format!(
                         "#pragma clang loop vectorize(enable)
 for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
-    *output_ptr = sqrtf(*input_0_ptr_{i} {op} *input_1_ptr_{i});
-    input_0_ptr_{i} += {i0str};
-    input_1_ptr_{i} += {i1str};
+    *output_ptr = {expr};
+    {inc}
     output_ptr += 1;
-}}"
+}}",
+                        expr = {
+                            let mut out = format!("*input_0_ptr_{i}");
+                            let mut opr_idx = 1;
+                            for &op in ops {
+                                match op {
+                                    "Add" | "Sub" | "Mul" | "Div" => {
+                                        out = format!(
+                                            "({out} {op} *input_{y}_ptr_{i})",
+                                            y = opr_idx,
+                                            op = match op {
+                                                "Add" => "+",
+                                                "Sub" => "-",
+                                                "Mul" => "*",
+                                                "Div" => "/",
+                                                _ => unreachable!(),
+                                            }
+                                        );
+                                        opr_idx += 1;
+                                    }
+                                    "Sqrt" => {
+                                        out = format!("sqrtf({out})");
+                                        opr_idx += 0;
+                                    }
+                                    e => todo!("{e}"),
+                                }
+                            }
+                            out
+                        },
+                        inc = inputs
+                            .iter()
+                            .zip(input_names.iter())
+                            .enumerate()
+                            .map(|(k, (_shape, _name))| {
+                                format!(
+                                    "input_{k}_ptr_{i} += {step};",
+                                    step = input_stride_list[k][i]
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n"),
                     );
                 } else {
                     kernel = format!(
-                        "{}for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
-    {in_ty} *input_0_ptr_{iplus1} = input_0_ptr_{i};
-    {in_ty} *input_1_ptr_{iplus1} = input_1_ptr_{i};
-{}
-    input_0_ptr_{i} += {i0str};
-    input_1_ptr_{i} += {i1str};
+                        "{header}for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
+    {in_defs}
+{body}
+    {inc}
 }}",
-                        if i == 0 {
+                        header = if i == 0 {
                             format!(
-                                "{in_ty} *input_0_ptr_0 = ({in_ty} *){};
-{in_ty} *input_1_ptr_0 = ({in_ty} *){};
-{out_ty} *output_ptr = {};\n",
-                                input_names[0],
-                                input_names[1],
-                                output_name,
-                                in_ty = get_c_type(inputs[0].elem_ty),
+                                "{in_defs}
+{out_ty} *output_ptr = {output_name};\n",
+                                in_defs = inputs
+                                    .iter()
+                                    .zip(input_names.iter())
+                                    .enumerate()
+                                    .map(|(i, (shape, name))| {
+                                        format!(
+                                            "{} *input_{}_ptr_0 = ({} *){};",
+                                            get_c_type(shape.elem_ty),
+                                            i,
+                                            get_c_type(shape.elem_ty),
+                                            name
+                                        )
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n"),
                                 out_ty = get_c_type(outputs[0].elem_ty),
                             )
                         } else {
                             "".to_string()
                         },
-                        indent_all_by(4, kernel),
-                        iplus1 = i + 1,
-                        in_ty = get_c_type(inputs[0].elem_ty),
+                        in_defs = inputs
+                            .iter()
+                            .enumerate()
+                            .map(|(k, shape)| {
+                                format!(
+                                    "{in_ty} *input_{k}_ptr_{iplus1} = input_{k}_ptr_{i};",
+                                    in_ty = get_c_type(shape.elem_ty),
+                                    iplus1 = i + 1
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        body = indent_all_by(4, kernel),
+                        inc = (0..inputs.len())
+                            .map(|k| format!(
+                                "input_{k}_ptr_{i} += {step};",
+                                step = input_stride_list[k][i]
+                            ))
+                            .collect::<Vec<_>>()
+                            .join("\n"),
                     );
                 }
             }

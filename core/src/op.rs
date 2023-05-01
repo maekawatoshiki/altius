@@ -388,7 +388,7 @@ impl Op {
                 | Self::Sub
                 | Self::Mul
                 | Self::Div
-                // | Self::Pow
+                | Self::Pow
                 | Self::Greater
                 | Self::Sqrt
                 | Self::ReLU

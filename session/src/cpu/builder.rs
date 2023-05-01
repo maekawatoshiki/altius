@@ -920,7 +920,6 @@ for (int i = 0; i < {size}; i++) {{
         Ok(kernel)
     }
 
-    #[cfg(feature = "elemwise_fusion")]
     fn translate_fused_elemwise(
         &mut self,
         op: &FusedElemwise,
@@ -975,6 +974,15 @@ for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
                                     Op::Sub => format!("({out} - *input_{opr_idx}_ptr_{i})"),
                                     Op::Mul => format!("({out} * *input_{opr_idx}_ptr_{i})"),
                                     Op::Div => format!("({out} / *input_{opr_idx}_ptr_{i})"),
+                                    Op::Pow => match self.model.inits.get(&inputs[1]) {
+                                        Some(init) if init.data::<f32>()[0] == 2. => {
+                                            format!("({out} * {out})")
+                                        }
+                                        Some(init) if init.data::<f32>()[0] == 3. => {
+                                            format!("({out} * {out} * {out})")
+                                        }
+                                        _ => format!("powf({out}, *input_{opr_idx}_ptr_{i})"),
+                                    },
                                     Op::Sqrt => format!("sqrtf({out})"),
                                     _ => todo!("{op:?}"),
                                 };
@@ -1174,6 +1182,15 @@ for (int i = 0; i < {size}; i++) {{
 #pragma clang loop vectorize(enable)
 for (int i = 0; i < {size}; i++) {{
     {output_name}[i] = {input_0}[i] * {input_0}[i];
+}}",
+                    input_0 = input_names[0],
+                    size = outputs[0].dims.total_elems(),
+                ),
+                Some(init) if init.data::<f32>()[0] == 3. => format!(
+                    "#pragma omp parallel for num_threads({num_threads})
+#pragma clang loop vectorize(enable)
+for (int i = 0; i < {size}; i++) {{
+    {output_name}[i] = {input_0}[i] * {input_0}[i] * {input_0}[i];
 }}",
                     input_0 = input_names[0],
                     size = outputs[0].dims.total_elems(),

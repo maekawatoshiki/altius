@@ -51,12 +51,15 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
                                 && value_shapes[&node.inputs[1]]
                                     == value_shapes[&last_node.inputs[1]]))
                 }));
-            let end_of_chain = fusible && value_users[&node.outputs[0]].len() != 1;
+            let end_of_chain = fusible
+                && value_users
+                    .get(&node.outputs[0])
+                    .map_or(true, |users| users.len() != 1);
             if fusible {
                 fusible_nodes.push(cur_node_id);
                 last_node_id = Some(cur_node_id);
-                cur_node_id = *value_users[&node.outputs[0]].iter().next().unwrap();
                 if !end_of_chain {
+                    cur_node_id = *value_users[&node.outputs[0]].iter().next().unwrap();
                     continue;
                 }
             }
@@ -85,7 +88,7 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
         );
     }
 
-    // let count = list.len();
+    let count = list.len();
 
     for chain in list {
         let mut input_map = Vec::new();
@@ -126,7 +129,7 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
         }
     }
 
-    log::info!("fuse_elemwise_ops(): {:?}", start.elapsed());
+    log::info!("fuse_elemwise_ops({count}): {:?}", start.elapsed());
 
     Ok(())
 }

@@ -6,7 +6,7 @@ CXX=clang++
 all: main
 
 main: main.cc
-	$(CXX) -O3 -march=native -lblis -o $@ $<
+	$(CXX) -O3 -march=native -ffp-contract=fast -lm -lblis -o $@ $<
 
 test: all
 	@./main

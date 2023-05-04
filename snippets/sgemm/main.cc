@@ -36,43 +36,33 @@ void myblas_sgemm_2(int m, int n, int k, const float *a, int lda,
   assert(m % 8 == 0);
   assert(n % 8 == 0);
   assert(k % 8 == 0);
+  __m256 sum[8] = {_mm256_setzero_ps(), _mm256_setzero_ps(),
+                   _mm256_setzero_ps(), _mm256_setzero_ps(),
+                   _mm256_setzero_ps(), _mm256_setzero_ps(),
+                   _mm256_setzero_ps(), _mm256_setzero_ps()};
   for (int i = 0; i < m; i += 8)
     for (int j = 0; j < n; j += 8) {
-      __m256 sum[8] = {_mm256_setzero_ps(), _mm256_setzero_ps(),
-                       _mm256_setzero_ps(), _mm256_setzero_ps(),
-                       _mm256_setzero_ps(), _mm256_setzero_ps(),
-                       _mm256_setzero_ps(), _mm256_setzero_ps()};
+
+#pragma unroll
+      for (int l = 0; l < 8; l++)
+        sum[l] = _mm256_setzero_ps();
       for (int l = 0; l < k; l++) {
         _mm_prefetch((const char *)(b + (l + 0) * ldb + j), _MM_HINT_T0);
         _mm_prefetch((const char *)(b + (l + 1) * ldb + j), _MM_HINT_T0);
         _mm_prefetch((const char *)(b + (l + 2) * ldb + j), _MM_HINT_T0);
         _mm_prefetch((const char *)(b + (l + 3) * ldb + j), _MM_HINT_T0);
-        const __m256 a0 = _mm256_broadcast_ss(a + (i + 0) * lda + l);
-        const __m256 a1 = _mm256_broadcast_ss(a + (i + 1) * lda + l);
-        const __m256 a2 = _mm256_broadcast_ss(a + (i + 2) * lda + l);
-        const __m256 a3 = _mm256_broadcast_ss(a + (i + 3) * lda + l);
-        const __m256 a4 = _mm256_broadcast_ss(a + (i + 4) * lda + l);
-        const __m256 a5 = _mm256_broadcast_ss(a + (i + 5) * lda + l);
-        const __m256 a6 = _mm256_broadcast_ss(a + (i + 6) * lda + l);
-        const __m256 a7 = _mm256_broadcast_ss(a + (i + 7) * lda + l);
+        __m256 as[8];
+#pragma unroll
+        for (int ll = 0; ll < 8; ll++)
+          as[ll] = _mm256_broadcast_ss(a + (i + ll) * lda + l);
         __m256 bs = _mm256_loadu_ps(b + l * ldb + j);
-        sum[0] = _mm256_fmadd_ps(a0, bs, sum[0]);
-        sum[1] = _mm256_fmadd_ps(a1, bs, sum[1]);
-        sum[2] = _mm256_fmadd_ps(a2, bs, sum[2]);
-        sum[3] = _mm256_fmadd_ps(a3, bs, sum[3]);
-        sum[4] = _mm256_fmadd_ps(a4, bs, sum[4]);
-        sum[5] = _mm256_fmadd_ps(a5, bs, sum[5]);
-        sum[6] = _mm256_fmadd_ps(a6, bs, sum[6]);
-        sum[7] = _mm256_fmadd_ps(a7, bs, sum[7]);
+#pragma unroll
+        for (int ll = 0; ll < 8; ll++)
+          sum[ll] = _mm256_fmadd_ps(as[ll], bs, sum[ll]);
       }
-      _mm256_storeu_ps(c + (i + 0) * ldc + j, sum[0]);
-      _mm256_storeu_ps(c + (i + 1) * ldc + j, sum[1]);
-      _mm256_storeu_ps(c + (i + 2) * ldc + j, sum[2]);
-      _mm256_storeu_ps(c + (i + 3) * ldc + j, sum[3]);
-      _mm256_storeu_ps(c + (i + 4) * ldc + j, sum[4]);
-      _mm256_storeu_ps(c + (i + 5) * ldc + j, sum[5]);
-      _mm256_storeu_ps(c + (i + 6) * ldc + j, sum[6]);
-      _mm256_storeu_ps(c + (i + 7) * ldc + j, sum[7]);
+#pragma unroll
+      for (int l = 0; l < 8; l++)
+        _mm256_storeu_ps(c + (i + l) * ldc + j, sum[l]);
     }
 }
 

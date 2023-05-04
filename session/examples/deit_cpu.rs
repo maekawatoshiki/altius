@@ -8,6 +8,13 @@ pub struct Opt {
 
     #[structopt(long = "iters", help = "The number of iterations", default_value = "1")]
     pub iters: usize,
+
+    #[structopt(
+        long = "threads",
+        help = "The number of computation threads",
+        default_value = "1"
+    )]
+    pub threads: usize,
 }
 
 #[cfg(feature = "cpu-backend")]
@@ -42,6 +49,7 @@ fn main() {
 
     let i = CPUSessionBuilder::new(model)
         .with_profiling_enabled(opt.profile)
+        .with_intra_op_num_threads(opt.threads)
         .build()
         .unwrap();
     let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();

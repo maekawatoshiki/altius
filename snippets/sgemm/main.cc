@@ -10,6 +10,9 @@
 const int m = 128;
 const int n = 256;
 const int k = 1024;
+// const int m = 8;
+// const int n = 8;
+// const int k = 8;
 
 const int iter = 10;
 
@@ -23,7 +26,7 @@ void myblas_sgemm_1(int m, int n, int k, const float *a, int lda,
                     const float *b, int ldb, float *c, int ldc) {
   for (int i = 0; i < m; i++)
     for (int j = 0; j < n; j++) {
-      float sum = 0.0;
+      float sum = c[i * ldc + j];
 #pragma clang loop vectorize(enable)
       for (int l = 0; l < k; l++)
         sum += a[i * lda + l] * b[l * ldb + j];
@@ -66,6 +69,54 @@ void myblas_sgemm_2(int m, int n, int k, const float *a, int lda,
     }
 }
 
+const int simd_lane = 8;
+
+inline void micro_kernel(float *a, int lda, float *b, int ldb, float *c,
+                         int ldc) {
+  for (int i = 0; i < simd_lane; i++) {
+    __m256 sum = _mm256_loadu_ps(c + i * ldc);
+    for (int l = 0; l < simd_lane; l++) {
+      _mm_prefetch((const char *)(a + i * lda + l), _MM_HINT_T0);
+      __m256 as = _mm256_broadcast_ss(a + i * lda + l);
+      __m256 bs = _mm256_loadu_ps(b + l * ldb);
+      sum = _mm256_fmadd_ps(as, bs, sum);
+    }
+    _mm256_storeu_ps(c + i * ldc, sum);
+  }
+}
+
+void myblas_sgemm_3(int m, int n, int k, float *A, int lda, float *B, int ldb,
+                    float *C, int ldc) {
+  for (int i = 0; i < m; ++i) {
+#pragma clang loop vectorize(enable)
+    for (int j = 0; j < n; ++j) {
+      C[i * ldc + j] = 0;
+    }
+  }
+
+  int nc = n;
+  int kc = simd_lane;
+  int mc = m / simd_lane;
+  int mr = simd_lane;
+  int nr = simd_lane;
+  for (int i0 = 0; i0 < k; i0 += kc) {
+    float *Ap = A + i0;       // m*kc
+    float *Bp = B + i0 * ldb; // kc*n
+    for (int i1 = 0; i1 < m; i1 += mc) {
+      float *Ai = Ap + i1 * lda; // mc*kc
+      float *Cp = C + i1 * ldc;  // mc*n
+      for (int i2 = 0; i2 < n; i2 += nr) {
+        float *Bi = Bp + i2; // kc*nr
+        float *Ci = Cp + i2; // mc*nr
+        for (int i3 = 0; i3 < mc; i3 += mr) {
+          // 8x8x8
+          micro_kernel(Ai + i3 * lda, lda, Bi, ldb, Ci + i3 * ldc, ldc);
+        }
+      }
+    }
+  }
+}
+
 void fill_random(float *x, int n) {
   for (int i = 0; i < n; i++)
     x[i] = (float)rand() / (float)RAND_MAX;
@@ -102,7 +153,7 @@ int main() {
       cblas_elapsed += now_in_sec() - cblas_start;
 
       const double myblas_start = now_in_sec();
-      myblas_sgemm_2(m, n, k, x, k, y, n, myblas_z, n);
+      myblas_sgemm_3(m, n, k, x, k, y, n, myblas_z, n);
       myblas_elapsed += now_in_sec() - myblas_start;
 
       assert(allclose(cblas_z, myblas_z, m * n));

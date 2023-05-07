@@ -25,6 +25,11 @@ Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) an
 ./run.sh deit
 ./run.sh vit
 
+# Experimental CPU backend (that generates code in C)
+./run_cpu.sh mnist_cpu --iters 3
+./run_cpu.sh mobilenet_cpu --iters 3 --profile
+./run_cpu.sh deit_cpu --iters 3 --threads 8 --profile
+
 # On macOS, you can use 'accelerate' library.
 cargo run --release --features accelerate --example mobilenet
 ```

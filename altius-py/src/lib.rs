@@ -55,6 +55,11 @@ fn session(
     let mut model = model.0;
     optimize::layer_norm_fusion::fuse_layer_norm(&mut model);
     optimize::gelu_fusion::fuse_gelu(&mut model);
+    if backend == "cpu" {
+        optimize::elemwise_fusion::fuse_elemwise_ops(&mut model).map_err(|e| {
+            PyRuntimeError::new_err(format!("Failed to fuse element-wise operations: {e:?}"))
+        })?
+    }
 
     match backend.as_str() {
         "interpreter" => Ok(PyInterpreterSession(

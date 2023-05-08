@@ -39,6 +39,8 @@ jobs:
       run: cargo install grcov
     - name: Install dependencies
       run: sudo apt install libomp-dev
+    - name: Install rye
+      run: cargo install --git https://github.com/mitsuhiko/rye rye
     - name: Test
       run: |
         cargo test --release --features blis
@@ -47,7 +49,7 @@ jobs:
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
     - name: Run examples
       run: |
-        (cd altius-py && source .env/bin/activate && python deit.py)
+        (cd altius-py && source .venv/bin/activate && python deit.py)
         cargo run --release --features blis --example mnist
         cargo run --release --features blis --example mobilenet
         cargo run --release --features blis --example deit
@@ -87,6 +89,8 @@ jobs:
       run: ./download.sh CI
     - name: Install dependencies
       run: sudo apt install libomp-dev
+    - name: Install rye
+      run: cargo install --git https://github.com/mitsuhiko/rye rye
     - name: Test
       run: |
         cargo test --release --features blis,cpu-backend
@@ -97,7 +101,7 @@ jobs:
         ALTIUS_BACKEND: cpu
     - name: Run examples
       run: |
-        (cd altius-py && source .env/bin/activate && python deit.py)
+        (cd altius-py && source .venv/bin/activate && python deit.py)
         cargo run --release --features blis,cpu --example mnist
         cargo run --release --features blis,cpu --example mobilenet
         cargo run --release --features blis,cpu --example deit

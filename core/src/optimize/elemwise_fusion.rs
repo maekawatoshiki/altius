@@ -107,6 +107,10 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
                 }
                 prev_node_id = Some(node_id);
             }
+
+            // Deduplicate values
+            let mut present = FxHashSet::default();
+            input_map.retain(|&id| present.insert(id));
         }
         let last_node = &model.nodes[*chain.last().unwrap()];
 

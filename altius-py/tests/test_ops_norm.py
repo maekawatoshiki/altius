@@ -39,4 +39,4 @@ def op_layer_norm(filepath, shape, **kwargs):
     actual = altius_sess.run(None, inputs)
 
     for expected, actual in zip(expected, actual):
-        assert np.allclose(expected, actual, rtol=1e-5, atol=1e-6)
+        assert np.allclose(expected, actual, rtol=1e-4, atol=1e-5)

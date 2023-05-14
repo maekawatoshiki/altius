@@ -12,10 +12,10 @@ pub mod wgpu;
 use std::borrow::Cow;
 
 use altius_core::{analysis::shape::ShapeError, model::Model, node::NodeId, value::ValueId};
-#[cfg(all(feature = "cblas", not(feature = "blis")))]
+#[cfg(all(feature = "cblas", target_os = "macos"))]
 #[allow(unused)]
-use blas_src;
-#[cfg(all(feature = "cblas", feature = "blis"))]
+use blas_src; // For accelerate
+#[cfg(all(feature = "cblas", target_os = "linux"))]
 #[allow(unused)]
 use blis_src;
 use rustc_hash::FxHashMap;

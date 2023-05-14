@@ -5,7 +5,6 @@ use altius_core::optimize;
 use altius_core::tensor::{TensorElemType, TensorElemTypeExt};
 use altius_core::value::ValueId;
 use altius_core::{model::Model, tensor::Tensor};
-#[cfg(feature = "cpu")]
 use altius_session::cpu::{CPUSession, CPUSessionBuilder};
 use altius_session::interpreter::{InterpreterSession, InterpreterSessionBuilder};
 use altius_session::SessionError;
@@ -23,7 +22,6 @@ pub struct PyModel(pub Model);
 #[repr(transparent)]
 pub struct PyInterpreterSession(pub InterpreterSession);
 
-#[cfg(feature = "cpu")]
 #[pyclass]
 #[repr(transparent)]
 pub struct PyCPUSession(pub CPUSession);
@@ -72,7 +70,6 @@ fn session(
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
         )
         .into_py(py)),
-        #[cfg(feature = "cpu")]
         "cpu" => Ok(PyCPUSession(
             py.allow_threads(|| {
                 CPUSessionBuilder::new(model)
@@ -180,7 +177,6 @@ impl Session for PyInterpreterSession {
     }
 }
 
-#[cfg(feature = "cpu")]
 impl Session for PyCPUSession {
     fn model(&self) -> &Model {
         self.0.model()
@@ -198,7 +194,6 @@ impl PyInterpreterSession {
     }
 }
 
-#[cfg(feature = "cpu")]
 #[pymethods]
 impl PyCPUSession {
     fn run(&self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {

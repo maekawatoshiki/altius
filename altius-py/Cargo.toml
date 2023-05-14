@@ -18,11 +18,6 @@ numpy = "^0.17.0"
 cargo-util = "^0.2.1"
 
 [features]
-# default = ["cpu"]
 matrixmultiply-threading = [ "altius-session/matrixmultiply-threading" ]
-openblas = [ "altius-session/openblas" ]
-blis = [ "altius-session/blis" ]
-cpu = [ "altius-session/cpu-backend" ]
 cuda = [ "altius-session/cuda" ]
 heavy-log = [ "altius-session/heavy-log" ]
-accelerate = [ "altius-session/accelerate" ]

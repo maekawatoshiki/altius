@@ -43,18 +43,18 @@ jobs:
       run: cargo install --git https://github.com/mitsuhiko/rye rye
     - name: Test
       run: |
-        cargo test --release --features blis
+        cargo test --release
       env:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
     - name: Run examples
       run: |
         (cd altius-py && source .venv/bin/activate && python deit.py)
-        cargo run --release --features blis --example mnist
-        cargo run --release --features blis --example mobilenet
-        cargo run --release --features blis --example deit
-        cargo run --release --features blis --example vit
-        cargo run --release --features blis --example infer -- ./models/mnist-8.onnx
+        cargo run --release --example mnist
+        cargo run --release --example mobilenet
+        cargo run --release --example deit
+        cargo run --release --example vit
+        cargo run --release --example infer -- ./models/mnist-8.onnx
       env:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
@@ -93,17 +93,16 @@ jobs:
       run: cargo install --git https://github.com/mitsuhiko/rye rye
     - name: Test
       run: |
-        cargo test --release --features blis,cpu-backend
+        cargo test --release
       env:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
-        ALTIUSPY_FEATURES: blis,cpu
         ALTIUS_BACKEND: cpu
     - name: Run examples
       run: |
         (cd altius-py && source .venv/bin/activate && python deit.py)
-        cargo run --release --features blis,cpu --example mnist
-        cargo run --release --features blis,cpu --example mobilenet
-        cargo run --release --features blis,cpu --example deit
+        cargo run --release --example mnist
+        cargo run --release --example mobilenet
+        cargo run --release --example deit
         # cargo run --release --features blis --example vit
         # cargo run --release --features blis --example infer -- ./models/mnist-8.onnx

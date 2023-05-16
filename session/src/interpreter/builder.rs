@@ -43,8 +43,9 @@ impl InterpreterSessionBuilder {
         let mut inferred_shapes = FxHashMap::default();
         infer_shapes(&model, &mut inferred_shapes, &mut FxHashMap::default())?;
 
-        #[cfg(feature = "blis")]
+        #[cfg(target_os = "linux")]
         {
+            // Suppose that blis is used for BLAS.
             extern "C" {
                 fn bli_thread_set_num_threads(n_threads: usize);
             }

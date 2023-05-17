@@ -9,7 +9,8 @@ Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) an
 
 # Requirements
 
-- Python 3.x (Used in some tests; You can disable them by just ignoring tests in `./altius-py`)
+- [rye](https://github.com/mitsuhiko/rye)
+    - To use Python
 
 # Run
 
@@ -20,18 +21,15 @@ Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) an
 # Run examples.
 # {mnist, mobilenet, deit, vit} are available.
 # You can specify the number of threads for computation by editing the code.
-./run.sh mnist
-./run.sh mobilenet
-./run.sh deit
-./run.sh vit
+cargo run --release --example mnist
+cargo run --release --example mobilenet
+cargo run --release --example deit
+cargo run --release --example vit
 
 # Experimental CPU backend (that generates code in C)
-./run_cpu.sh mnist_cpu --iters 3
-./run_cpu.sh mobilenet_cpu --iters 3 --profile
-./run_cpu.sh deit_cpu --iters 3 --threads 8 --profile
-
-# On macOS, you can use 'accelerate' library.
-cargo run --release --features accelerate --example mobilenet
+cargo run --release --example mnist_cpu     -- --iters 10 
+cargo run --release --example mobilenet_cpu -- --iters 10 --profile
+cargo run --release --example deit_cpu      -- --iters 10 --threads 8 --profile
 ```
 
 # Run from WebAssembly
@@ -50,9 +48,8 @@ yarn serve
 
 ```sh
 cd altius-py
-python -m venv .env
-source .env/bin/activate
-pip install -r requirements.txt
-RUSTFLAGS="-C target-cpu=native" maturin develop -r --features blis
-python mobilenet.py
+rye shell
+rye sync
+rye run maturin develop -r
+rye run python mobilenet.py
 ```

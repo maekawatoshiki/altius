@@ -29,14 +29,16 @@ def op_layer_norm(filepath, shape, **kwargs):
 
     onnx.save(model, filepath)
     ort_sess = ort.InferenceSession(filepath, providers=["CPUExecutionProvider"])
-    altius_sess = altius_py.InferenceSession(filepath)
 
-    x = np.random.random_sample(shape).astype(np.float32)
-    scale = np.random.random_sample(shape_scale).astype(np.float32)
-    bias = np.random.random_sample(shape_scale).astype(np.float32)
-    inputs = {"x": x, "scale": scale, "bias": bias}
-    expected = ort_sess.run(None, inputs)
-    actual = altius_sess.run(None, inputs)
+    for backend in ["interpreter", "cpu"]:
+        altius_sess = altius_py.InferenceSession(filepath, backend=backend)
 
-    for expected, actual in zip(expected, actual):
-        assert np.allclose(expected, actual, rtol=1e-4, atol=1e-5)
+        x = np.random.random_sample(shape).astype(np.float32)
+        scale = np.random.random_sample(shape_scale).astype(np.float32)
+        bias = np.random.random_sample(shape_scale).astype(np.float32)
+        inputs = {"x": x, "scale": scale, "bias": bias}
+        expected = ort_sess.run(None, inputs)
+        actual = altius_sess.run(None, inputs)
+
+        for expected, actual in zip(expected, actual):
+            assert np.allclose(expected, actual, rtol=1e-4, atol=1e-5)

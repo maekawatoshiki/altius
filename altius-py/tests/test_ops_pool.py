@@ -50,12 +50,14 @@ def op_maxpool(filepath, shape_x, shape_y, **kwargs):
 
     onnx.save(model, filepath)
     ort_sess = ort.InferenceSession(filepath, providers=["CPUExecutionProvider"])
-    altius_sess = altius_py.InferenceSession(filepath)
 
-    x = np.random.random_sample(shape_x).astype(np.float32)
-    inputs = {"x": x}
-    expected = ort_sess.run(None, inputs)
-    actual = altius_sess.run(None, inputs)
+    for backend in ["interpreter", "cpu"]:
+        altius_sess = altius_py.InferenceSession(filepath, backend=backend)
 
-    for expected, actual in zip(expected, actual):
-        assert np.allclose(expected, actual)
+        x = np.random.random_sample(shape_x).astype(np.float32)
+        inputs = {"x": x}
+        expected = ort_sess.run(None, inputs)
+        actual = altius_sess.run(None, inputs)
+
+        for expected, actual in zip(expected, actual):
+            assert np.allclose(expected, actual)

@@ -19,6 +19,7 @@ pub struct Opt {
 
 #[cfg(feature = "cpu-backend")]
 fn main() {
+    use altius_core::optimize::elemwise_fusion::fuse_elemwise_ops;
     use altius_core::optimize::gelu_fusion::fuse_gelu;
     use altius_core::optimize::layer_norm_fusion::fuse_layer_norm;
     use altius_core::{onnx::load_onnx, tensor::Tensor};
@@ -36,6 +37,7 @@ fn main() {
         .expect("Failed to load model. Have you run altius-py/deit.py?");
     fuse_layer_norm(&mut model);
     fuse_gelu(&mut model);
+    fuse_elemwise_ops(&mut model).unwrap();
     let input_value = model.lookup_named_value("input.1").unwrap();
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();

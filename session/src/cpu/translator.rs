@@ -55,7 +55,6 @@ impl<'a> Translator<'a> {
         if target_dir.as_path().exists() {
             let files = glob::glob(target_dir.join("*.c").as_path().to_str().unwrap())
                 .unwrap()
-                .into_iter()
                 .map(Result::unwrap)
                 .collect::<Vec<_>>();
             prev_code_hash = compute_sha1_from_files(&files);
@@ -100,7 +99,6 @@ impl<'a> Translator<'a> {
         let new_hash = compute_sha1_from_files(
             &glob::glob(self.target_dir.join("*.c").as_path().to_str().unwrap())
                 .unwrap()
-                .into_iter()
                 .map(Result::unwrap)
                 .collect::<Vec<_>>(),
         );
@@ -179,7 +177,6 @@ impl<'a> Translator<'a> {
                 });
                 (thread, self.target_dir.join(format!("kernels-{i:05}.o")))
             })
-            .into_iter()
             .collect::<Vec<_>>()
             .into_iter()
             .map(|(t, file)| {
@@ -221,7 +218,7 @@ impl<'a> Translator<'a> {
         let main_file = self.create_file("main.c")?;
         let mut writer = BufWriter::new(main_file);
 
-        let execution_plans = create_execution_plan(&self.model);
+        let execution_plans = create_execution_plan(self.model);
 
         for plan in execution_plans {
             let node = &self.model.nodes[plan.node_id];
@@ -452,7 +449,7 @@ static struct timespec now() {{
             .collect::<Vec<_>>();
         let (op, outputs) = self.inferred_shapes.get(&node_id).map_or_else(
             || todo!("Why is this node output shape not inferred?"),
-            |result| Ok::<&(Op, Vec<TypedShape>), SessionError>(result),
+            Ok::<&(Op, Vec<TypedShape>), SessionError>,
         )?;
         self.used_op_names.insert(op.name().into());
 
@@ -491,41 +488,41 @@ static struct timespec now() {{
         }
 
         let kernel = match op {
-            Op::Conv2d(ref c) => self.translate_conv2d(c, &args, &inputs, &outputs)?,
-            Op::HardSigmoid(ref h) => self.translate_hard_sigmoid(h, &args, &inputs, &outputs)?,
-            Op::Add => self.translate_bin_op("+", &args, &inputs, &outputs)?,
-            Op::Sub => self.translate_bin_op("-", &args, &inputs, &outputs)?,
-            Op::Mul => self.translate_bin_op("*", &args, &inputs, &outputs)?,
-            Op::Div => self.translate_bin_op("/", &args, &inputs, &outputs)?,
-            Op::Greater => self.translate_bin_op(">", &args, &inputs, &outputs)?,
-            Op::Pow => self.translate_pow(&node, &args, &inputs, &outputs)?,
-            Op::Sqrt => self.translate_sqrt(&args, &inputs, &outputs)?,
-            Op::ReLU => self.translate_relu(&args, &inputs, &outputs)?,
-            Op::Erf => self.translate_erf(&args, &inputs, &outputs)?,
-            Op::Sigmoid => self.translate_sigmoid(&args, &inputs, &outputs)?,
-            Op::Tanh => self.translate_tanh(&args, &inputs, &outputs)?,
-            Op::Where => self.translate_where(&args, &inputs, &outputs)?,
-            Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, &outputs)?,
-            Op::MaxPool(ref m) => self.translate_max_pool(m, &args, &inputs, &outputs)?,
-            Op::Reshape => self.translate_reshape(&args, &inputs, &outputs)?,
-            Op::MatMul => self.translate_mat_mul(&args, &inputs, &outputs)?,
-            Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, &outputs)?,
-            Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, &outputs)?,
-            Op::Transpose(ref t) => self.translate_transpose(t, &args, &inputs, &outputs)?,
-            Op::Expand => self.translate_expand(&args, &inputs, &outputs)?,
-            Op::Concat(ref c) => self.translate_concat(c, &args, &inputs, &outputs)?,
-            Op::Gather(ref g) => self.translate_gather(g, &args, &inputs, &outputs)?,
-            Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, &outputs)?,
-            Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, &outputs)?,
-            Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, &outputs)?,
-            Op::Gelu => self.translate_gelu(&args, &inputs, &outputs)?,
+            Op::Conv2d(ref c) => self.translate_conv2d(c, &args, &inputs, outputs)?,
+            Op::HardSigmoid(ref h) => self.translate_hard_sigmoid(h, &args, &inputs, outputs)?,
+            Op::Add => self.translate_bin_op("+", &args, &inputs, outputs)?,
+            Op::Sub => self.translate_bin_op("-", &args, &inputs, outputs)?,
+            Op::Mul => self.translate_bin_op("*", &args, &inputs, outputs)?,
+            Op::Div => self.translate_bin_op("/", &args, &inputs, outputs)?,
+            Op::Greater => self.translate_bin_op(">", &args, &inputs, outputs)?,
+            Op::Pow => self.translate_pow(node, &args, &inputs, outputs)?,
+            Op::Sqrt => self.translate_sqrt(&args, &inputs, outputs)?,
+            Op::ReLU => self.translate_relu(&args, &inputs, outputs)?,
+            Op::Erf => self.translate_erf(&args, &inputs, outputs)?,
+            Op::Sigmoid => self.translate_sigmoid(&args, &inputs, outputs)?,
+            Op::Tanh => self.translate_tanh(&args, &inputs, outputs)?,
+            Op::Where => self.translate_where(&args, &inputs, outputs)?,
+            Op::GlobalAveragePool => self.translate_gavg_pool(&args, &inputs, outputs)?,
+            Op::MaxPool(ref m) => self.translate_max_pool(m, &args, &inputs, outputs)?,
+            Op::Reshape => self.translate_reshape(&args, &inputs, outputs)?,
+            Op::MatMul => self.translate_mat_mul(&args, &inputs, outputs)?,
+            Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, outputs)?,
+            Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, outputs)?,
+            Op::Transpose(ref t) => self.translate_transpose(t, &args, &inputs, outputs)?,
+            Op::Expand => self.translate_expand(&args, &inputs, outputs)?,
+            Op::Concat(ref c) => self.translate_concat(c, &args, &inputs, outputs)?,
+            Op::Gather(ref g) => self.translate_gather(g, &args, &inputs, outputs)?,
+            Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, outputs)?,
+            Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, outputs)?,
+            Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, outputs)?,
+            Op::Gelu => self.translate_gelu(&args, &inputs, outputs)?,
             Op::Unsqueeze(_) => String::new(), // nop
             Op::Squeeze(_) => String::new(),   // nop
-            Op::Split(ref s) => self.translate_split(s, &args, &inputs, &outputs)?,
-            Op::Cast(ref c) => self.translate_cast(c, &args, &inputs, &outputs)?,
-            Op::Resize(ref r) => self.translate_resize(r, &args, &inputs, &outputs)?,
+            Op::Split(ref s) => self.translate_split(s, &args, &inputs, outputs)?,
+            Op::Cast(ref c) => self.translate_cast(c, &args, &inputs, outputs)?,
+            Op::Resize(ref r) => self.translate_resize(r, &args, &inputs, outputs)?,
             Op::FusedElemwise(ref f) => {
-                self.translate_fused_elemwise(f, &args, &inputs, &outputs)?
+                self.translate_fused_elemwise(f, &args, &inputs, outputs)?
             }
             _ => todo!("Translation not implemented for {:?}", op),
         };
@@ -554,7 +551,7 @@ static struct timespec now() {{
 }}",
             body = indent_all_by(4, kernel),
             start_profiling = if self.enable_profiling {
-                indent_all_by(4, format!("const struct timespec _start = now();"))
+                indent_all_by(4, "const struct timespec _start = now();".to_string())
             } else {
                 String::new()
             },
@@ -2318,15 +2315,15 @@ for (int i = 0; i < {size} / {axis_len}; i++) {{
             );
             Ok(kernel)
         } else {
-            return Err(SessionError::Message(
+            Err(SessionError::Message(
                 format!("Resize: mode '{}' not supported", resize.mode).into(),
-            ));
+            ))
         }
     }
 
     fn create_file(&self, name: &str) -> Result<File, SessionError> {
         let path = self.target_dir.join(name);
-        let file = File::create(&path)?;
+        let file = File::create(path)?;
         Ok(file)
     }
 
@@ -2346,7 +2343,7 @@ fn escape_name(s: impl Into<String>) -> String {
         if s.starts_with(|c: char| c.is_ascii_digit()) {
             format!("_{}", s)
         } else {
-            s.to_string()
+            s
         }
     }
     add_prefix(

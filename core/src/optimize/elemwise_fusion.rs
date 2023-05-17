@@ -80,8 +80,7 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
                 .iter()
                 .map(|&id| model.nodes[id]
                     .name
-                    .as_ref()
-                    .map(String::as_str)
+                    .as_deref()
                     .unwrap_or(model.nodes[id].op.name()))
                 .collect::<Vec<_>>()
                 .join(" -> ")

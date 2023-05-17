@@ -29,12 +29,11 @@ pub fn fuse_conv_act(model: &mut Model) {
             .copied()
             .unwrap();
         let act = &model.nodes[act_id];
-        let fused_act;
-        match act.op {
-            Op::ReLU => fused_act = FusedActivation::Relu,
-            Op::HardSigmoid(ref h) => fused_act = FusedActivation::HardSigmoid(*h),
+        let fused_act = match act.op {
+            Op::ReLU => FusedActivation::Relu,
+            Op::HardSigmoid(ref h) => FusedActivation::HardSigmoid(*h),
             _ => continue,
-        }
+        };
 
         // Conv+Activation Detected!
 

@@ -582,7 +582,7 @@ impl Op {
                             &inputs
                                 .iter()
                                 .map(|v| {
-                                    map.get(&v).copied().unwrap_or_else(|| {
+                                    map.get(v).copied().unwrap_or_else(|| {
                                         assert_eq!(Some(*v), prev_output_id);
                                         &prev_output_dummy
                                     })

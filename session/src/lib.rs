@@ -14,7 +14,8 @@ use std::borrow::Cow;
 use altius_core::{analysis::shape::ShapeError, model::Model, node::NodeId, value::ValueId};
 #[cfg(all(feature = "cblas", target_os = "macos"))]
 #[allow(unused)]
-use blas_src; // For accelerate
+#[allow(clippy::single_component_path_imports)]
+use blas_src; // For accelerate, this is necessary to link the library.
 #[cfg(all(feature = "cblas", target_os = "linux"))]
 #[allow(unused)]
 use blis_src;

@@ -1,10 +1,14 @@
-#include <stdio.h>
-#include <sys/time.h>
-
+#include <assert.h>
+#include <blis/blis.h>
 #include <cublas.h>
 #include <cublas_v2.h>
 #include <cudnn.h>
+#include <cudnn_backend.h>
 #include <curand.h>
+#include <stdio.h>
+#include <sys/time.h>
+
+#define ATTEMPT 10
 
 double now_in_sec() {
   struct timeval tv;
@@ -48,21 +52,44 @@ extern "C" void entry() {
     curandDestroyGenerator(gen);
   }
 
-  for (int attempt = 0; attempt < 100; attempt++) {
+  for (int attempt = 0; attempt < ATTEMPT; attempt++) {
     const double start = now_in_sec();
     for (int i = 0; i < 1000; i++) {
-      cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, lhs, m,
-                  rhs, k, &beta, result, m);
-      relu<<<(m * n + 31) / 32, 32>>>(result, m * n);
-      sigmoid<<<(m * n + 31) / 32, 32>>>(result, m * n);
+      cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, rhs, n,
+                  lhs, k, &beta, result, n);
+      // relu<<<(m * n + 31) / 32, 32>>>(result, m * n);
+      // sigmoid<<<(m * n + 31) / 32, 32>>>(result, m * n);
     }
     const double end = now_in_sec();
-    printf("Time: %lf[ms]\n", (end - start) * 1000.0);
+    printf("GPU Time: %lf[ms]\n", (end - start) * 1000.0);
   }
 
-  float *host = (float *)malloc(m * n * sizeof(float));
-  cudaMemcpy(host, result, m * n * sizeof(float), cudaMemcpyDeviceToHost);
-  // for (int i = 0; i < m * n; i++) {
-  //   printf("%f ", host[i]);
-  // }
+  float *gpu_result = (float *)malloc(m * n * sizeof(float));
+  cudaMemcpy(gpu_result, result, m * n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  float *cpu_lhs = (float *)malloc(m * k * sizeof(float));
+  float *cpu_rhs = (float *)malloc(k * n * sizeof(float));
+  float *cpu_result = (float *)malloc(m * n * sizeof(float));
+
+  cudaMemcpy(cpu_lhs, lhs, m * k * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(cpu_rhs, rhs, k * n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  for (int attempt = 0; attempt < ATTEMPT; attempt++) {
+    const double start = now_in_sec();
+    for (int i = 0; i < 1000; i++) {
+      cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, n, k, alpha,
+                  cpu_lhs, k, cpu_rhs, n, beta, cpu_result, n);
+    }
+    const double end = now_in_sec();
+    printf("CPU Time: %lf[ms]\n", (end - start) * 1000.0);
+  }
+
+  for (int i = 0; i < m * n; i++) {
+    const float diff = fabs(gpu_result[i] - cpu_result[i]);
+    assert(diff < 1e-3);
+  }
+
+  cudaFree(lhs);
+  cudaFree(rhs);
+  cudaFree(result);
 }

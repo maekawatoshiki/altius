@@ -1,13 +1,11 @@
 use std::fmt;
 
-use id_arena::Id;
-
 use crate::dim::Dimension;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum SymbolicDimension {
     Static(Dimension),
-    Dynamic(Id<String>),
+    Dynamic(String),
 }
 
 /// An alternative to `Dimensions` that allows dynamic shape.
@@ -19,7 +17,7 @@ impl fmt::Debug for SymbolicDimension {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SymbolicDimension::Static(d) => write!(f, "{}", d),
-            SymbolicDimension::Dynamic(id) => write!(f, "#{}", id.index()),
+            SymbolicDimension::Dynamic(s) => write!(f, "{}", s),
         }
     }
 }
@@ -32,12 +30,8 @@ impl fmt::Debug for SymbolicDimensions {
 
 #[test]
 fn use_symdims() {
-    use id_arena::Arena;
-
-    let mut arena = Arena::<String>::new();
-    let batch = arena.alloc("batch".to_string());
     let _ = SymbolicDimensions(vec![
-        SymbolicDimension::Dynamic(batch),
+        SymbolicDimension::Dynamic("batch".into()),
         SymbolicDimension::Static(8),
     ]);
 }

@@ -12,7 +12,7 @@ use crate::{
         LayerNormalization, LeakyReLU, MaxPool, Op, ReduceMax, ReduceMean, ReduceMin, Resize,
         Shape, Softmax, Split, Squeeze, Transpose, Unsqueeze,
     },
-    tensor::{Tensor, TensorElemType, TypedShape},
+    tensor::{Tensor, TensorElemType, TypedFixedShape},
 };
 
 use tensor_proto::DataType;
@@ -112,7 +112,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 }
                 Entry::Vacant(v) => *v.insert(model.values.new_val_named_and_shaped(
                     x.name(),
-                    TypedShape::new(
+                    TypedFixedShape::new(
                         FixedDimensions::from_i64(&dims),
                         DataType::from_i32(tensor.elem_type()).unwrap().try_into()?,
                     ),

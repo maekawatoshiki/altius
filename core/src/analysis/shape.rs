@@ -8,7 +8,7 @@ use crate::{
     model::Model,
     node::NodeId,
     op::Op,
-    tensor::{Tensor, TensorElemType, TypedShape},
+    tensor::{Tensor, TensorElemType, TypedFixedShape},
     value::ValueId,
 };
 
@@ -26,7 +26,7 @@ impl Op {
         inputs: &[&Tensor],
         num_outputs: usize,
         opset_version: i64,
-    ) -> Result<Vec<TypedShape>, ShapeError> {
+    ) -> Result<Vec<TypedFixedShape>, ShapeError> {
         let mut shapes = vec![];
 
         match self {
@@ -77,7 +77,7 @@ impl Op {
                     (h_in + pad_h - dilations[0] * (kernel[0] - 1) - 1) / stride[0] + 1,
                     (w_in + pad_w - dilations[1] * (kernel[1] - 1) - 1) / stride[1] + 1,
                 ];
-                shapes.push(TypedShape::new(
+                shapes.push(TypedFixedShape::new(
                     output_shape.into(),
                     inputs[Op::CONV2D_IN].elem_ty(),
                 ));
@@ -86,19 +86,19 @@ impl Op {
                 let x = inputs[0].dims();
                 let y = inputs[1].dims();
                 let shape = x.broadcast(y).unwrap();
-                shapes.push(TypedShape::new(shape, inputs[0].elem_ty()));
+                shapes.push(TypedFixedShape::new(shape, inputs[0].elem_ty()));
             }
             Op::Greater => {
                 let x = inputs[0].dims();
                 let y = inputs[1].dims();
                 let shape = x.broadcast(y).unwrap();
-                shapes.push(TypedShape::new(shape, TensorElemType::Bool));
+                shapes.push(TypedFixedShape::new(shape, TensorElemType::Bool));
             }
             Op::Where => {
                 let x = inputs[1].dims();
                 let y = inputs[2].dims();
                 let shape = x.broadcast(y).unwrap();
-                shapes.push(TypedShape::new(shape, inputs[1].elem_ty()));
+                shapes.push(TypedFixedShape::new(shape, inputs[1].elem_ty()));
             }
             Op::MaxPool(maxpool) => {
                 let auto_pad = &maxpool.auto_pad;
@@ -128,7 +128,7 @@ impl Op {
                     (h_in + (padding[0] + padding[2]) - (kernel[0] - 1) - 1) / stride[0] + 1,
                     (w_in + (padding[1] + padding[3]) - (kernel[1] - 1) - 1) / stride[1] + 1,
                 ];
-                shapes.push(TypedShape::new(
+                shapes.push(TypedFixedShape::new(
                     output_shape.into(),
                     inputs[Op::MAXPOOL_IN].elem_ty(),
                 ));
@@ -136,7 +136,7 @@ impl Op {
             Op::GlobalAveragePool => {
                 let input = &inputs[Op::GLOBALAVERAGEPOOL_IN].dims();
                 assert!(input.len() == 4);
-                shapes.push(TypedShape::new(
+                shapes.push(TypedFixedShape::new(
                     vec![input[0], input[1], 1, 1].into(),
                     inputs[Op::GLOBALAVERAGEPOOL_IN].elem_ty(),
                 ));
@@ -144,7 +144,7 @@ impl Op {
             Op::Expand => {
                 let input = inputs[0];
                 let shape = inputs[1];
-                shapes.push(TypedShape::new(
+                shapes.push(TypedFixedShape::new(
                     shape
                         .data::<i64>()
                         .iter()
@@ -171,7 +171,7 @@ impl Op {
                         }
                     })
                     .collect::<Vec<_>>();
-                shapes.push(TypedShape::new(
+                shapes.push(TypedFixedShape::new(
                     shape.into(),
                     inputs[Op::RESHAPE_IN].elem_ty(),
                 ))
@@ -181,7 +181,7 @@ impl Op {
                 assert!(flatten.axis >= 0);
                 let x: FixedDimensions = dims[..flatten.axis as usize].to_vec().into();
                 let y: FixedDimensions = dims[flatten.axis as usize..].to_vec().into();
-                shapes.push(TypedShape::new(
+                shapes.push(TypedFixedShape::new(
                     vec![x.total_elems(), y.total_elems()].into(),
                     inputs[Op::FLATTEN_IN].elem_ty(),
                 ));
@@ -190,7 +190,7 @@ impl Op {
                 if inputs.len() == 4 {
                     let sizes = &inputs[Op::RESIZE_IN_SIZES];
                     assert!(sizes.dims().len() == 1 && sizes.dims()[0] == 4);
-                    shapes.push(TypedShape::new(
+                    shapes.push(TypedFixedShape::new(
                         FixedDimensions::from_i64(sizes.data::<i64>()),
                         inputs[Op::RESIZE_IN_X].elem_ty(),
                     ))
@@ -206,7 +206,7 @@ impl Op {
                                                                          // it only takes effect when coordinate_transformation_mode is "tf_crop_and_resize".
                                                                          // Since we assume coordinate_transformation_mode is "asymmetric" for now, just ignore roi.
                     let scales = &inputs[Op::RESIZE_IN_SCALES].data::<f32>();
-                    shapes.push(TypedShape::new(
+                    shapes.push(TypedFixedShape::new(
                         vec![
                             (x.dims()[0] as f32 * scales[0]).floor() as usize,
                             (x.dims()[1] as f32 * scales[1]).floor() as usize,
@@ -217,7 +217,7 @@ impl Op {
                         inputs[Op::RESIZE_IN_X].elem_ty(),
                     ))
                     // NOTE: Use the following code when roi takes effect ... right?
-                    // shapes.push(TypedShape::new(
+                    // shapes.push(TypedFixedShape::new(
                     //     vec![
                     //         (x.dims()[0] as f32 * (roi[4] - roi[0]) * scales[0]).floor() as usize,
                     //         (x.dims()[1] as f32 * (roi[5] - roi[1]) * scales[1]).floor() as usize,
@@ -238,7 +238,7 @@ impl Op {
                     sum += i.dims()[concat.axis as usize];
                 }
                 dims.as_mut_slice()[concat.axis as usize] = sum;
-                shapes.push(TypedShape::new(dims, inputs[Op::CONCAT_IN].elem_ty()))
+                shapes.push(TypedFixedShape::new(dims, inputs[Op::CONCAT_IN].elem_ty()))
             }
             Op::Transpose(trans) => {
                 assert!(!trans.perm.is_empty());
@@ -247,7 +247,7 @@ impl Op {
                 for i in 0..in_dims.len() {
                     dims[i] = in_dims[trans.perm[i] as usize];
                 }
-                shapes.push(TypedShape::new(
+                shapes.push(TypedFixedShape::new(
                     dims.into(),
                     inputs[Op::TRANSPOSE_IN].elem_ty(),
                 ))
@@ -263,7 +263,7 @@ impl Op {
                     }
                     dims.push(x);
                 }
-                shapes.push(TypedShape::new(
+                shapes.push(TypedFixedShape::new(
                     dims.into(),
                     inputs[Op::SQUEEZE_IN].elem_ty(),
                 ))
@@ -277,14 +277,14 @@ impl Op {
                     for &x in axes {
                         dims.insert(x as usize, 1);
                     }
-                    shapes.push(TypedShape::new(dims.into(), inputs[0].elem_ty()))
+                    shapes.push(TypedFixedShape::new(dims.into(), inputs[0].elem_ty()))
                 } else {
                     let in_dims = inputs[Op::UNSQUEEZE_IN].dims().as_slice().to_vec();
                     let mut dims = in_dims;
                     for &x in unsqueeze.axes.iter() {
                         dims.insert(x as usize, 1);
                     }
-                    shapes.push(TypedShape::new(
+                    shapes.push(TypedFixedShape::new(
                         dims.into(),
                         inputs[Op::UNSQUEEZE_IN].elem_ty(),
                     ))
@@ -313,7 +313,7 @@ impl Op {
                 if dims.is_empty() {
                     dims.push(1);
                 }
-                shapes.push(TypedShape::new(dims.into(), inputs[0].elem_ty()))
+                shapes.push(TypedFixedShape::new(dims.into(), inputs[0].elem_ty()))
             }
             Op::ReduceMax(rmax) => {
                 assert!(opset_version <= 13);
@@ -346,7 +346,7 @@ impl Op {
                 if dims.is_empty() {
                     dims.push(1);
                 }
-                shapes.push(TypedShape::new(dims.into(), inputs[0].elem_ty()))
+                shapes.push(TypedFixedShape::new(dims.into(), inputs[0].elem_ty()))
             }
             Op::ReduceMean(rmean) => {
                 let in_dims = inputs[0].dims();
@@ -371,7 +371,7 @@ impl Op {
                 if dims.is_empty() {
                     dims.push(1);
                 }
-                shapes.push(TypedShape::new(dims.into(), inputs[0].elem_ty()))
+                shapes.push(TypedFixedShape::new(dims.into(), inputs[0].elem_ty()))
             }
             Op::Loop => {
                 assert!(inputs.len() == 3);
@@ -391,7 +391,10 @@ impl Op {
                 for (i, &x) in in_dims.as_slice().iter().enumerate() {
                     dims.push(x * reps[i] as usize);
                 }
-                shapes.push(TypedShape::new(dims.into(), inputs[Op::TILE_IN].elem_ty()));
+                shapes.push(TypedFixedShape::new(
+                    dims.into(),
+                    inputs[Op::TILE_IN].elem_ty(),
+                ));
             }
             Op::Split(split) => {
                 if opset_version >= 13 {
@@ -402,7 +405,7 @@ impl Op {
                     for s in split {
                         let mut dims = input.clone();
                         dims[axis as usize] = *s as usize;
-                        shapes.push(TypedShape::new(dims, inputs[0].elem_ty()));
+                        shapes.push(TypedFixedShape::new(dims, inputs[0].elem_ty()));
                     }
                 } else {
                     let axis = split.axis;
@@ -412,7 +415,7 @@ impl Op {
                     for s in split {
                         let mut dims = input.clone();
                         dims[axis as usize] = *s as usize;
-                        shapes.push(TypedShape::new(dims, inputs[0].elem_ty()));
+                        shapes.push(TypedFixedShape::new(dims, inputs[0].elem_ty()));
                     }
                 }
             }
@@ -447,7 +450,10 @@ impl Op {
                     assert!(out_dim > 0);
                     dims[axis] = out_dim;
                 }
-                shapes.push(TypedShape::new(dims, inputs[Op::SLICE_IN_DATA].elem_ty()))
+                shapes.push(TypedFixedShape::new(
+                    dims,
+                    inputs[Op::SLICE_IN_DATA].elem_ty(),
+                ))
             }
             Op::Gather(gather) => {
                 let mut data = inputs[0].dims().0.to_owned();
@@ -459,13 +465,13 @@ impl Op {
                 );
                 if indices.is_scalar() {
                     data.remove(gather.axis as usize);
-                    shapes.push(TypedShape::new(data.into(), inputs[0].elem_ty()))
+                    shapes.push(TypedFixedShape::new(data.into(), inputs[0].elem_ty()))
                 } else {
                     assert_eq!(gather.axis, 0);
                     data.remove(gather.axis as usize);
                     data.insert(0, 1);
                     data.insert(1, indices[1]);
-                    shapes.push(TypedShape::new(data.into(), inputs[0].elem_ty()))
+                    shapes.push(TypedFixedShape::new(data.into(), inputs[0].elem_ty()))
                 }
             }
             Op::Shape(_) => return Err(ShapeError::Message("Shape: Unsupported op".into())),
@@ -492,22 +498,22 @@ impl Op {
                     "A shape: {in_a:?}, B shape: {in_b:?}"
                 );
                 if in_a.len() == 4 && in_b.len() == 4 {
-                    shapes.push(TypedShape::new(
+                    shapes.push(TypedFixedShape::new(
                         vec![in_a[0], in_a[1], in_a[2], in_b[3]].into(),
                         inputs[Op::MATMUL_IN_A].elem_ty(),
                     ));
                 } else if in_a.len() == 3 && in_b.len() == 2 {
-                    shapes.push(TypedShape::new(
+                    shapes.push(TypedFixedShape::new(
                         vec![in_a[0], in_a[1], in_b[1]].into(),
                         inputs[Op::MATMUL_IN_A].elem_ty(),
                     ));
                 } else if in_a.len() == 3 && in_b.len() == 3 {
-                    shapes.push(TypedShape::new(
+                    shapes.push(TypedFixedShape::new(
                         vec![in_a[0], in_a[1], in_b[2]].into(),
                         inputs[Op::MATMUL_IN_A].elem_ty(),
                     ));
                 } else {
-                    shapes.push(TypedShape::new(
+                    shapes.push(TypedFixedShape::new(
                         vec![in_a[0], in_b[1]].into(),
                         inputs[Op::MATMUL_IN_A].elem_ty(),
                     ));
@@ -527,7 +533,7 @@ impl Op {
                     (in_b[0], in_b[1])
                 };
                 assert_eq!(in_a1, in_b0);
-                shapes.push(TypedShape::new(
+                shapes.push(TypedFixedShape::new(
                     vec![in_a0, in_b1].into(),
                     inputs[Op::GEMM_IN_A].elem_ty(),
                 ));
@@ -548,17 +554,17 @@ impl Op {
             | Op::Softmax(_)
             | Op::BatchNormalization(_) => {
                 let input = inputs[0];
-                shapes.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
+                shapes.push(TypedFixedShape::new(input.dims().clone(), input.elem_ty()));
             }
             Op::LayerNormalization(ln) => {
                 assert!(num_outputs == 1);
                 let input = inputs[0];
                 assert!(ln.stash_type == 1);
-                shapes.push(TypedShape::new(input.dims().clone(), input.elem_ty()));
+                shapes.push(TypedFixedShape::new(input.dims().clone(), input.elem_ty()));
             }
             Op::Cast(cast) => {
                 let input = inputs[0];
-                shapes.push(TypedShape::new(input.dims().clone(), cast.to));
+                shapes.push(TypedFixedShape::new(input.dims().clone(), cast.to));
             }
             Op::FusedElemwise(ref mut f) => {
                 let mut map = FxHashMap::default();
@@ -602,12 +608,12 @@ impl Op {
     }
 }
 
-/// Infer `TypedShape`s of output tensors for each node.
+/// Infer `TypedFixedShape`s of output tensors for each node.
 /// It skips to infer on nodes without information for inference.
 pub fn infer_shapes(
     model: &Model,
-    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
-    value_shapes: &mut FxHashMap<ValueId, TypedShape>,
+    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedFixedShape>)>,
+    value_shapes: &mut FxHashMap<ValueId, TypedFixedShape>,
 ) -> Result<(), ShapeError> {
     let sorted_nodes = model.topo_sort_nodes();
     let mut values = model.inits.clone();
@@ -626,7 +632,7 @@ pub fn infer_shapes(
     value_shapes.extend(values.into_iter().map(|(val_id, tensor)| {
         let dims = tensor.dims().clone();
         let elem_ty = tensor.elem_ty();
-        let shape = TypedShape::new(dims, elem_ty);
+        let shape = TypedFixedShape::new(dims, elem_ty);
         (val_id, shape)
     }));
 
@@ -636,7 +642,7 @@ pub fn infer_shapes(
 fn infer_shape(
     model: &Model,
     values: &mut FxHashMap<ValueId, Tensor>,
-    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+    shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedFixedShape>)>,
     node_id: NodeId,
 ) -> Result<(), ShapeError> {
     let node = &model.nodes[node_id];

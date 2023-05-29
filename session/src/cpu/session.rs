@@ -1,7 +1,7 @@
 use crate::SessionError;
 use altius_core::{
     model::Model,
-    tensor::{Tensor, TypedShape},
+    tensor::{Tensor, TypedFixedShape},
     value::ValueId,
 };
 use rustc_hash::FxHashMap;
@@ -12,7 +12,7 @@ pub struct CPUSession {
     pub(super) model: Model,
     #[allow(dead_code)]
     pub(super) target_dir: PathBuf,
-    pub(super) value_shapes: FxHashMap<ValueId, TypedShape>,
+    pub(super) value_shapes: FxHashMap<ValueId, TypedFixedShape>,
     #[allow(dead_code)]
     pub(super) lib: libloading::Library,
     pub(super) trampoline: extern "C" fn(*const *const u8, *const *mut u8),

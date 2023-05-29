@@ -15,7 +15,7 @@ use altius_core::{
         Cast, Concat, Conv2d, Flatten, FusedActivation, FusedElemwise, Gather, Gemm, HardSigmoid,
         LayerNormalization, MaxPool, Op, ReduceMean, Resize, Softmax, Split, Transpose,
     },
-    tensor::{TensorElemType, TypedShape},
+    tensor::{TensorElemType, TypedFixedShape},
     value::ValueId,
 };
 use indent::indent_all_by;
@@ -26,8 +26,8 @@ use crate::{create_execution_plan, SessionError};
 
 pub(super) struct Translator<'a> {
     pub model: &'a Model,
-    inferred_shapes: &'a HashMap<NodeId, (Op, Vec<TypedShape>)>,
-    value_shapes: &'a HashMap<ValueId, TypedShape>,
+    inferred_shapes: &'a HashMap<NodeId, (Op, Vec<TypedFixedShape>)>,
+    value_shapes: &'a HashMap<ValueId, TypedFixedShape>,
     created_kernels: Vec<String>,
     created_kernel_protos: Vec<String>,
     created_extern_values: Vec<String>,
@@ -45,8 +45,8 @@ pub(super) struct Translator<'a> {
 impl<'a> Translator<'a> {
     pub fn new(
         model: &'a Model,
-        inferred_shapes: &'a HashMap<NodeId, (Op, Vec<TypedShape>)>,
-        value_shapes: &'a HashMap<ValueId, TypedShape>,
+        inferred_shapes: &'a HashMap<NodeId, (Op, Vec<TypedFixedShape>)>,
+        value_shapes: &'a HashMap<ValueId, TypedFixedShape>,
     ) -> Result<Self, SessionError> {
         // let target_dir = PathBuf::from("/tmp/model"); // For debugging
         let target_dir = tempfile::TempDir::new()?.into_path();
@@ -449,7 +449,7 @@ static struct timespec now() {{
             .collect::<Vec<_>>();
         let (op, outputs) = self.inferred_shapes.get(&node_id).map_or_else(
             || todo!("Why is this node output shape not inferred?"),
-            Ok::<&(Op, Vec<TypedShape>), SessionError>,
+            Ok::<&(Op, Vec<TypedFixedShape>), SessionError>,
         )?;
         self.used_op_names.insert(op.name().into());
 
@@ -581,8 +581,8 @@ static struct timespec now() {{
         &mut self,
         op: &Conv2d,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_names = &args[inputs.len()..];
@@ -820,8 +820,8 @@ free(col);",
         &mut self,
         hs: &HardSigmoid,
         args: &[String],
-        inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[..inputs.len()][0];
         let output_name = &args[inputs.len()..][0];
@@ -844,8 +844,8 @@ for (int i = 0; i < {size}; i++) {{
         &mut self,
         op: &FusedElemwise,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_name = &args[inputs.len()..][0];
@@ -988,8 +988,8 @@ for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
         &mut self,
         op: &str,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_name = &args[inputs.len()..][0];
@@ -1077,8 +1077,8 @@ for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
         &mut self,
         node: &Node,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_name = &args[inputs.len()..][0];
@@ -1139,8 +1139,8 @@ for (int i = 0; i < {size}; i++) {{
     fn translate_sqrt(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[0];
         let output_name = &args[1];
@@ -1161,8 +1161,8 @@ for (int i = 0; i < {size}; i++) {{
     fn translate_relu(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[..inputs.len()][0];
         let output_name = &args[inputs.len()..][0];
@@ -1182,8 +1182,8 @@ for (int i = 0; i < {size}; i++) {{
     fn translate_erf(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[..inputs.len()][0];
         let output_name = &args[inputs.len()..][0];
@@ -1202,8 +1202,8 @@ for (int i = 0; i < {size}; i++) {{
     fn translate_sigmoid(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[..inputs.len()][0];
         let output_name = &args[inputs.len()..][0];
@@ -1252,8 +1252,8 @@ for (int i = 0; i < {size}; i++) {{
     fn translate_tanh(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[..inputs.len()][0];
         let output_name = &args[inputs.len()..][0];
@@ -1272,8 +1272,8 @@ for (int i = 0; i < {size}; i++) {{
     fn translate_where(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_name = &args[inputs.len()..][0];
@@ -1367,8 +1367,8 @@ float *output_ptr = {};\n",
     fn translate_gavg_pool(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[0];
         let output_name = &args[1];
@@ -1407,8 +1407,8 @@ float *output_ptr = {};\n",
         &mut self,
         maxpool: &MaxPool,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_names = &args[inputs.len()..];
@@ -1480,8 +1480,8 @@ for (int outer = 0; outer < {outer}; outer++) {{
     fn translate_reshape(
         &mut self,
         _args: &[String],
-        _inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        _inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         // `Reshape`s are handled as nop.
         Ok(String::new())
@@ -1500,8 +1500,8 @@ for (int outer = 0; outer < {outer}; outer++) {{
     fn translate_mat_mul(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_names = &args[inputs.len()..];
@@ -1594,8 +1594,8 @@ for (int outer = 0; outer < {outer}; outer++) {{
         &mut self,
         _flatten: &Flatten,
         args: &[String],
-        inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[0];
         let output_name = &args[1];
@@ -1611,8 +1611,8 @@ for (int outer = 0; outer < {outer}; outer++) {{
         &mut self,
         gemm: &Gemm,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_0 = inputs[0];
         let input_1 = inputs[1];
@@ -1678,8 +1678,8 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
         &mut self,
         transpose: &Transpose,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[0];
         let output_name = &args[1];
@@ -1807,8 +1807,8 @@ for (int i = 0; i < {num_blocks}; i++) {{
     fn translate_expand(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input = inputs[0];
         let output = &outputs[0];
@@ -1835,8 +1835,8 @@ for (int i = 0; i < {num_blocks}; i++) {{
         &mut self,
         concat: &Concat,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_names = &args[0..inputs.len()];
         let output_name = &args[inputs.len()];
@@ -1881,8 +1881,8 @@ for (int i = 0; i < {outer}; i++) {{
         &mut self,
         gather: &Gather,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let data = inputs[0];
         let indices = inputs[1];
@@ -1934,8 +1934,8 @@ for (int i = 0; i < {outer}; i++) {{
         &mut self,
         rmean: &ReduceMean,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input = inputs[0];
         let output = &outputs[0];
@@ -1982,8 +1982,8 @@ for (int i = 0; i < {outer}; i++) {{
         &mut self,
         softmax: &Softmax,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input = inputs[0];
         let output = &outputs[0];
@@ -2058,8 +2058,8 @@ for (int i = 0; i < {batch}; i++) {{
         &mut self,
         ln: &LayerNormalization,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let data = inputs[0];
         let _scale = inputs[1];
@@ -2116,8 +2116,8 @@ for (int i = 0; i < {batch}; i++) {{
     fn translate_gelu(
         &mut self,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[0];
         let output_name = &args[1];
@@ -2181,8 +2181,8 @@ for (int i = 0; i < {size}; i++) {{
         &mut self,
         split: &Split,
         args: &[String],
-        inputs: &[&TypedShape],
-        _outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let opset_version = self.model.opset_version;
 
@@ -2251,8 +2251,8 @@ for (int i = 0; i < {size} / {axis_len}; i++) {{
         &mut self,
         cast: &Cast,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_name = &args[0];
         let output_name = &args[1];
@@ -2276,8 +2276,8 @@ for (int i = 0; i < {size} / {axis_len}; i++) {{
         &mut self,
         resize: &Resize,
         args: &[String],
-        inputs: &[&TypedShape],
-        outputs: &[TypedShape],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         let input_names = &args[0..inputs.len()];
         let output_names = &args[inputs.len()..];

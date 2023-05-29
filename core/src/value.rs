@@ -2,14 +2,14 @@ use std::ops::{Index, IndexMut};
 
 use id_arena::{Arena, Id};
 
-use crate::tensor::{TypedShape, TypedSymbolicShape};
+use crate::tensor::{TypedFixedShape, TypedSymbolicShape};
 
 pub type ValueId = Id<Value>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Value {
     pub name: Option<String>,
-    pub shape: Option<TypedShape>, // TODO: Support dynamic shape.
+    pub shape: Option<TypedFixedShape>, // TODO: Support dynamic shape.
     pub symshape: Option<TypedSymbolicShape>, // This will replace `shape` in the future.
 }
 
@@ -36,7 +36,7 @@ impl ValueArena {
     pub fn new_val_named_and_shaped(
         &mut self,
         name: impl Into<String>,
-        shape: impl Into<TypedShape>,
+        shape: impl Into<TypedFixedShape>,
     ) -> ValueId {
         self.0.alloc(Value {
             name: Some(name.into()),

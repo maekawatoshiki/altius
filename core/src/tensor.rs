@@ -21,13 +21,12 @@ pub struct Tensor {
 
 /// Represents a type and shape of a tensor.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TypedShape {
+pub struct TypedFixedShape {
     pub dims: FixedDimensions,
     pub elem_ty: TensorElemType,
 }
 
 /// Represents a type and shape of a tensor.
-/// This will replace `TypedShape` in the future.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypedSymbolicShape {
     pub dims: SymbolicDimensions,
@@ -417,7 +416,7 @@ impl Deref for FixedDimensions {
     }
 }
 
-impl TypedShape {
+impl TypedFixedShape {
     pub fn new(dims: FixedDimensions, elem_ty: TensorElemType) -> Self {
         Self { dims, elem_ty }
     }

@@ -16,7 +16,7 @@ use altius_core::{
         LeakyReLU, MaxPool, Op, ReduceMax, ReduceMean, Resize, Softmax, Split, Squeeze, Transpose,
         Unsqueeze,
     },
-    tensor::{Tensor, TensorElemType, TypedShape},
+    tensor::{Tensor, TensorElemType, TypedFixedShape},
     value::ValueId,
 };
 #[cfg(feature = "cuda")]
@@ -53,7 +53,7 @@ pub struct InterpreterSession {
     #[cfg(feature = "cuda")]
     pub(super) cudnn_ctx: SafeCudnnContext,
     pub(super) execution_plans: Vec<NodeExecutionPlan>,
-    pub(super) inferred_shapes: FxHashMap<NodeId, (Op, Vec<TypedShape>)>,
+    pub(super) inferred_shapes: FxHashMap<NodeId, (Op, Vec<TypedFixedShape>)>,
     pub(super) enable_profiling: bool,
     pub(super) values: ThreadLocal<RefCell<FxHashMap<ValueId, Tensor>>>,
     pub(super) dummy_value: Tensor,
@@ -186,7 +186,7 @@ impl InterpreterSession {
         )?;
         let mut outputs = output_shapes
             .into_iter()
-            .map(|TypedShape { elem_ty, dims }| Tensor::uninit_of_type(elem_ty, dims))
+            .map(|TypedFixedShape { elem_ty, dims }| Tensor::uninit_of_type(elem_ty, dims))
             .collect::<Vec<_>>();
 
         #[cfg(not(target_arch = "wasm32"))]

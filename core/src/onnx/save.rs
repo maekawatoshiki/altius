@@ -4,8 +4,8 @@ use prost::Message;
 use thiserror::Error;
 
 use crate::{
+    dim::Dimension as Dim,
     model::Model,
-    symdim::Dimension as Dim,
     tensor::{TensorElemType, TypedShape},
 };
 

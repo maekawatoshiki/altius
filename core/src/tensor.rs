@@ -1,8 +1,8 @@
 use std::{cell::RefCell, cmp::Ordering, fmt, iter::Sum, mem::MaybeUninit, sync::Arc};
 
 use crate::{
-    dim::{FixedDimension, FixedDimensions},
-    symdim::{Dimension, Dimensions},
+    dim::{Dimension, Dimensions},
+    fixed_dim::{FixedDimension, FixedDimensions},
 };
 use rand::{
     distributions::Standard, prelude::Distribution, rngs::StdRng, thread_rng, Rng, SeedableRng,

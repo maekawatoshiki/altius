@@ -1,5 +1,5 @@
 use crate::{
-    dim::FixedDimensions,
+    fixed_dim::FixedDimensions,
     tensor::{Tensor, TensorElemType},
     value::ValueId,
 };

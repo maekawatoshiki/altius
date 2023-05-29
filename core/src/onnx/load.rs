@@ -4,7 +4,7 @@ use std::{borrow::Cow, collections::hash_map::Entry, fs, io, path::Path};
 use thiserror::Error;
 
 use crate::{
-    dim::FixedDimensions,
+    fixed_dim::FixedDimensions,
     model::Model,
     node::Node,
     op::{

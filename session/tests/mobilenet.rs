@@ -1,4 +1,4 @@
-use altius_core::symdim::Dimension;
+use altius_core::dim::Dimension;
 use altius_core::{onnx::load_onnx, tensor::Tensor};
 use altius_session::interpreter::InterpreterSessionBuilder;
 use std::cmp::Ordering;

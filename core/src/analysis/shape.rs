@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 use thiserror::Error;
 
 use crate::{
-    dim::FixedDimensions,
+    fixed_dim::FixedDimensions,
     model::Model,
     node::NodeId,
     op::Op,

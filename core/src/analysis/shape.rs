@@ -269,20 +269,35 @@ impl Op {
                 ))
             }
             Op::Squeeze(squeeze) => {
-                assert!(!squeeze.axes.is_empty());
-                assert!(squeeze.axes.iter().all(|&x| x >= 0));
-                let in_dims = inputs[Op::SQUEEZE_IN].dims().as_slice();
-                let mut dims = vec![];
-                for (i, &x) in in_dims.iter().enumerate() {
-                    if squeeze.axes.contains(&(i as i64)) {
-                        continue;
+                if opset_version < 12 {
+                    assert!(!squeeze.axes.is_empty());
+                    assert!(squeeze.axes.iter().all(|&x| x >= 0));
+                    let in_dims = inputs[Op::SQUEEZE_IN].dims().as_slice();
+                    let mut dims = vec![];
+                    for (i, &x) in in_dims.iter().enumerate() {
+                        if squeeze.axes.contains(&(i as i64)) {
+                            continue;
+                        }
+                        dims.push(x);
                     }
-                    dims.push(x);
+                    shapes.push(TypedFixedShape::new(
+                        dims.into(),
+                        inputs[Op::SQUEEZE_IN].elem_ty(),
+                    ))
+                } else {
+                    let in_dims = inputs[0].dims().as_slice();
+                    let axes = inputs[1].data::<i64>();
+                    assert!(!axes.is_empty());
+                    assert!(axes.iter().all(|&x| x >= 0));
+                    let mut dims = vec![];
+                    for (i, &x) in in_dims.iter().enumerate() {
+                        if axes.contains(&(i as i64)) {
+                            continue;
+                        }
+                        dims.push(x);
+                    }
+                    shapes.push(TypedFixedShape::new(dims.into(), inputs[0].elem_ty()))
                 }
-                shapes.push(TypedFixedShape::new(
-                    dims.into(),
-                    inputs[Op::SQUEEZE_IN].elem_ty(),
-                ))
             }
             Op::Unsqueeze(unsqueeze) => {
                 if opset_version >= 13 {

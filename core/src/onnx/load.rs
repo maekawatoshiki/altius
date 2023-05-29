@@ -241,9 +241,10 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             "Transpose" => Op::Transpose(Transpose {
                 perm: get_attribute(&node.attribute, "perm").unwrap().ints.clone(),
             }),
-            "Squeeze" => Op::Squeeze(Squeeze {
+            "Squeeze" if opset_version < Some(12) => Op::Squeeze(Squeeze {
                 axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
             }),
+            "Squeeze" => Op::Squeeze(Squeeze { axes: vec![] }),
             "Unsqueeze" => Op::Unsqueeze(Unsqueeze {
                 axes: get_attribute(&node.attribute, "axes")
                     .map_or_else(Vec::new, |a| a.ints.clone()),

@@ -130,7 +130,7 @@ pub struct Transpose {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Squeeze {
-    pub axes: Vec<i64>,
+    pub axes: Vec<i64>, // From opset 12, this attribute is no longer used.
 }
 
 /// <https://github.com/onnx/onnx/blob/main/docs/Operators.md#Unsqueeze>

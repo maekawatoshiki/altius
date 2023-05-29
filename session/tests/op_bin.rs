@@ -1,4 +1,4 @@
-use altius_core::{dim::Dimensions, model::Model, node::Node, op::Op, tensor::Tensor};
+use altius_core::{dim::FixedDimensions, model::Model, node::Node, op::Op, tensor::Tensor};
 use altius_session::interpreter::InterpreterSessionBuilder;
 
 macro_rules! test_op {
@@ -23,7 +23,7 @@ macro_rules! test_op {
 macro_rules! op {
     ($name:ident, $op:ident, $bin:tt) => {
         #[cfg(test)]
-        fn $name(shape: Dimensions) {
+        fn $name(shape: FixedDimensions) {
             let mut model = Model::default();
             let x = model.values.new_val_named("x");
             let y = model.values.new_val_named("y");

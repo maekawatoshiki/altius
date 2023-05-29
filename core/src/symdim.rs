@@ -1,15 +1,14 @@
 use std::fmt;
 
-use crate::dim::Dimension;
+use crate::dim::FixedDimension;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum SymbolicDimension {
-    Static(Dimension),
+    Static(FixedDimension),
     Dynamic(String),
 }
 
-/// An alternative to `Dimensions` that allows dynamic shape.
-/// This will replace `Dimensions` in the future.
+/// An alternative to `FixedDimensions` that allows dynamic shape.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SymbolicDimensions(Vec<SymbolicDimension>);
 

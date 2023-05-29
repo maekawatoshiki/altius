@@ -3,18 +3,18 @@ use std::{
     slice::SliceIndex,
 };
 
-pub type Dimension = usize;
+pub type FixedDimension = usize;
 
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
-pub struct Dimensions(pub Vec<Dimension>);
+pub struct FixedDimensions(pub Vec<FixedDimension>);
 
-impl std::fmt::Debug for Dimensions {
+impl std::fmt::Debug for FixedDimensions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.0)
     }
 }
 
-impl Dimensions {
+impl FixedDimensions {
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -31,11 +31,11 @@ impl Dimensions {
         self.0.iter().product()
     }
 
-    pub fn as_slice(&self) -> &[Dimension] {
+    pub fn as_slice(&self) -> &[FixedDimension] {
         self.0.as_slice()
     }
 
-    pub fn as_mut_slice(&mut self) -> &mut [Dimension] {
+    pub fn as_mut_slice(&mut self) -> &mut [FixedDimension] {
         self.0.as_mut_slice()
     }
 
@@ -44,15 +44,15 @@ impl Dimensions {
     }
 
     pub fn from_i64(dims: &[i64]) -> Self {
-        Self(dims.iter().map(|&x| x as Dimension).collect())
+        Self(dims.iter().map(|&x| x as FixedDimension).collect())
     }
 
     pub fn broadcast(&self, other: impl AsRef<Self>) -> Option<Self> {
         broadcast(&[self, other.as_ref()])
     }
 
-    pub fn to_fixed_dims<const N: usize>(&self) -> [Dimension; N] {
-        let mut dims: [Dimension; N] = [0; N];
+    pub fn to_fixed_dims<const N: usize>(&self) -> [FixedDimension; N] {
+        let mut dims: [FixedDimension; N] = [0; N];
         dims.copy_from_slice(&self.0);
         dims
     }
@@ -61,12 +61,12 @@ impl Dimensions {
         compute_strides(self)
     }
 
-    pub fn strides_for_broadcasting_to(&self, dims: &[Dimension]) -> Option<Dimensions> {
+    pub fn strides_for_broadcasting_to(&self, dims: &[FixedDimension]) -> Option<FixedDimensions> {
         fn upcast(
-            to: &[Dimension],
-            from: &[Dimension],
-            stride: &[Dimension],
-        ) -> Option<Dimensions> {
+            to: &[FixedDimension],
+            from: &[FixedDimension],
+            stride: &[FixedDimension],
+        ) -> Option<FixedDimensions> {
             let mut new_stride = to.to_vec();
 
             if to.len() < from.len() {
@@ -101,7 +101,7 @@ impl Dimensions {
     }
 }
 
-fn compute_strides(dims: &Dimensions) -> Dimensions {
+fn compute_strides(dims: &FixedDimensions) -> FixedDimensions {
     let mut strides = vec![];
     for i in 0..dims.len() {
         strides.push(dims[i + 1..].iter().product());
@@ -109,12 +109,12 @@ fn compute_strides(dims: &Dimensions) -> Dimensions {
     strides.into()
 }
 
-pub fn broadcast(shapes: &[impl AsRef<Dimensions>]) -> Option<Dimensions> {
+pub fn broadcast(shapes: &[impl AsRef<FixedDimensions>]) -> Option<FixedDimensions> {
     let mut shape = vec![];
     let max_len = shapes
         .iter()
         .map(AsRef::as_ref)
-        .map(Dimensions::len)
+        .map(FixedDimensions::len)
         .max()?;
     for i in 0..max_len {
         let mut size = 1;
@@ -135,72 +135,72 @@ pub fn broadcast(shapes: &[impl AsRef<Dimensions>]) -> Option<Dimensions> {
     Some(shape.into())
 }
 
-impl AsRef<Dimensions> for Dimensions {
-    fn as_ref(&self) -> &Dimensions {
+impl AsRef<FixedDimensions> for FixedDimensions {
+    fn as_ref(&self) -> &FixedDimensions {
         self
     }
 }
 
-impl<I> Index<I> for Dimensions
+impl<I> Index<I> for FixedDimensions
 where
-    I: SliceIndex<[Dimension]>,
+    I: SliceIndex<[FixedDimension]>,
 {
-    type Output = <I as SliceIndex<[Dimension]>>::Output;
+    type Output = <I as SliceIndex<[FixedDimension]>>::Output;
 
     fn index(&self, index: I) -> &Self::Output {
         &self.0[index]
     }
 }
 
-impl<I> IndexMut<I> for Dimensions
+impl<I> IndexMut<I> for FixedDimensions
 where
-    I: SliceIndex<[Dimension]>,
+    I: SliceIndex<[FixedDimension]>,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         &mut self.0[index]
     }
 }
 
-impl From<Vec<Dimension>> for Dimensions {
-    fn from(v: Vec<Dimension>) -> Dimensions {
-        Dimensions(v)
+impl From<Vec<FixedDimension>> for FixedDimensions {
+    fn from(v: Vec<FixedDimension>) -> FixedDimensions {
+        FixedDimensions(v)
     }
 }
 
 #[test]
 fn total_elems() {
-    assert_eq!(Dimensions(vec![1, 1, 28, 28]).total_elems(), 784)
+    assert_eq!(FixedDimensions(vec![1, 1, 28, 28]).total_elems(), 784)
 }
 
 #[test]
 fn total_elems2() {
-    assert_eq!(Dimensions(vec![1]).total_elems(), 1)
+    assert_eq!(FixedDimensions(vec![1]).total_elems(), 1)
 }
 
 #[test]
 fn total_elems3() {
-    assert_eq!(Dimensions(vec![]).total_elems(), 1)
+    assert_eq!(FixedDimensions(vec![]).total_elems(), 1)
 }
 
 #[test]
 fn broadcast_1() {
-    let one = Dimensions::from(vec![1]);
+    let one = FixedDimensions::from(vec![1]);
     let shape = broadcast(&[&one]).unwrap();
     assert_eq!(shape, one)
 }
 
 #[test]
 fn broadcast_2() {
-    let one = Dimensions::from(vec![1]);
-    let four = Dimensions::from(vec![4, 1]);
+    let one = FixedDimensions::from(vec![1]);
+    let four = FixedDimensions::from(vec![4, 1]);
     let shape = broadcast(&[one, four]).unwrap();
     assert_eq!(shape, vec![4, 1].into())
 }
 
 #[test]
 fn broadcast_3() {
-    let one = Dimensions::from(vec![1]);
-    let four = Dimensions::from(vec![4, 1]);
+    let one = FixedDimensions::from(vec![1]);
+    let four = FixedDimensions::from(vec![4, 1]);
     let shape = broadcast(&[four, one]).unwrap();
     assert_eq!(shape, vec![4, 1].into())
 }
@@ -208,31 +208,31 @@ fn broadcast_3() {
 #[test]
 #[should_panic]
 fn broadcast_4() {
-    let one = Dimensions::from(vec![10, 20]);
-    let four = Dimensions::from(vec![10, 20, 30]);
+    let one = FixedDimensions::from(vec![10, 20]);
+    let four = FixedDimensions::from(vec![10, 20, 30]);
     let _ = broadcast(&[four, one]).unwrap();
 }
 
 #[test]
 fn broadcast_5() {
-    let x = Dimensions::from(vec![1, 3, 3]);
-    let y = Dimensions::from(vec![5, 1, 3, 3]);
+    let x = FixedDimensions::from(vec![1, 3, 3]);
+    let y = FixedDimensions::from(vec![5, 1, 3, 3]);
     let shape = broadcast(&[x, y]).unwrap();
     assert_eq!(shape, vec![5, 1, 3, 3].into())
 }
 
 #[test]
 fn broadcast_6() {
-    let x = Dimensions::from(vec![1, 3, 1]);
-    let y = Dimensions::from(vec![5, 3, 10]);
+    let x = FixedDimensions::from(vec![1, 3, 1]);
+    let y = FixedDimensions::from(vec![5, 3, 10]);
     let shape = broadcast(&[x, y]).unwrap();
     assert_eq!(shape, vec![5, 3, 10].into())
 }
 
 #[test]
 fn broadcast_7() {
-    let x = Dimensions::from(vec![1, 3, 4, 4]);
-    let y = Dimensions::from(vec![3, 1, 1]);
+    let x = FixedDimensions::from(vec![1, 3, 4, 4]);
+    let y = FixedDimensions::from(vec![3, 1, 1]);
     let shape = broadcast(&[x, y]).unwrap();
     assert_eq!(shape, vec![1, 3, 4, 4,].into())
 }

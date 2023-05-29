@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 use thiserror::Error;
 
 use crate::{
-    dim::Dimensions,
+    dim::FixedDimensions,
     model::Model,
     node::NodeId,
     op::Op,
@@ -179,8 +179,8 @@ impl Op {
             Op::Flatten(flatten) => {
                 let dims = inputs[Op::FLATTEN_IN].dims();
                 assert!(flatten.axis >= 0);
-                let x: Dimensions = dims[..flatten.axis as usize].to_vec().into();
-                let y: Dimensions = dims[flatten.axis as usize..].to_vec().into();
+                let x: FixedDimensions = dims[..flatten.axis as usize].to_vec().into();
+                let y: FixedDimensions = dims[flatten.axis as usize..].to_vec().into();
                 shapes.push(TypedShape::new(
                     vec![x.total_elems(), y.total_elems()].into(),
                     inputs[Op::FLATTEN_IN].elem_ty(),
@@ -191,7 +191,7 @@ impl Op {
                     let sizes = &inputs[Op::RESIZE_IN_SIZES];
                     assert!(sizes.dims().len() == 1 && sizes.dims()[0] == 4);
                     shapes.push(TypedShape::new(
-                        Dimensions::from_i64(sizes.data::<i64>()),
+                        FixedDimensions::from_i64(sizes.data::<i64>()),
                         inputs[Op::RESIZE_IN_X].elem_ty(),
                     ))
                 } else if inputs.len() == 3 {

@@ -1,6 +1,9 @@
 use std::{cell::RefCell, cmp::Ordering, fmt, iter::Sum, mem::MaybeUninit, ops::Deref, sync::Arc};
 
-use crate::{dim::{Dimension, Dimensions}, symdim::SymbolicDimensions};
+use crate::{
+    dim::{FixedDimension, FixedDimensions},
+    symdim::SymbolicDimensions,
+};
 use rand::{
     distributions::Standard, prelude::Distribution, rngs::StdRng, thread_rng, Rng, SeedableRng,
 };
@@ -10,8 +13,8 @@ thread_local!(static RNG: RefCell<StdRng> =
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tensor {
-    dims: Dimensions,
-    stride: Dimensions,
+    dims: FixedDimensions,
+    stride: FixedDimensions,
     data: Arc<Vec<u8>>,
     elem_ty: TensorElemType,
 }
@@ -19,7 +22,7 @@ pub struct Tensor {
 /// Represents a type and shape of a tensor.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypedShape {
-    pub dims: Dimensions,
+    pub dims: FixedDimensions,
     pub elem_ty: TensorElemType,
 }
 
@@ -55,7 +58,7 @@ pub trait TensorElemTypeExt: PartialEq + PartialOrd + Copy {
 }
 
 impl Tensor {
-    pub fn new<T: TensorElemTypeExt>(dims: Dimensions, data: Vec<T>) -> Self {
+    pub fn new<T: TensorElemTypeExt>(dims: FixedDimensions, data: Vec<T>) -> Self {
         let data = std::mem::ManuallyDrop::new(data);
         Self {
             stride: compute_strides(&dims),
@@ -71,7 +74,7 @@ impl Tensor {
         }
     }
 
-    pub fn new_from_raw(dims: Dimensions, elem_ty: TensorElemType, data: Vec<u8>) -> Self {
+    pub fn new_from_raw(dims: FixedDimensions, elem_ty: TensorElemType, data: Vec<u8>) -> Self {
         let data = std::mem::ManuallyDrop::new(data);
         Self {
             stride: compute_strides(&dims),
@@ -83,14 +86,14 @@ impl Tensor {
         }
     }
 
-    pub fn zeros<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
+    pub fn zeros<T: TensorElemTypeExt>(dims: FixedDimensions) -> Self {
         let total_elems = dims.total_elems();
         Self::new(dims, vec![T::zero(); total_elems])
     }
 
     /// Returns `Tensor` of given type and shape but allocates no elements.
     /// This is used in shape inference.
-    pub fn empty_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
+    pub fn empty_of_type(ty: TensorElemType, dims: FixedDimensions) -> Self {
         match ty {
             TensorElemType::Bool => Self::new::<bool>(dims, vec![]),
             TensorElemType::F32 => Self::new::<f32>(dims, vec![]),
@@ -99,7 +102,7 @@ impl Tensor {
         }
     }
 
-    pub fn zeros_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
+    pub fn zeros_of_type(ty: TensorElemType, dims: FixedDimensions) -> Self {
         let total_elems = dims.total_elems();
         match ty {
             TensorElemType::Bool => Self::new(dims, vec![0u8; total_elems]),
@@ -109,7 +112,7 @@ impl Tensor {
         }
     }
 
-    pub fn uninit_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
+    pub fn uninit_of_type(ty: TensorElemType, dims: FixedDimensions) -> Self {
         fn uninit_of<T: TensorElemTypeExt>(total_elems: usize) -> Vec<T> {
             let mut vec = MaybeUninit::new(Vec::with_capacity(total_elems));
             unsafe {
@@ -127,7 +130,7 @@ impl Tensor {
         }
     }
 
-    pub fn uninit<T: TensorElemTypeExt>(dims: Dimensions) -> Self {
+    pub fn uninit<T: TensorElemTypeExt>(dims: FixedDimensions) -> Self {
         fn uninit_of<T: TensorElemTypeExt>(total_elems: usize) -> Vec<T> {
             let mut vec = MaybeUninit::new(Vec::with_capacity(total_elems));
             unsafe {
@@ -140,7 +143,7 @@ impl Tensor {
         Self::new(dims, uninit_of::<T>(total_elems))
     }
 
-    pub fn rand<T>(dims: Dimensions) -> Self
+    pub fn rand<T>(dims: FixedDimensions) -> Self
     where
         T: TensorElemTypeExt,
         Standard: Distribution<T>,
@@ -157,7 +160,7 @@ impl Tensor {
         )
     }
 
-    pub fn rand_of_type(ty: TensorElemType, dims: Dimensions) -> Self {
+    pub fn rand_of_type(ty: TensorElemType, dims: FixedDimensions) -> Self {
         fn new<T>(total_elems: usize) -> Vec<T>
         where
             T: TensorElemTypeExt,
@@ -195,7 +198,7 @@ impl Tensor {
         });
     }
 
-    // pub fn reshape_into(mut self, dims: Dimensions) -> Self {
+    // pub fn reshape_into(mut self, dims: FixedDimensions) -> Self {
     //     self.stride = compute_strides(&dims);
     //     self.dims = dims;
     //     assert!(self.verify());
@@ -213,7 +216,7 @@ impl Tensor {
     //     out
     // }
 
-    pub fn slice_at<T: TensorElemTypeExt>(&self, indices: &[Dimension]) -> &[T] {
+    pub fn slice_at<T: TensorElemTypeExt>(&self, indices: &[FixedDimension]) -> &[T] {
         let mut index = 0;
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
@@ -221,7 +224,7 @@ impl Tensor {
         &self.data::<T>()[index..]
     }
 
-    pub fn slice_at_mut<T: TensorElemTypeExt>(&mut self, indices: &[Dimension]) -> &mut [T] {
+    pub fn slice_at_mut<T: TensorElemTypeExt>(&mut self, indices: &[FixedDimension]) -> &mut [T] {
         let mut index = 0;
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
@@ -229,7 +232,7 @@ impl Tensor {
         &mut self.data_mut::<T>()[index..]
     }
 
-    pub fn at(&self, indices: &[Dimension]) -> f32 {
+    pub fn at(&self, indices: &[FixedDimension]) -> f32 {
         let mut index = 0;
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
@@ -237,7 +240,7 @@ impl Tensor {
         self.data::<f32>()[index]
     }
 
-    pub fn at_mut(&mut self, indices: &[Dimension]) -> &mut f32 {
+    pub fn at_mut(&mut self, indices: &[FixedDimension]) -> &mut f32 {
         let mut index = 0;
         for (idx, d) in indices.iter().zip(self.stride.as_slice().iter()) {
             index += d * idx;
@@ -245,47 +248,58 @@ impl Tensor {
         &mut self.data_mut::<f32>()[index]
     }
 
-    pub fn at_2d(&self, x: Dimension, y: Dimension) -> f32 {
+    pub fn at_2d(&self, x: FixedDimension, y: FixedDimension) -> f32 {
         self.data::<f32>()[self.stride[0] * x + self.stride[1] * y]
     }
 
-    pub fn at_2d_mut(&mut self, x: Dimension, y: Dimension) -> &mut f32 {
+    pub fn at_2d_mut(&mut self, x: FixedDimension, y: FixedDimension) -> &mut f32 {
         let offset = self.stride[0] * x + self.stride[1] * y;
         &mut self.data_mut::<f32>()[offset]
     }
 
-    pub fn at_3d(&self, x: Dimension, y: Dimension, z: Dimension) -> f32 {
+    pub fn at_3d(&self, x: FixedDimension, y: FixedDimension, z: FixedDimension) -> f32 {
         self.data::<f32>()[self.stride[0] * x + self.stride[1] * y + self.stride[2] * z]
     }
 
-    pub fn at_3d_mut(&mut self, x: Dimension, y: Dimension, z: Dimension) -> &mut f32 {
+    pub fn at_3d_mut(
+        &mut self,
+        x: FixedDimension,
+        y: FixedDimension,
+        z: FixedDimension,
+    ) -> &mut f32 {
         let offset = self.stride[0] * x + self.stride[1] * y + self.stride[2] * z;
         &mut self.data_mut::<f32>()[offset]
     }
 
-    pub fn at_4d(&self, x: Dimension, y: Dimension, z: Dimension, u: Dimension) -> f32 {
+    pub fn at_4d(
+        &self,
+        x: FixedDimension,
+        y: FixedDimension,
+        z: FixedDimension,
+        u: FixedDimension,
+    ) -> f32 {
         self.data::<f32>()
             [self.stride[0] * x + self.stride[1] * y + self.stride[2] * z + self.stride[3] * u]
     }
 
     pub fn at_4d_mut(
         &mut self,
-        x: Dimension,
-        y: Dimension,
-        z: Dimension,
-        u: Dimension,
+        x: FixedDimension,
+        y: FixedDimension,
+        z: FixedDimension,
+        u: FixedDimension,
     ) -> &mut f32 {
         let offset =
             self.stride[0] * x + self.stride[1] * y + self.stride[2] * z + self.stride[3] * u;
         &mut self.data_mut::<f32>()[offset]
     }
 
-    pub fn dims(&self) -> &Dimensions {
+    pub fn dims(&self) -> &FixedDimensions {
         &self.dims
     }
 
-    pub fn fixed_dims<const N: usize>(&self) -> [Dimension; N] {
-        let mut dims: [Dimension; N] = [0; N];
+    pub fn fixed_dims<const N: usize>(&self) -> [FixedDimension; N] {
+        let mut dims: [FixedDimension; N] = [0; N];
         dims.copy_from_slice(self.dims.as_slice());
         dims
     }
@@ -330,7 +344,7 @@ impl Tensor {
         self.elem_ty
     }
 
-    pub fn strides(&self) -> &[Dimension] {
+    pub fn strides(&self) -> &[FixedDimension] {
         self.stride.as_slice()
     }
 
@@ -338,12 +352,12 @@ impl Tensor {
         self.data.len() / self.elem_ty.size() == self.dims.total_elems()
     }
 
-    pub fn strides_for_broadcasting(&self, dims: &[Dimension]) -> Option<Dimensions> {
+    pub fn strides_for_broadcasting(&self, dims: &[FixedDimension]) -> Option<FixedDimensions> {
         fn upcast(
-            to: &[Dimension],
-            from: &[Dimension],
-            stride: &[Dimension],
-        ) -> Option<Dimensions> {
+            to: &[FixedDimension],
+            from: &[FixedDimension],
+            stride: &[FixedDimension],
+        ) -> Option<FixedDimensions> {
             let mut new_stride = to.to_vec();
 
             if to.len() < from.len() {
@@ -396,7 +410,7 @@ impl Tensor {
     }
 }
 
-impl Deref for Dimensions {
+impl Deref for FixedDimensions {
     type Target = Vec<usize>;
     fn deref(&self) -> &Vec<usize> {
         &self.0
@@ -404,7 +418,7 @@ impl Deref for Dimensions {
 }
 
 impl TypedShape {
-    pub fn new(dims: Dimensions, elem_ty: TensorElemType) -> Self {
+    pub fn new(dims: FixedDimensions, elem_ty: TensorElemType) -> Self {
         Self { dims, elem_ty }
     }
 }
@@ -486,7 +500,7 @@ impl TensorElemTypeExt for i64 {
     }
 }
 
-fn compute_strides(dims: &Dimensions) -> Dimensions {
+fn compute_strides(dims: &FixedDimensions) -> FixedDimensions {
     let mut strides = vec![];
     for i in 0..dims.len() {
         strides.push(dims[i + 1..].iter().product());
@@ -544,10 +558,10 @@ dump_tensor!(bool, dump_bool_tensor);
 
 #[test]
 fn create_tensors() {
-    assert!(Tensor::zeros::<u8>(Dimensions(vec![1, 1, 28, 28])).verify());
-    assert!(Tensor::zeros::<f32>(Dimensions(vec![1, 1, 28, 28])).verify());
-    assert!(Tensor::zeros::<i32>(Dimensions(vec![1, 1, 28, 28])).verify());
-    assert!(Tensor::zeros::<i64>(Dimensions(vec![1, 1, 28, 28])).verify());
+    assert!(Tensor::zeros::<u8>(FixedDimensions(vec![1, 1, 28, 28])).verify());
+    assert!(Tensor::zeros::<f32>(FixedDimensions(vec![1, 1, 28, 28])).verify());
+    assert!(Tensor::zeros::<i32>(FixedDimensions(vec![1, 1, 28, 28])).verify());
+    assert!(Tensor::zeros::<i64>(FixedDimensions(vec![1, 1, 28, 28])).verify());
     let t = Tensor::new(
         vec![4, 4].into(),
         vec![

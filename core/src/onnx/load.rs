@@ -4,7 +4,7 @@ use std::{borrow::Cow, collections::hash_map::Entry, fs, io, path::Path};
 use thiserror::Error;
 
 use crate::{
-    dim::Dimensions,
+    dim::FixedDimensions,
     model::Model,
     node::Node,
     op::{
@@ -113,7 +113,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 Entry::Vacant(v) => *v.insert(model.values.new_val_named_and_shaped(
                     x.name(),
                     TypedShape::new(
-                        Dimensions::from_i64(&dims),
+                        FixedDimensions::from_i64(&dims),
                         DataType::from_i32(tensor.elem_type()).unwrap().try_into()?,
                     ),
                 )),
@@ -182,15 +182,15 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                     .map_or("NOTSET".to_string(), |a| {
                         unsafe { std::str::from_utf8_unchecked(a.s()) }.to_string()
                     });
-                let kernel_shape = Dimensions::from_i64(
+                let kernel_shape = FixedDimensions::from_i64(
                     &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,
                 );
                 let strides = get_attribute(&node.attribute, "strides")
-                    .map_or(vec![1, 1].into(), |a| Dimensions::from_i64(&a.ints));
+                    .map_or(vec![1, 1].into(), |a| FixedDimensions::from_i64(&a.ints));
                 let padding = get_attribute(&node.attribute, "pads")
-                    .map_or(vec![0, 0].into(), |a| Dimensions::from_i64(&a.ints));
+                    .map_or(vec![0, 0].into(), |a| FixedDimensions::from_i64(&a.ints));
                 let dilations = get_attribute(&node.attribute, "dilations")
-                    .map_or(vec![1, 1].into(), |a| Dimensions::from_i64(&a.ints));
+                    .map_or(vec![1, 1].into(), |a| FixedDimensions::from_i64(&a.ints));
                 let group = get_attribute(&node.attribute, "group").map_or(1, |a| a.i());
                 Op::Conv2d(Conv2d {
                     auto_pad,
@@ -288,12 +288,13 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                         unsafe { std::str::from_utf8_unchecked(a.s()) }.to_string()
                     });
                 let padding = get_attribute(&node.attribute, "pads")
-                    .map_or(vec![0, 0].into(), |a| Dimensions::from_i64(&a.ints));
-                let kernel = Dimensions::from_i64(
+                    .map_or(vec![0, 0].into(), |a| FixedDimensions::from_i64(&a.ints));
+                let kernel = FixedDimensions::from_i64(
                     &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,
                 );
-                let strides =
-                    Dimensions::from_i64(&get_attribute(&node.attribute, "strides").unwrap().ints);
+                let strides = FixedDimensions::from_i64(
+                    &get_attribute(&node.attribute, "strides").unwrap().ints,
+                );
                 Op::MaxPool(MaxPool {
                     auto_pad,
                     padding,
@@ -364,34 +365,34 @@ fn get_attribute<'a>(
 fn get_tensor(tensor: &TensorProto) -> Result<Tensor, ModelLoadError> {
     Ok(match DataType::from_i32(tensor.data_type()).unwrap() {
         DataType::Float if tensor.raw_data().is_empty() => Tensor::new(
-            Dimensions::from_i64(&tensor.dims),
+            FixedDimensions::from_i64(&tensor.dims),
             tensor.float_data.clone(),
         ),
         DataType::Float => Tensor::new_from_raw(
-            Dimensions::from_i64(&tensor.dims),
+            FixedDimensions::from_i64(&tensor.dims),
             TensorElemType::F32,
             tensor.raw_data().to_vec(),
         ),
         DataType::Int64 if tensor.raw_data().is_empty() => Tensor::new(
-            Dimensions::from_i64(&tensor.dims),
+            FixedDimensions::from_i64(&tensor.dims),
             tensor.int64_data.clone(),
         ),
         DataType::Int64 => Tensor::new_from_raw(
-            Dimensions::from_i64(&tensor.dims),
+            FixedDimensions::from_i64(&tensor.dims),
             TensorElemType::I64,
             tensor.raw_data().to_vec(),
         ),
         DataType::Int32 if tensor.raw_data().is_empty() => Tensor::new(
-            Dimensions::from_i64(&tensor.dims),
+            FixedDimensions::from_i64(&tensor.dims),
             tensor.int32_data.clone(),
         ),
         DataType::Int32 => Tensor::new_from_raw(
-            Dimensions::from_i64(&tensor.dims),
+            FixedDimensions::from_i64(&tensor.dims),
             TensorElemType::I32,
             tensor.raw_data().to_vec(),
         ),
         DataType::Bool => Tensor::new_from_raw(
-            Dimensions::from_i64(&tensor.dims),
+            FixedDimensions::from_i64(&tensor.dims),
             TensorElemType::Bool,
             tensor.raw_data().to_vec(),
         ),

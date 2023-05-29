@@ -1,5 +1,5 @@
 use crate::{
-    dim::Dimensions,
+    dim::FixedDimensions,
     tensor::{Tensor, TensorElemType},
     value::ValueId,
 };
@@ -58,11 +58,11 @@ pub enum Op {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Conv2d {
     pub auto_pad: String,
-    pub dilations: Dimensions,
+    pub dilations: FixedDimensions,
     pub group: i64,
-    pub kernel_shape: Dimensions,
-    pub strides: Dimensions,
-    pub padding: Dimensions,
+    pub kernel_shape: FixedDimensions,
+    pub strides: FixedDimensions,
+    pub padding: FixedDimensions,
     pub activation: Option<FusedActivation>, // This is not part of the ONNX spec.
 }
 
@@ -75,9 +75,9 @@ pub enum FusedActivation {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MaxPool {
     pub auto_pad: String,
-    pub kernel_shape: Dimensions,
-    pub strides: Dimensions,
-    pub padding: Dimensions,
+    pub kernel_shape: FixedDimensions,
+    pub strides: FixedDimensions,
+    pub padding: FixedDimensions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

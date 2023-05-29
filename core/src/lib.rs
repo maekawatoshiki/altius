@@ -2,6 +2,7 @@
 
 pub mod analysis;
 pub mod dim;
+pub mod symdim;
 pub mod model;
 pub mod node;
 pub mod onnx;

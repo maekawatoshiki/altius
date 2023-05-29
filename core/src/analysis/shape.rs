@@ -154,6 +154,22 @@ impl Op {
                     input.elem_ty(),
                 ));
             }
+            Op::Range => {
+                if !inputs[0].elem_ty().is_i64() {
+                    return Err(ShapeError::Message(
+                        "Range only supports i64 for now".into(),
+                    ));
+                }
+
+                let start = inputs[0].data::<i64>()[0];
+                let limit = inputs[1].data::<i64>()[0];
+                let delta = inputs[2].data::<i64>()[0];
+                let num_elems = (((limit - start) as f32 / delta as f32).ceil() as i64).max(0);
+                shapes.push(TypedFixedShape::new(
+                    vec![num_elems as usize].into(),
+                    inputs[0].elem_ty(),
+                ));
+            }
             Op::Reshape => {
                 let shape = inputs[Op::RESHAPE_SHAPE]
                     .data::<i64>()

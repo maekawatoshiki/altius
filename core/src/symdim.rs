@@ -3,25 +3,25 @@ use std::fmt;
 use crate::dim::FixedDimension;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub enum SymbolicDimension {
-    Static(FixedDimension),
+pub enum Dimension {
+    Fixed(FixedDimension),
     Dynamic(String),
 }
 
 /// An alternative to `FixedDimensions` that allows dynamic shape.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct SymbolicDimensions(Vec<SymbolicDimension>);
+pub struct Dimensions(Vec<Dimension>);
 
-impl fmt::Debug for SymbolicDimension {
+impl fmt::Debug for Dimension {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SymbolicDimension::Static(d) => write!(f, "{}", d),
-            SymbolicDimension::Dynamic(s) => write!(f, "{}", s),
+            Dimension::Fixed(d) => write!(f, "{}", d),
+            Dimension::Dynamic(s) => write!(f, "{}", s),
         }
     }
 }
 
-impl fmt::Debug for SymbolicDimensions {
+impl fmt::Debug for Dimensions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.0)
     }
@@ -29,8 +29,8 @@ impl fmt::Debug for SymbolicDimensions {
 
 #[test]
 fn use_symdims() {
-    let _ = SymbolicDimensions(vec![
-        SymbolicDimension::Dynamic("batch".into()),
-        SymbolicDimension::Static(8),
+    let _ = Dimensions(vec![
+        Dimension::Dynamic("batch".into()),
+        Dimension::Fixed(8),
     ]);
 }

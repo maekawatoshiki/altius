@@ -2,7 +2,7 @@ use std::{cell::RefCell, cmp::Ordering, fmt, iter::Sum, mem::MaybeUninit, ops::D
 
 use crate::{
     dim::{FixedDimension, FixedDimensions},
-    symdim::SymbolicDimensions,
+    symdim::Dimensions,
 };
 use rand::{
     distributions::Standard, prelude::Distribution, rngs::StdRng, thread_rng, Rng, SeedableRng,
@@ -28,8 +28,8 @@ pub struct TypedFixedShape {
 
 /// Represents a type and shape of a tensor.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct TypedSymbolicShape {
-    pub dims: SymbolicDimensions,
+pub struct TypedShape {
+    pub dims: Dimensions,
     pub elem_ty: TensorElemType,
 }
 

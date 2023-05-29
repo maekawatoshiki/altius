@@ -1,6 +1,6 @@
 use std::{cell::RefCell, cmp::Ordering, fmt, iter::Sum, mem::MaybeUninit, ops::Deref, sync::Arc};
 
-use crate::dim::{Dimension, Dimensions};
+use crate::{dim::{Dimension, Dimensions}, symdim::SymbolicDimensions};
 use rand::{
     distributions::Standard, prelude::Distribution, rngs::StdRng, thread_rng, Rng, SeedableRng,
 };
@@ -20,6 +20,14 @@ pub struct Tensor {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypedShape {
     pub dims: Dimensions,
+    pub elem_ty: TensorElemType,
+}
+
+/// Represents a type and shape of a tensor.
+/// This will replace `TypedShape` in the future.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TypedSymbolicShape {
+    pub dims: SymbolicDimensions,
     pub elem_ty: TensorElemType,
 }
 

@@ -621,7 +621,13 @@ pub fn infer_shapes(
     for &val_id in &model.inputs {
         let shape = &model.values.inner()[val_id].shape;
         let Some(shape) = shape else { continue };
-        let tensor = Tensor::zeros_of_type(shape.elem_ty, shape.dims.clone());
+        let tensor = Tensor::zeros_of_type(
+            shape.elem_ty,
+            shape
+                .dims
+                .as_fixed_dims()
+                .ok_or_else(|| ShapeError::Message("Must be fixed dimension".into()))?,
+        );
         values.insert(val_id, tensor);
     }
 

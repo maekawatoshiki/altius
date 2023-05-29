@@ -1,3 +1,4 @@
+use altius_core::symdim::Dimension;
 use altius_core::{onnx::load_onnx, tensor::Tensor};
 use altius_session::interpreter::InterpreterSessionBuilder;
 use std::cmp::Ordering;
@@ -16,7 +17,7 @@ fn mobilenet() {
         .as_mut()
         .unwrap()
         .dims
-        .as_mut_slice()[0] = 4;
+        .0[0] = Dimension::Fixed(4);
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
     let resized = image::imageops::resize(&image, 224, 224, image::imageops::FilterType::Triangle);

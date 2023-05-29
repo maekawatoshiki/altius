@@ -5,7 +5,8 @@ use thiserror::Error;
 
 use crate::{
     model::Model,
-    tensor::{TensorElemType, TypedFixedShape},
+    symdim::Dimension as Dim,
+    tensor::{TensorElemType, TypedShape},
 };
 
 include!(concat!(env!("OUT_DIR"), "/onnx.rs"));
@@ -59,7 +60,7 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
     ] {
         for &id in vals {
             let val = &model.values.inner()[id];
-            let Some(TypedFixedShape { dims, elem_ty }) =
+            let Some(TypedShape { dims, elem_ty }) =
                 &val.shape else { return Err(ModelSaveError::NoGraphInputShape) };
             let elem_ty: DataType = (*elem_ty).into();
 
@@ -68,11 +69,14 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
                 value: Some(TensorType(type_proto::Tensor {
                     elem_type: Some(elem_ty as i32),
                     shape: Some(TensorShapeProto {
-                        dim: dims
+                        dim: dims[0..]
                             .iter()
                             .map(|d| Dimension {
                                 denotation: None,
-                                value: Some(DimValue::DimValue(*d as i64)),
+                                value: match d {
+                                    Dim::Fixed(d) => Some(DimValue::DimValue(*d as i64)),
+                                    Dim::Dynamic(d) => Some(DimValue::DimParam(d.clone())),
+                                },
                             })
                             .collect::<Vec<_>>(),
                     }),

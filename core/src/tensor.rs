@@ -1,8 +1,8 @@
-use std::{cell::RefCell, cmp::Ordering, fmt, iter::Sum, mem::MaybeUninit, ops::Deref, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, fmt, iter::Sum, mem::MaybeUninit, sync::Arc};
 
 use crate::{
     dim::{FixedDimension, FixedDimensions},
-    symdim::Dimensions,
+    symdim::{Dimension, Dimensions},
 };
 use rand::{
     distributions::Standard, prelude::Distribution, rngs::StdRng, thread_rng, Rng, SeedableRng,
@@ -409,16 +409,25 @@ impl Tensor {
     }
 }
 
-impl Deref for FixedDimensions {
-    type Target = Vec<usize>;
-    fn deref(&self) -> &Vec<usize> {
-        &self.0
-    }
-}
-
 impl TypedFixedShape {
     pub fn new(dims: FixedDimensions, elem_ty: TensorElemType) -> Self {
         Self { dims, elem_ty }
+    }
+}
+
+impl From<TypedFixedShape> for TypedShape {
+    fn from(typed: TypedFixedShape) -> Self {
+        Self {
+            dims: Dimensions::new(
+                typed
+                    .dims
+                    .0
+                    .into_iter()
+                    .map(|x| Dimension::Fixed(x))
+                    .collect(),
+            ),
+            elem_ty: typed.elem_ty,
+        }
     }
 }
 

@@ -71,7 +71,7 @@ fn main() {
 
         inputs.push((
             input_id,
-            Tensor::rand_of_type(shape.elem_ty, shape.dims.clone()),
+            Tensor::rand_of_type(shape.elem_ty, shape.dims.as_fixed_dims().unwrap()),
         ));
     }
 

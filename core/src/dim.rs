@@ -1,5 +1,5 @@
 use std::{
-    ops::{Index, IndexMut},
+    ops::{Deref, Index, IndexMut},
     slice::SliceIndex,
 };
 
@@ -164,6 +164,13 @@ where
 impl From<Vec<FixedDimension>> for FixedDimensions {
     fn from(v: Vec<FixedDimension>) -> FixedDimensions {
         FixedDimensions(v)
+    }
+}
+
+impl Deref for FixedDimensions {
+    type Target = Vec<usize>;
+    fn deref(&self) -> &Vec<usize> {
+        &self.0
     }
 }
 

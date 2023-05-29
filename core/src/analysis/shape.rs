@@ -505,7 +505,15 @@ impl Op {
                     shapes.push(TypedFixedShape::new(data.into(), inputs[0].elem_ty()))
                 }
             }
-            Op::Shape(_) => return Err(ShapeError::Message("Shape: Unsupported op".into())),
+            Op::Shape(shape) => {
+                assert!(shape.end.is_none());
+                assert!(shape.start == 0);
+                let input = inputs[0].dims();
+                shapes.push(TypedFixedShape::new(
+                    vec![input.len()].into(),
+                    TensorElemType::I64,
+                ));
+            }
             Op::NonMaxSuppression => {
                 return Err(ShapeError::Message(
                     "NonMaxSuppression: Unsupported op".into(),

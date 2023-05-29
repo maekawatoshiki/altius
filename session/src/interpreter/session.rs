@@ -259,11 +259,7 @@ impl InterpreterSession {
             }
             Op::Slice => compute_slice(node, &inputs, &mut outputs),
             Op::Gather(ref gather) => compute_gather(gather, &inputs, &mut outputs),
-            Op::Shape(_) => {
-                return Err(SessionError::Message(
-                    "Shape: Kernel not implemented".into(),
-                ))
-            }
+            Op::Shape(_) => compute_shape(&inputs, &mut outputs),
             Op::NonMaxSuppression => {
                 return Err(SessionError::Message(
                     "NonMaxSuppression: Kernel not implemented".into(),
@@ -1602,6 +1598,16 @@ fn compute_gather(gather: &Gather, inputs: &[&Tensor], outputs: &mut [Tensor]) {
             assert!(i >= 0);
             o.copy_from_slice(&data.slice_at::<f32>(&[i as usize])[..data.dims()[1]]);
         }
+    }
+}
+
+fn compute_shape(inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input = inputs[0];
+    let output = &mut outputs[0];
+
+    let output = output.data_mut::<i64>();
+    for (i, &d) in input.dims().iter().enumerate() {
+        output[i] = d as i64;
     }
 }
 

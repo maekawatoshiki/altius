@@ -415,6 +415,12 @@ impl TypedFixedShape {
     }
 }
 
+impl TypedShape {
+    pub fn new(dims: Dimensions, elem_ty: TensorElemType) -> Self {
+        Self { dims, elem_ty }
+    }
+}
+
 impl From<TypedFixedShape> for TypedShape {
     fn from(typed: TypedFixedShape) -> Self {
         Self {

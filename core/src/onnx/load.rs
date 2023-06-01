@@ -1,9 +1,10 @@
-use prost::Message;
+use prost::{DecodeError, Message};
 use rustc_hash::FxHashMap;
 use std::{borrow::Cow, collections::hash_map::Entry, fs, io, path::Path};
 use thiserror::Error;
 
 use crate::{
+    dim::Dimension,
     fixed_dim::FixedDimensions,
     model::Model,
     node::Node,
@@ -12,10 +13,12 @@ use crate::{
         LayerNormalization, LeakyReLU, MaxPool, Op, ReduceMax, ReduceMean, ReduceMin, Resize,
         Shape, Softmax, Split, Squeeze, Transpose, Unsqueeze,
     },
-    tensor::{Tensor, TensorElemType, TypedFixedShape},
+    tensor::{Tensor, TensorElemType, TypedShape},
 };
 
 use tensor_proto::DataType;
+use tensor_shape_proto::dimension::Value::{DimParam, DimValue};
+use type_proto::Value::TensorType;
 
 include!(concat!(env!("OUT_DIR"), "/onnx.rs"));
 
@@ -27,8 +30,17 @@ pub enum ModelLoadError {
     #[error("Model does not contain any graph")]
     NoGraph,
 
+    #[error("Model is invalid: {0}")]
+    InvalidModel(DecodeError),
+
     #[error("Model contains duplicated opsets")]
     DuplicateOpset,
+
+    #[error("Value type is not specified")]
+    NoValueType,
+
+    #[error("Value shape is not specified")]
+    NoValueShape,
 
     #[error("Model contains unknown opset")]
     UnknownOpsetVersion,
@@ -43,7 +55,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
 }
 
 pub fn load_onnx_from_buffer(buf: &[u8]) -> Result<Model, ModelLoadError> {
-    let model = ModelProto::decode(buf).unwrap();
+    let model = ModelProto::decode(buf).map_err(|e| ModelLoadError::InvalidModel(e))?;
     load_onnx_from_model_proto(model)
 }
 
@@ -81,39 +93,36 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
         (&graph.output, &mut model.outputs),
     ] {
         for x in vals {
-            let val = x.r#type.as_ref().unwrap().value.as_ref().unwrap();
-            let mut dims = vec![];
-            let mut is_dynamic_shape = false;
-            let type_proto::Value::TensorType(tensor) = val else {
-                return Err(ModelLoadError::Todo(
-                    "Graph input must be tensor type".into(),
-                ));
-            };
+            let TensorType(tensor) = x
+                .r#type
+                .as_ref()
+                .ok_or_else(|| ModelLoadError::NoValueType)?
+                .value
+                .as_ref()
+                .ok_or_else(|| ModelLoadError::NoValueType)? else {
+                    return Err(ModelLoadError::Todo(
+                        "Graph input must be tensor type".into(),
+                    ));
+                };
 
-            for d in tensor
+            let dims: Vec<Dimension> = tensor
                 .shape
                 .as_ref()
-                .unwrap()
+                .ok_or_else(|| ModelLoadError::NoValueShape)?
                 .dim
                 .iter()
-                .map(|d| d.value.as_ref().unwrap())
-            {
-                let tensor_shape_proto::dimension::Value::DimValue(i) = d else {
-                is_dynamic_shape = true;
-                break
-            };
-                dims.push(*i)
-            }
+                .map(|d| match d.value.as_ref().unwrap() {
+                    DimValue(i) => Dimension::Fixed(*i as usize),
+                    DimParam(s) => Dimension::Dynamic(s.clone()),
+                })
+                .collect();
 
             let input = match name_to_val.entry(x.name()) {
                 Entry::Occupied(o) => *o.get(),
-                Entry::Vacant(v) if is_dynamic_shape => {
-                    *v.insert(model.values.new_val_named(x.name()))
-                }
                 Entry::Vacant(v) => *v.insert(model.values.new_val_named_and_shaped(
                     x.name(),
-                    TypedFixedShape::new(
-                        FixedDimensions::from_i64(&dims),
+                    TypedShape::new(
+                        dims.into(),
                         DataType::from_i32(tensor.elem_type()).unwrap().try_into()?,
                     ),
                 )),

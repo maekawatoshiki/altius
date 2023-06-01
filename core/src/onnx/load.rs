@@ -42,6 +42,9 @@ pub enum ModelLoadError {
     #[error("Value shape is not specified")]
     NoValueShape,
 
+    #[error("Attribute '{0}' is not specified")]
+    NoAttribute(&'static str),
+
     #[error("Model contains unknown opset")]
     UnknownOpsetVersion,
 
@@ -177,7 +180,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             "Split" => Op::Split(Split {
                 axis: get_attribute(&node.attribute, "axis").map_or(0, |a| a.i()),
                 split: get_attribute(&node.attribute, "split")
-                    .map_or_else(Vec::new, |a| a.ints.clone()),
+                    .map_or_else(|_| Vec::new(), |a| a.ints.clone()),
             }),
             "Slice" => Op::Slice,
             "Gather" => Op::Gather(Gather {
@@ -193,7 +196,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                         unsafe { std::str::from_utf8_unchecked(a.s()) }.to_string()
                     });
                 let kernel_shape = FixedDimensions::from_i64(
-                    &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,
+                    &get_attribute(&node.attribute, "kernel_shape")?.ints,
                 );
                 let strides = get_attribute(&node.attribute, "strides")
                     .map_or(vec![1, 1].into(), |a| FixedDimensions::from_i64(&a.ints));
@@ -245,21 +248,21 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 })
             }
             "Concat" => Op::Concat(Concat {
-                axis: get_attribute(&node.attribute, "axis").unwrap().i(),
+                axis: get_attribute(&node.attribute, "axis")?.i(),
             }),
             "Transpose" => Op::Transpose(Transpose {
-                perm: get_attribute(&node.attribute, "perm").unwrap().ints.clone(),
+                perm: get_attribute(&node.attribute, "perm")?.ints.clone(),
             }),
             "Squeeze" if opset_version < Some(12) => Op::Squeeze(Squeeze {
-                axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
+                axes: get_attribute(&node.attribute, "axes")?.ints.clone(),
             }),
             "Squeeze" => Op::Squeeze(Squeeze { axes: vec![] }),
             "Unsqueeze" => Op::Unsqueeze(Unsqueeze {
                 axes: get_attribute(&node.attribute, "axes")
-                    .map_or_else(Vec::new, |a| a.ints.clone()),
+                    .map_or_else(|_| Vec::new(), |a| a.ints.clone()),
             }),
             "ReduceMin" => Op::ReduceMin(ReduceMin {
-                axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
+                axes: get_attribute(&node.attribute, "axes")?.ints.clone(),
                 keep_dims: get_attribute(&node.attribute, "keepdims").map_or(true, |a| a.i() != 0),
             }),
             "ReduceMax" => Op::ReduceMax(ReduceMax {
@@ -267,20 +270,18 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 keep_dims: get_attribute(&node.attribute, "keepdims").map_or(true, |a| a.i() != 0),
             }),
             "ReduceMean" => Op::ReduceMean(ReduceMean {
-                axes: get_attribute(&node.attribute, "axes").unwrap().ints.clone(),
+                axes: get_attribute(&node.attribute, "axes")?.ints.clone(),
                 keep_dims: get_attribute(&node.attribute, "keepdims").map_or(true, |a| a.i() != 0),
             }),
             "Loop" => {
                 // TODO
-                let _body = get_attribute(&node.attribute, "body").unwrap();
+                let _body = get_attribute(&node.attribute, "body")?;
                 log::warn!("Ignore loop body!");
                 Op::Loop
             }
             "Cast" => {
-                let to = match DataType::from_i32(
-                    get_attribute(&node.attribute, "to").unwrap().i() as i32
-                )
-                .unwrap()
+                let to = match DataType::from_i32(get_attribute(&node.attribute, "to")?.i() as i32)
+                    .unwrap()
                 {
                     DataType::Float => TensorElemType::F32,
                     DataType::Int32 => TensorElemType::I32,
@@ -301,11 +302,10 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 let padding = get_attribute(&node.attribute, "pads")
                     .map_or(vec![0, 0].into(), |a| FixedDimensions::from_i64(&a.ints));
                 let kernel = FixedDimensions::from_i64(
-                    &get_attribute(&node.attribute, "kernel_shape").unwrap().ints,
+                    &get_attribute(&node.attribute, "kernel_shape")?.ints,
                 );
-                let strides = FixedDimensions::from_i64(
-                    &get_attribute(&node.attribute, "strides").unwrap().ints,
-                );
+                let strides =
+                    FixedDimensions::from_i64(&get_attribute(&node.attribute, "strides")?.ints);
                 Op::MaxPool(MaxPool {
                     auto_pad,
                     padding,
@@ -339,12 +339,12 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             }),
             "Clip" => Op::Clip,
             "Shape" => Op::Shape(Shape {
-                end: get_attribute(&node.attribute, "end").and_then(|a| a.i),
+                end: get_attribute(&node.attribute, "end").map_or(None, |a| a.i),
                 start: get_attribute(&node.attribute, "start").map_or(0, |a| a.i()),
             }),
             "Constant" => Op::Constant(Constant {
                 value: get_tensor(get_attribute(&node.attribute, "value").map_or_else(
-                    || {
+                    |_| {
                         Err(ModelLoadError::Todo(
                             "Constant.value must be specified for now".into(),
                         ))
@@ -369,8 +369,11 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
 fn get_attribute<'a>(
     attrs: &'a [AttributeProto],
     name: &'static str,
-) -> Option<&'a AttributeProto> {
-    attrs.iter().find(|x| x.name() == name)
+) -> Result<&'a AttributeProto, ModelLoadError> {
+    attrs
+        .iter()
+        .find(|x| x.name() == name)
+        .ok_or_else(|| ModelLoadError::NoAttribute(name.into()))
 }
 
 fn get_tensor(tensor: &TensorProto) -> Result<Tensor, ModelLoadError> {

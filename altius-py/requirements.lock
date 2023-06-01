@@ -61,5 +61,3 @@ transformers==4.28.1
 typing-extensions==4.5.0
 urllib3==2.0.2
 xmltodict==0.13.0
-# The following packages are considered to be unsafe in a requirements file:
-pip==23.1.2

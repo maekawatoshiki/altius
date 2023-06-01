@@ -1,11 +1,23 @@
-# altius
-
-[![CI](https://github.com/maekawatoshiki/altius/workflows/CI/badge.svg)](https://github.com/maekawatoshiki/altius/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/maekawatoshiki/altius/branch/main/graph/badge.svg)](https://codecov.io/gh/maekawatoshiki/altius)
-
-Small ONNX inference runtime written in Rust
-
-Feel free to create [issues](https://github.com/maekawatoshiki/altius/issues) and [discussions](https://github.com/maekawatoshiki/altius/discussions)
+<div align=center>
+    <h1>Altius</h1>
+    <a href="https://github.com/maekawatoshiki/altius/actions/workflows/ci.yml" target="_blank">
+        <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/maekawatoshiki/altius/ci.yml?branch=main&style=for-the-badge">
+    </a>
+    <a href="https://codecov.io/gh/maekawatoshiki/altius" target="_blank">
+        <img alt="Coverage" src="https://img.shields.io/codecov/c/gh/maekawatoshiki/altius?style=for-the-badge">
+    </a>
+    <br />
+    Small ONNX inference runtime written in Rust.
+    <br />
+    Feel free to create
+    <a href="https://github.com/maekawatoshiki/altius/issues" target="_blank">
+        issues
+    </a>
+    and 
+    <a href="https://github.com/maekawatoshiki/altius/discussions" target="_blank">
+        discussions!
+    </a>
+</div>
 
 # Requirements
 

@@ -182,7 +182,7 @@ impl InterpreterSession {
                     op.compute_output_shapes(&inputs, node.outputs.len(), self.model.opset_version);
                 output_shapes.map(|os| (op, os))
             },
-            |result| Ok(result),
+            Ok,
         )?;
         let mut outputs = output_shapes
             .into_iter()

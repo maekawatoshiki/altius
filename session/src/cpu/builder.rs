@@ -39,10 +39,9 @@ impl CPUSessionBuilder {
         let mut translator = Translator::new(&self.model, &inferred_shapes, &value_shapes)?
             .with_profiling_enabled(self.enable_profiling)
             .with_intra_op_num_threads(self.intra_op_num_threads);
-        {
-            translator.translate_into_c()?;
-            translator.compile()?;
-        }
+        translator.translate_into_c()?;
+        translator.compile()?;
+
         let lib = unsafe { libloading::Library::new(translator.target_dir.join("model.so")) }?;
         {
             let initializer: libloading::Symbol<unsafe extern "C" fn()> =

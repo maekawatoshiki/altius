@@ -1624,6 +1624,7 @@ for (int outer = 0; outer < {outer}; outer++) {{
         assert!(input_0.dims.len() == 2);
         assert!(input_1.dims.len() == 2);
         assert!(matches!(input_2.dims.len(), 1 | 2));
+        assert!(output.elem_ty.is_f32());
 
         let m = input_0.dims[gemm.trans_a as usize];
         let k = input_0.dims[1 - gemm.trans_a as usize];

@@ -696,17 +696,16 @@ fn compute_mat_mul(_node: &Node, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 }
 
 fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
-    let input_a = inputs[Op::GEMM_IN_A];
-    let input_b = inputs[Op::GEMM_IN_B];
-    let input_c = inputs[Op::GEMM_IN_C];
-    let output = &mut outputs[Op::GEMM_OUT];
-
-    assert!(input_a.dims().len() == 2);
-    assert!(input_b.dims().len() == 2);
-    assert!(matches!(input_c.dims().len(), 1 | 2));
-
     #[cfg(feature = "cblas")]
     {
+        let input_a = inputs[Op::GEMM_IN_A];
+        let input_b = inputs[Op::GEMM_IN_B];
+        // let input_c = inputs[Op::GEMM_IN_C];
+        let output = &mut outputs[Op::GEMM_OUT];
+
+        assert!(input_a.dims().len() == 2);
+        assert!(input_b.dims().len() == 2);
+
         let m = input_a.dims()[gemm.trans_a as usize];
         let k = input_a.dims()[1 - gemm.trans_a as usize];
         let n = input_b.dims()[1 - gemm.trans_b as usize];
@@ -715,17 +714,21 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
         let b = input_b.data();
         let c = output.data_mut::<f32>();
 
-        match input_c.dims().len() {
-            1 => {
-                c.chunks_mut(input_c.dims()[0])
-                    .for_each(|o| o.copy_from_slice(input_c.data::<f32>()));
+        if let Some(input_c) = inputs.get(2) {
+            match input_c.dims().len() {
+                1 => {
+                    c.chunks_mut(input_c.dims()[0])
+                        .for_each(|o| o.copy_from_slice(input_c.data::<f32>()));
+                }
+                2 => {
+                    assert_eq!(input_c.dims()[0], m);
+                    assert_eq!(input_c.dims()[1], n);
+                    c.copy_from_slice(input_c.data::<f32>());
+                }
+                _ => todo!(),
             }
-            2 => {
-                assert_eq!(input_c.dims()[0], m);
-                assert_eq!(input_c.dims()[1], n);
-                c.copy_from_slice(input_c.data::<f32>());
-            }
-            _ => unreachable!(),
+        } else {
+            c.fill(0.);
         }
 
         sgemm2(
@@ -748,6 +751,15 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     #[cfg(not(feature = "cblas"))]
     {
         use ndarray::Array2;
+
+        let input_a = inputs[Op::GEMM_IN_A];
+        let input_b = inputs[Op::GEMM_IN_B];
+        let input_c = inputs[Op::GEMM_IN_C];
+        let output = &mut outputs[Op::GEMM_OUT];
+
+        assert!(input_a.dims().len() == 2);
+        assert!(input_b.dims().len() == 2);
+        assert!(matches!(input_c.dims().len(), 1 | 2));
 
         let a = Array2::from_shape_vec(input_a.fixed_dims::<2>(), input_a.data::<f32>().to_vec())
             .unwrap();

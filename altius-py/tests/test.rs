@@ -8,7 +8,7 @@ use std::{
 use cargo_util::paths::mtime_recursive;
 
 #[test]
-fn run_test() {
+fn run_python_tests() {
     // If build artifacts are modified, run `maturin develop -r` by passing `build` option to
     // `./test.sh`.
     let root = get_project_root().unwrap();

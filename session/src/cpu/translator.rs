@@ -1642,7 +1642,7 @@ for (int outer = 0; outer < {outer}; outer++) {{
             2 => {
                 assert_eq!(output.dims.total_elems(), m * n);
                 format!(
-                    "memcpy({out}, {bias}, {n} * sizeof(float));",
+                    "memcpy({out}, {bias}, {m} * {n} * sizeof(float));",
                     bias = input_names[2],
                     out = output_names[0]
                 )

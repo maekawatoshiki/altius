@@ -13,12 +13,12 @@ def test_gemm_1():
         op_gemm(os.path.join(tmpdir, "model.onnx"), [5, 10], [10, 15], [15], [5, 15])
 
 
+def test_gemm_2():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_gemm(os.path.join(tmpdir, "model.onnx"), [5, 10], [10, 15], [5, 15], [5, 15])
+
+
 # TODO
-# def test_gemm_2():
-#     with tempfile.TemporaryDirectory() as tmpdir:
-#         op_gemm(os.path.join(tmpdir, "model.onnx"), [3, 5, 10], [10, 15], [3, 5, 15])
-#
-#
 # def test_gemm_3():
 #     with tempfile.TemporaryDirectory() as tmpdir:
 #         op_gemm(

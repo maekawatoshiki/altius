@@ -1616,44 +1616,46 @@ for (int outer = 0; outer < {outer}; outer++) {{
     ) -> Result<String, SessionError> {
         let input_0 = inputs[0];
         let input_1 = inputs[1];
-        let input_2 = inputs[2];
         let output = &outputs[0];
         let input_names = &args[..inputs.len()];
         let output_names = &args[inputs.len()..];
 
         assert!(input_0.dims.len() == 2);
         assert!(input_1.dims.len() == 2);
-        assert!(matches!(input_2.dims.len(), 1 | 2));
         assert!(output.elem_ty.is_f32());
 
         let m = input_0.dims[gemm.trans_a as usize];
         let k = input_0.dims[1 - gemm.trans_a as usize];
         let n = input_1.dims[1 - gemm.trans_b as usize];
 
-        let bias = match input_2.dims.len() {
-            1 => format!(
-                "for (int i = 0; i < {output_size}; i += {n}) {{
+        let bias = if let Some(input_2) = inputs.get(2) {
+            match input_2.dims.len() {
+                1 => format!(
+                    "for (int i = 0; i < {output_size}; i += {n}) {{
     memcpy({out} + i, {in2}, {n} * sizeof(float));
 }}",
-                output_size = output.dims.total_elems(),
-                in2 = input_names[2],
-                out = output_names[0]
-            ),
-            2 => {
-                assert_eq!(output.dims.total_elems(), m * n);
-                format!(
-                    "memcpy({out}, {bias}, {m} * {n} * sizeof(float));",
-                    bias = input_names[2],
+                    output_size = output.dims.total_elems(),
+                    in2 = input_names[2],
                     out = output_names[0]
-                )
+                ),
+                2 => {
+                    assert_eq!(output.dims.total_elems(), m * n);
+                    format!(
+                        "memcpy({out}, {bias}, {m} * {n} * sizeof(float));",
+                        bias = input_names[2],
+                        out = output_names[0]
+                    )
+                }
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
+        } else {
+            String::new()
         };
         let kernel = format!(
             "{bias}
 cblas_sgemm(CblasRowMajor, {transa}, {transb},
-    {m}, {n}, {k}, 1.,
-    {in0}, {lda}, {in1}, {ldb}, 1., {out}, {n});",
+    {m}, {n}, {k}, {alpha},
+    {in0}, {lda}, {in1}, {ldb}, {beta}, {out}, {n});",
             bias = bias,
             transa = if gemm.trans_a {
                 "CblasTrans"
@@ -1669,7 +1671,9 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
             in1 = input_names[1],
             lda = if gemm.trans_a { m } else { k },
             ldb = if gemm.trans_b { k } else { n },
-            out = output_names[0]
+            out = output_names[0],
+            alpha = gemm.alpha,
+            beta = inputs.get(2).map_or_else(|| 0.0, |_| gemm.beta)
         );
 
         Ok(kernel)

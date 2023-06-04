@@ -700,7 +700,6 @@ fn compute_gemm(gemm: &Gemm, inputs: &[&Tensor], outputs: &mut [Tensor]) {
     {
         let input_a = inputs[Op::GEMM_IN_A];
         let input_b = inputs[Op::GEMM_IN_B];
-        // let input_c = inputs[Op::GEMM_IN_C];
         let output = &mut outputs[Op::GEMM_OUT];
 
         assert!(input_a.dims().len() == 2);

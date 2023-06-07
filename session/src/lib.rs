@@ -11,7 +11,9 @@ pub mod wgpu;
 
 use std::borrow::Cow;
 
-use altius_core::{analysis::shape::ShapeError, model::Model, node::NodeId, value::ValueId};
+use altius_core::{
+    analysis::shape::ShapeError, model::Model, node::NodeId, tensor::Tensor, value::ValueId,
+};
 #[cfg(all(feature = "cblas", target_os = "macos"))]
 #[allow(unused)]
 #[allow(clippy::single_component_path_imports)]
@@ -48,6 +50,10 @@ struct NodeExecutionPlan {
 
     /// Values to be freed after the execution of the node.
     free_vals: Vec<ValueId>,
+}
+
+pub trait Session {
+    fn run(&self, inputs: Vec<Tensor>) -> Result<Vec<Tensor>, SessionError>;
 }
 
 fn create_execution_plan(model: &Model) -> Vec<NodeExecutionPlan> {

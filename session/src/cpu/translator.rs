@@ -22,7 +22,7 @@ use indent::indent_all_by;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use sha1::{Digest, Sha1};
 
-use crate::{create_execution_plan, SessionError};
+use crate::{plan::create_execution_plan, SessionError};
 
 pub(super) struct Translator<'a> {
     pub model: &'a Model,

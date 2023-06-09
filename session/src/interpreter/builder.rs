@@ -2,7 +2,7 @@ use altius_core::{analysis::shape::infer_shapes, model::Model, tensor::Tensor};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
 
-use crate::{create_execution_plan, SessionError};
+use crate::{plan::create_execution_plan, SessionError};
 
 #[cfg(feature = "cuda")]
 use super::session::SafeCudnnContext;

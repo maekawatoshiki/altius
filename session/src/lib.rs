@@ -6,14 +6,13 @@ pub mod cpu;
 pub mod interpreter;
 #[cfg(feature = "opencl")]
 pub mod opencl;
+mod plan;
 #[cfg(feature = "wgpu-backend")]
 pub mod wgpu;
 
 use std::borrow::Cow;
 
-use altius_core::{
-    analysis::shape::ShapeError, model::Model, node::NodeId, tensor::Tensor, value::ValueId,
-};
+use altius_core::{analysis::shape::ShapeError, tensor::Tensor};
 #[cfg(all(feature = "cblas", target_os = "macos"))]
 #[allow(unused)]
 #[allow(clippy::single_component_path_imports)]
@@ -21,7 +20,6 @@ use blas_src; // For accelerate, this is necessary to link the library.
 #[cfg(all(feature = "cblas", target_os = "linux"))]
 #[allow(unused)]
 use blis_src;
-use rustc_hash::FxHashMap;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -42,64 +40,6 @@ pub enum SessionError {
     Message(Cow<'static, str>),
 }
 
-/// Represents a node to execute and values to be freed after the execution of the node.
-#[derive(Debug)]
-struct NodeExecutionPlan {
-    /// The node to execute.
-    node_id: NodeId,
-
-    /// Values to be freed after the execution of the node.
-    free_vals: Vec<ValueId>,
-}
-
 pub trait Session {
     fn run(&self, inputs: Vec<Tensor>) -> Result<Vec<Tensor>, SessionError>;
-}
-
-fn create_execution_plan(model: &Model) -> Vec<NodeExecutionPlan> {
-    let sorted_nodes = model.topo_sort_nodes();
-    let node_order: FxHashMap<NodeId, usize> = sorted_nodes
-        .iter()
-        .enumerate()
-        .map(|(i, id)| (*id, i))
-        .collect();
-    let mut new_sorted_nodes = vec![];
-    let mut node_to_free_vals = FxHashMap::default();
-    let value_users = model.get_value_users();
-
-    for node_id in sorted_nodes {
-        let node = &model.nodes[node_id];
-        new_sorted_nodes.push(NodeExecutionPlan {
-            node_id,
-            free_vals: vec![],
-        });
-
-        for &output_id in &node.outputs {
-            if !value_users.contains_key(&output_id) {
-                continue;
-            }
-
-            let users = &value_users[&output_id];
-            let last_user = users
-                .iter()
-                .map(|id| (node_order[id], id))
-                .max_by(|x, y| x.0.cmp(&y.0))
-                .unwrap()
-                .1;
-            node_to_free_vals
-                .entry(last_user)
-                .or_insert_with(Vec::new)
-                .push(output_id)
-        }
-
-        if let Some(mut vals) = node_to_free_vals.remove(&node_id) {
-            new_sorted_nodes
-                .last_mut()
-                .unwrap()
-                .free_vals
-                .append(&mut vals);
-        }
-    }
-
-    new_sorted_nodes
 }

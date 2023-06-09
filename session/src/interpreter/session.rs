@@ -7,7 +7,7 @@ use super::{
     thread::ThreadCtx,
 };
 
-use crate::{interpreter::fast_math::fast_sum_exp, NodeExecutionPlan, SessionError};
+use crate::{interpreter::fast_math::fast_sum_exp, plan::NodeExecutionPlan, SessionError};
 use altius_core::{
     model::Model,
     node::{Node, NodeId},

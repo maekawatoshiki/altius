@@ -28,7 +28,7 @@ impl CPUSession {
         &self.model
     }
 
-    pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
+    pub fn run(&self, inputs: Vec<Tensor>) -> Result<Vec<Tensor>, SessionError> {
         let mut outputs = self
             .model
             .outputs
@@ -44,7 +44,7 @@ impl CPUSession {
         {
             let mut inputs_ = Vec::with_capacity(inputs.len());
             let mut outputs_ = Vec::with_capacity(outputs.len());
-            for (_, tensor) in inputs.iter() {
+            for tensor in inputs.iter() {
                 inputs_.push(tensor.data_as_ptr());
             }
             for tensor in outputs.iter_mut() {

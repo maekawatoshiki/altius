@@ -1,6 +1,8 @@
 extern crate altius_core;
 extern crate altius_session;
 
+use std::collections::HashMap;
+
 use altius_core::optimize;
 use altius_core::tensor::{TensorElemType, TensorElemTypeExt};
 use altius_core::value::ValueId;
@@ -88,7 +90,7 @@ fn session(
 
 trait Session {
     fn model(&self) -> &Model;
-    fn run_(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError>;
+    fn _run(&self, inputs: Vec<Tensor>) -> Result<Vec<Tensor>, SessionError>;
 
     fn run(&self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
         fn create_input<T: Element + TensorElemTypeExt>(
@@ -110,25 +112,29 @@ trait Session {
             ))
         }
 
-        let mut new_inputs = vec![];
+        let mut new_inputs = HashMap::<ValueId, Tensor>::default();
         for (i, item) in inputs.items().iter().enumerate() {
             if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<f32>)>() {
-                new_inputs.push(create_input(self.model(), name, val)?);
+                let (key, val) = create_input(self.model(), name, val)?;
+                new_inputs.insert(key, val);
                 continue;
             }
 
             if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<i64>)>() {
-                new_inputs.push(create_input(self.model(), name, val)?);
+                let (key, val) = create_input(self.model(), name, val)?;
+                new_inputs.insert(key, val);
                 continue;
             }
 
             if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<i32>)>() {
-                new_inputs.push(create_input(self.model(), name, val)?);
+                let (key, val) = create_input(self.model(), name, val)?;
+                new_inputs.insert(key, val);
                 continue;
             }
 
             if let Ok((name, val)) = item.extract::<(String, PyReadonlyArrayDyn<bool>)>() {
-                new_inputs.push(create_input(self.model(), name, val)?);
+                let (key, val) = create_input(self.model(), name, val)?;
+                new_inputs.insert(key, val);
                 continue;
             }
 
@@ -137,9 +143,15 @@ trait Session {
             )));
         }
 
+        let new_inputs = self
+            .model()
+            .inputs
+            .iter()
+            .map(|i| new_inputs.remove(i).unwrap())
+            .collect::<Vec<_>>();
         let mut outputs = vec![];
         for out in self
-            .run_(new_inputs)
+            ._run(new_inputs)
             .map_err(|e| PyRuntimeError::new_err(format!("Inference failed: {e}")))?
         {
             macro_rules! arr {
@@ -172,8 +184,15 @@ impl Session for PyInterpreterSession {
         self.0.model()
     }
 
-    fn run_(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
-        self.0.run(inputs)
+    fn _run(&self, inputs: Vec<Tensor>) -> Result<Vec<Tensor>, SessionError> {
+        self.0.run(
+            self.model()
+                .inputs
+                .iter()
+                .copied()
+                .zip(inputs.into_iter())
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
@@ -182,7 +201,7 @@ impl Session for PyCPUSession {
         self.0.model()
     }
 
-    fn run_(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
+    fn _run(&self, inputs: Vec<Tensor>) -> Result<Vec<Tensor>, SessionError> {
         self.0.run(inputs)
     }
 }

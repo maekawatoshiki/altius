@@ -38,7 +38,6 @@ fn main() {
     fuse_layer_norm(&mut model);
     fuse_gelu(&mut model);
     fuse_elemwise_ops(&mut model).unwrap();
-    let input_value = model.lookup_named_value("input.1").unwrap();
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
     let resized = image::imageops::resize(&image, 224, 224, image::imageops::FilterType::Triangle);
@@ -56,9 +55,7 @@ fn main() {
         .unwrap();
     let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
     for _ in 0..opt.iters {
-        let out = i
-            .run(vec![(input_value, input.clone())])
-            .expect("Inference failed");
+        let out = i.run(vec![input.clone()]).expect("Inference failed");
         let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
         out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 

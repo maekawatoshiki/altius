@@ -31,7 +31,6 @@ fn main() {
     let opt = Opt::from_args();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
     let model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
-    let input_value = model.lookup_named_value("input").unwrap();
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
     let resized = image::imageops::resize(&image, 224, 224, image::imageops::FilterType::Triangle);
@@ -49,9 +48,7 @@ fn main() {
         .unwrap();
     let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
     for _ in 0..opt.iters {
-        let out = session
-            .run(vec![(input_value, input.clone())])
-            .expect("Inference failed");
+        let out = session.run(vec![input.clone()]).expect("Inference failed");
         let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
         out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 

@@ -135,6 +135,9 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
         }
     }
 
+    // Remove initializers from inputs if needed.
+    model.inputs.retain(|&x| !model.inits.contains_key(&x));
+
     // Load nodes.
     for node in graph.node.iter() {
         let inputs = node

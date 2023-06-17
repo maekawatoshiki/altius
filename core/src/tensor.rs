@@ -424,14 +424,7 @@ impl TypedShape {
 impl From<TypedFixedShape> for TypedShape {
     fn from(typed: TypedFixedShape) -> Self {
         Self {
-            dims: Dimensions::new(
-                typed
-                    .dims
-                    .0
-                    .into_iter()
-                    .map(|x| Dimension::Fixed(x))
-                    .collect(),
-            ),
+            dims: Dimensions::new(typed.dims.0.into_iter().map(Dimension::Fixed).collect()),
             elem_ty: typed.elem_ty,
         }
     }

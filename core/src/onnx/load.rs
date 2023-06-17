@@ -58,7 +58,7 @@ pub fn load_onnx(path: impl AsRef<Path>) -> Result<Model, ModelLoadError> {
 }
 
 pub fn load_onnx_from_buffer(buf: &[u8]) -> Result<Model, ModelLoadError> {
-    let model = ModelProto::decode(buf).map_err(|e| ModelLoadError::InvalidModel(e))?;
+    let model = ModelProto::decode(buf).map_err(ModelLoadError::InvalidModel)?;
     load_onnx_from_model_proto(model)
 }
 
@@ -368,7 +368,7 @@ fn get_attribute<'a>(
     attrs
         .iter()
         .find(|x| x.name() == name)
-        .ok_or_else(|| ModelLoadError::NoAttribute(name.into()))
+        .ok_or_else(|| ModelLoadError::NoAttribute(name))
 }
 
 fn get_tensor(tensor: &TensorProto) -> Result<Tensor, ModelLoadError> {

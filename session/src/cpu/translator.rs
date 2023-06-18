@@ -30,9 +30,6 @@ pub(super) struct Translator<'a> {
     value_shapes: &'a HashMap<ValueId, TypedFixedShape>,
     created_kernels: Vec<String>,
     created_kernel_protos: Vec<String>,
-    created_extern_values: Vec<String>,
-    created_tmp_values: Vec<String>,
-    created_calls: Vec<String>,
     reshaped_values: HashSet<ValueId>,
     propagated_inits: HashSet<ValueId>,
     pub used_op_names: HashSet<String>,
@@ -70,9 +67,6 @@ impl<'a> Translator<'a> {
             value_shapes,
             created_kernels: Vec::new(),
             created_kernel_protos: Vec::new(),
-            created_extern_values: Vec::new(),
-            created_tmp_values: Vec::new(),
-            created_calls: Vec::new(),
             reshaped_values: HashSet::default(),
             propagated_inits: HashSet::default(),
             used_op_names: HashSet::default(),
@@ -220,6 +214,10 @@ impl<'a> Translator<'a> {
 
         let execution_plans = create_execution_plan(self.model);
 
+        let mut created_calls = vec![];
+        let mut created_tmp_values = vec![];
+        let mut created_extern_values = vec![];
+
         for plan in execution_plans {
             let node = &self.model.nodes[plan.node_id];
             // Allocate temporary tensors.
@@ -233,22 +231,21 @@ impl<'a> Translator<'a> {
                 }
                 let shape = &self.value_shapes[output];
                 let ty = get_c_type(shape.elem_ty);
-                self.created_calls.push(format!(
+                created_calls.push(format!(
                     "{name} = ({ty} *)malloc(sizeof({ty}) * ({size}));",
                     name = self.value_name(*output),
                     size = self.value_shapes[output].dims.total_elems(),
                 ));
             }
 
-            self.translate_node(plan.node_id)?;
+            self.translate_node(plan.node_id, &mut created_calls)?;
 
             // Free tensors.
             for free in plan.free_vals.iter() {
                 if self.reshaped_values.contains(free) || self.propagated_inits.contains(free) {
                     continue;
                 }
-                self.created_calls
-                    .push(format!("free({});", self.value_name(*free)));
+                created_calls.push(format!("free({});", self.value_name(*free)));
             }
         }
 
@@ -263,9 +260,9 @@ impl<'a> Translator<'a> {
             let ty = get_c_type(shape.elem_ty);
 
             if self.model.inits.contains_key(&id) {
-                &mut self.created_extern_values
+                &mut created_extern_values
             } else {
-                &mut self.created_tmp_values
+                &mut created_tmp_values
             }
             .push(format!("{ty} *{name};"));
         }
@@ -346,7 +343,7 @@ static struct timespec now() {{
             }
             writer.write_all(b"\n")?;
 
-            for value in &self.created_extern_values {
+            for value in created_extern_values {
                 writer.write_all(b"")?;
                 writer.write_all(value.as_bytes())?;
                 writer.write_all(b"\n")?;
@@ -392,14 +389,14 @@ static struct timespec now() {{
                 writer.write_all(b"\n")?;
             }
 
-            for value in &self.created_tmp_values {
+            for value in created_tmp_values {
                 writer.write_all(b"    ")?;
                 writer.write_all(value.as_bytes())?;
                 writer.write_all(b"\n")?;
             }
             writer.write_all(b"\n")?;
 
-            for call in &self.created_calls {
+            for call in created_calls {
                 writer.write_all(b"    ")?;
                 writer.write_all(call.as_bytes())?;
                 writer.write_all(b"\n")?;
@@ -440,7 +437,11 @@ static struct timespec now() {{
         Ok(())
     }
 
-    fn translate_node(&mut self, node_id: NodeId) -> Result<(), SessionError> {
+    fn translate_node(
+        &mut self,
+        node_id: NodeId,
+        created_calls: &mut Vec<String>,
+    ) -> Result<(), SessionError> {
         let node = &self.model.nodes[node_id];
         let inputs = node
             .inputs
@@ -477,14 +478,13 @@ static struct timespec now() {{
                 self.propagated_inits.insert(node.outputs[0]);
             }
             let ty = get_c_type(inputs[0].elem_ty);
-            self.created_calls.push(format!(
+            created_calls.push(format!(
                 "{} = ({ty} *){};",
                 args[inputs.len()..][0],
                 args[0]
             ))
         } else {
-            self.created_calls
-                .push(format!("{node_name}({});", args.join(", ")));
+            created_calls.push(format!("{node_name}({});", args.join(", ")));
         }
 
         let kernel = match op {

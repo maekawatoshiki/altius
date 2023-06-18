@@ -39,6 +39,12 @@ pub(super) struct Translator<'a> {
     prev_code_hash: Option<[u8; 20]>,
 }
 
+pub(super) struct TranslationProduct<'a> {
+    pub model: &'a Model,
+    pub used_op_names: HashSet<String>,
+    pub target_dir: PathBuf,
+}
+
 impl<'a> Translator<'a> {
     pub fn new(
         model: &'a Model,
@@ -87,7 +93,7 @@ impl<'a> Translator<'a> {
         self
     }
 
-    pub fn compile(&mut self) -> Result<(), SessionError> {
+    pub fn compile(mut self) -> Result<TranslationProduct<'a>, SessionError> {
         log::debug!("Compiling the model...");
 
         self.translate_into_c()?;
@@ -100,7 +106,11 @@ impl<'a> Translator<'a> {
         );
         if new_hash.is_some() && new_hash == self.prev_code_hash {
             log::debug!("Skipped compiling!");
-            return Ok(());
+            return Ok(TranslationProduct {
+                model: self.model,
+                used_op_names: self.used_op_names,
+                target_dir: self.target_dir,
+            });
         }
 
         let mut cmd = std::process::Command::new("clang");
@@ -207,7 +217,11 @@ impl<'a> Translator<'a> {
 
         log::debug!("Finished compiling the model.");
 
-        Ok(())
+        Ok(TranslationProduct {
+            model: self.model,
+            used_op_names: self.used_op_names,
+            target_dir: self.target_dir,
+        })
     }
 
     fn translate_into_c(&mut self) -> Result<(), SessionError> {
@@ -2335,14 +2349,24 @@ for (int i = 0; i < {size} / {axis_len}; i++) {{
     }
 
     pub fn value_name(&self, id: ValueId) -> String {
-        let value = &self.model.values.inner()[id];
-        escape_name(
-            value
-                .name
-                .clone()
-                .unwrap_or_else(|| format!("Value_noname_{}", id.index())),
-        )
+        value_name(self.model, id)
     }
+}
+
+impl<'a> TranslationProduct<'a> {
+    pub fn value_name(&self, id: ValueId) -> String {
+        value_name(self.model, id)
+    }
+}
+
+fn value_name(model: &Model, id: ValueId) -> String {
+    let value = &model.values.inner()[id];
+    escape_name(
+        value
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("Value_noname_{}", id.index())),
+    )
 }
 
 fn escape_name(s: impl Into<String>) -> String {

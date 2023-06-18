@@ -87,8 +87,10 @@ impl<'a> Translator<'a> {
         self
     }
 
-    pub fn compile(&self) -> Result<(), SessionError> {
+    pub fn compile(&mut self) -> Result<(), SessionError> {
         log::debug!("Compiling the model...");
+
+        self.translate_into_c()?;
 
         let new_hash = compute_sha1_from_files(
             &glob::glob(self.target_dir.join("*.c").as_path().to_str().unwrap())
@@ -208,7 +210,7 @@ impl<'a> Translator<'a> {
         Ok(())
     }
 
-    pub fn translate_into_c(&mut self) -> Result<(), SessionError> {
+    fn translate_into_c(&mut self) -> Result<(), SessionError> {
         let main_file = self.create_file("main.c")?;
         let mut writer = BufWriter::new(main_file);
 

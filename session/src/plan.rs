@@ -1,4 +1,4 @@
-use altius_core::{node::NodeId, value::ValueId, model::Model};
+use altius_core::{model::Model, node::NodeId, value::ValueId};
 use rustc_hash::FxHashMap;
 
 /// Represents a node to execute and values to be freed after the execution of the node.
@@ -24,10 +24,10 @@ pub fn create_execution_plan(model: &Model) -> Vec<NodeExecutionPlan> {
 
     for node_id in sorted_nodes {
         let node = &model.nodes[node_id];
-        new_sorted_nodes.push(NodeExecutionPlan {
+        let mut plan = NodeExecutionPlan {
             node_id,
-            free_vals: vec![],
-        });
+            free_vals: Vec::new(),
+        };
 
         for &output_id in &node.outputs {
             if !value_users.contains_key(&output_id) {
@@ -48,12 +48,10 @@ pub fn create_execution_plan(model: &Model) -> Vec<NodeExecutionPlan> {
         }
 
         if let Some(mut vals) = node_to_free_vals.remove(&node_id) {
-            new_sorted_nodes
-                .last_mut()
-                .unwrap()
-                .free_vals
-                .append(&mut vals);
+            plan.free_vals.append(&mut vals);
         }
+
+        new_sorted_nodes.push(plan);
     }
 
     new_sorted_nodes

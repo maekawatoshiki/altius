@@ -31,6 +31,11 @@ sha1 = { version = "0.10.5", optional = true }
 glob = { version = "0.3.1", optional = true }
 num_cpus = { version = "1.15.0", optional = true }
 tempfile = { version = "3.5.0", optional = true }
+cranelift = { version = "^0.96.0", optional = true }
+cranelift-module = { version = "^0.96.0", optional = true }
+cranelift-object = { version = "^0.96.0", optional = true }
+cranelift-codegen = { version = "^0.96.0", optional = true }
+target-lexicon = { version = "^0.12.7", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 blis-src = { version = "*", features = [ "openmp" ], default-features = false }
@@ -41,7 +46,19 @@ blas-src = { version = "0.8", features = ["accelerate"] }
 
 [features]
 default = ["cpu-backend", "cblas"]
-cpu-backend = ["indent", "libloading", "sha1", "glob", "num_cpus", "tempfile"]
+cpu-backend = [
+  "indent",
+  "libloading",
+  "sha1",
+  "glob",
+  "num_cpus",
+  "tempfile",
+  # "cranelift",
+  # "cranelift-module",
+  # "cranelift-object",
+  # "cranelift-codegen",
+  # "target-lexicon",
+]
 cuda = ["cudnn", "cust"]
 matrixmultiply-threading = ["matrixmultiply/threading"]
 opencl = ["opencl3"]

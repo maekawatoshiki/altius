@@ -30,6 +30,7 @@ managed = true
 dev-dependencies = [
     "maturin~=1.0.1",
     "pip~=23.1.2",
+    "patchelf~=0.17.2.1",
 ]
 [tool.hatch.metadata]
 allow-direct-references = true

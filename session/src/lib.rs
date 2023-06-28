@@ -20,6 +20,7 @@ use blas_src; // For accelerate, this is necessary to link the library.
 #[cfg(all(feature = "cblas", target_os = "linux"))]
 #[allow(unused)]
 use blis_src;
+use cranelift_module::ModuleError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -34,6 +35,10 @@ pub enum SessionError {
     #[cfg(feature = "cpu-backend")]
     #[error("Libloading: {0}")]
     Libloading(#[from] libloading::Error),
+
+    #[cfg(feature = "cpu-backend")]
+    #[error("Cranelift: {0}")]
+    Cranelift(#[from] ModuleError),
 
     /// General error messages (including TODOs).
     #[error("Something went wrong: {0}")]

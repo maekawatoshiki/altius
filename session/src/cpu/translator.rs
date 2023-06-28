@@ -18,7 +18,17 @@ use altius_core::{
     tensor::{TensorElemType, TypedFixedShape},
     value::ValueId,
 };
-use cranelift::codegen::settings::Configurable;
+use cranelift::prelude::InstBuilder;
+use cranelift::{
+    codegen::settings::Configurable,
+    prelude::{FunctionBuilder, FunctionBuilderContext},
+};
+use cranelift_codegen::{
+    ir::{self, AbiParam, Signature},
+    isa::CallConv,
+    Context,
+};
+use cranelift_module::{Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use indent::indent_all_by;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -52,7 +62,9 @@ pub(super) struct TranslationProduct<'a> {
 
 #[allow(dead_code)]
 struct CraneliftCtx {
+    ctx: Context,
     module: ObjectModule,
+    builder_ctx: FunctionBuilderContext,
 }
 
 impl<'a> Translator<'a> {
@@ -1641,6 +1653,44 @@ for (int outer = 0; outer < {outer}; outer++) {{
         inputs: &[&TypedFixedShape],
         outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
+        // TODO: Use cranelift for code generation
+        if false {
+            let mut sig = Signature::new(CallConv::SystemV);
+            let i32 = ir::types::I32;
+            let float = ir::types::F32;
+            let ptr = self.clif_ctx.module.target_config().pointer_type();
+            sig.params.push(AbiParam::new(i32)); // order
+            sig.params.push(AbiParam::new(i32)); // trans
+            sig.params.push(AbiParam::new(i32)); // trans
+            sig.params.push(AbiParam::new(i32)); // m
+            sig.params.push(AbiParam::new(i32)); // n
+            sig.params.push(AbiParam::new(i32)); // k
+            sig.params.push(AbiParam::new(float)); // alpha
+            sig.params.push(AbiParam::new(ptr)); // a
+            sig.params.push(AbiParam::new(i32)); // lda
+            sig.params.push(AbiParam::new(ptr)); // b
+            sig.params.push(AbiParam::new(i32)); // ldb
+            sig.params.push(AbiParam::new(float)); // beta
+            sig.params.push(AbiParam::new(ptr)); // c
+            sig.params.push(AbiParam::new(i32)); // n
+            let cblas_sgemm =
+                self.clif_ctx
+                    .module
+                    .declare_function("cblas_sgemm", Linkage::Import, &sig)?;
+            let cblas_sgemm_ref = self
+                .clif_ctx
+                .module
+                .declare_func_in_func(cblas_sgemm, &mut self.clif_ctx.ctx.func);
+            let mut builder =
+                FunctionBuilder::new(&mut self.clif_ctx.ctx.func, &mut self.clif_ctx.builder_ctx);
+            let entry = builder.create_block();
+            builder.append_block_params_for_function_params(entry);
+            builder.switch_to_block(entry);
+            builder.ins().call(cblas_sgemm_ref, &[]);
+            builder.seal_block(entry);
+            log::debug!("Func: {}", self.clif_ctx.ctx.func);
+        }
+
         let input_0 = inputs[0];
         let input_1 = inputs[1];
         let output = &outputs[0];
@@ -2380,8 +2430,11 @@ impl Default for CraneliftCtx {
             .unwrap();
         let builder =
             ObjectBuilder::new(isa, "builder", cranelift_module::default_libcall_names()).unwrap();
+        let module = ObjectModule::new(builder);
         Self {
-            module: ObjectModule::new(builder),
+            builder_ctx: FunctionBuilderContext::new(),
+            ctx: module.make_context(),
+            module,
         }
     }
 }

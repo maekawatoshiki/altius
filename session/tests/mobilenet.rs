@@ -42,7 +42,7 @@ fn mobilenet() {
         .with_profiling_enabled(true)
         .build()
         .unwrap();
-    let out = i.run(vec![(input_value, input)]).expect("Inference failed");
+    let out = i.run(vec![input]).expect("Inference failed");
     let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
     out[0..1000].sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
     out[1000..2000].sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));

@@ -186,14 +186,7 @@ impl Session for PyInterpreterSession {
     }
 
     fn _run(&self, inputs: Vec<Tensor>) -> Result<Vec<Tensor>, SessionError> {
-        self.0.run(
-            self.model()
-                .inputs
-                .iter()
-                .copied()
-                .zip(inputs.into_iter())
-                .collect::<Vec<_>>(),
-        )
+        self.0.run(inputs)
     }
 }
 

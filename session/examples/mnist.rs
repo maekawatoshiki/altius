@@ -36,16 +36,13 @@ fn main() {
     let start = Instant::now();
 
     let validation_count = 10000;
-    let input_value = mnist.lookup_named_value("Input3").unwrap();
     let sess = InterpreterSessionBuilder::new(mnist).build().unwrap();
 
     let correct: i32 = inputs
         .iter()
         .take(validation_count)
         .map(|(expected, input)| {
-            let v = sess
-                .run(vec![(input_value, input.clone())])
-                .expect("Inference failed");
+            let v = sess.run(vec![input.clone()]).expect("Inference failed");
             let inferred = v[0]
                 .data::<f32>()
                 .iter()

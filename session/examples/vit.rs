@@ -24,7 +24,6 @@ fn main() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
     let mut model = load_onnx(root.join("vit_b_16.onnx")).unwrap();
     fuse_gelu(&mut model);
-    let input_value = model.lookup_named_value("x").unwrap();
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
     let resized = image::imageops::resize(&image, 384, 384, image::imageops::FilterType::Triangle);
@@ -37,13 +36,11 @@ fn main() {
 
     let i = InterpreterSessionBuilder::new(model)
         .with_profiling_enabled(opt.profile)
-        .with_intra_op_num_threads(1)
+        .with_intra_op_num_threads(16)
         .build()
         .unwrap();
     for _ in 0..opt.iters {
-        let out = i
-            .run(vec![(input_value, input.clone())])
-            .expect("Inference failed");
+        let out = i.run(vec![input.clone()]).expect("Inference failed");
         let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
         out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 

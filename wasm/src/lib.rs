@@ -16,7 +16,6 @@ pub fn load_and_run(onnx: &[u8], img: &[u8]) -> Option<String> {
 
     let model = load_onnx_from_buffer(onnx).expect("failed to load onnx");
     let sess = InterpreterSessionBuilder::new(model).build().unwrap();
-    let input_value = sess.model().inputs.get(0).copied()?;
 
     let image = Reader::new(Cursor::new(img))
         .with_guessed_format()
@@ -36,7 +35,7 @@ pub fn load_and_run(onnx: &[u8], img: &[u8]) -> Option<String> {
         image.into_raw_vec().into_iter().collect::<Vec<_>>(),
     );
 
-    let results = sess.run(vec![(input_value, input)]).ok()?;
+    let results = sess.run(vec![input]).ok()?;
 
     let mut out = results[0]
         .data::<f32>()

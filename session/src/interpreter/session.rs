@@ -93,7 +93,7 @@ impl InterpreterSession {
         &self.model
     }
 
-    pub fn run(&self, inputs: Vec<(ValueId, Tensor)>) -> Result<Vec<Tensor>, SessionError> {
+    pub fn run(&self, inputs: Vec<Tensor>) -> Result<Vec<Tensor>, SessionError> {
         #[cfg(not(target_arch = "wasm32"))]
         let start = Instant::now();
 
@@ -108,8 +108,8 @@ impl InterpreterSession {
             .borrow_mut();
 
         // Set inputs.
-        for (id, tensor) in inputs {
-            values.insert(id, tensor);
+        for (id, tensor) in self.model.inputs.iter().zip(inputs) {
+            values.insert(*id, tensor);
         }
 
         #[cfg(not(feature = "heavy-log"))]

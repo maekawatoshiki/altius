@@ -44,7 +44,7 @@ macro_rules! op {
                 .zip(y_val.data::<f32>().iter())
                 .map(|(&x, &y)| x $bin y)
                 .collect::<Vec<_>>();
-            let actual = sess.run(vec![(x, x_val), (y, y_val)]).unwrap();
+            let actual = sess.run(vec![x_val, y_val]).unwrap();
             assert_eq!(actual.len(), 1);
             assert!(allclose(actual[0].data::<f32>(), expected.as_slice()),
                 "actual: {:?} vs expected: {:?}",

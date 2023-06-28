@@ -53,11 +53,11 @@ cpu-backend = [
   "glob",
   "num_cpus",
   "tempfile",
-  # "cranelift",
-  # "cranelift-module",
-  # "cranelift-object",
-  # "cranelift-codegen",
-  # "target-lexicon",
+  "cranelift",
+  "cranelift-module",
+  "cranelift-object",
+  "cranelift-codegen",
+  "target-lexicon",
 ]
 cuda = ["cudnn", "cust"]
 matrixmultiply-threading = ["matrixmultiply/threading"]

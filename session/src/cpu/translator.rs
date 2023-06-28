@@ -18,9 +18,12 @@ use altius_core::{
     tensor::{TensorElemType, TypedFixedShape},
     value::ValueId,
 };
+use cranelift::codegen::settings::Configurable;
+use cranelift_object::{ObjectBuilder, ObjectModule};
 use indent::indent_all_by;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use sha1::{Digest, Sha1};
+use target_lexicon::Triple;
 
 use crate::{plan::create_execution_plan, SessionError};
 
@@ -37,12 +40,19 @@ pub(super) struct Translator<'a> {
     enable_profiling: bool,
     intra_op_num_threads: usize,
     prev_code_hash: Option<[u8; 20]>,
+    #[allow(dead_code)]
+    clif_ctx: CraneliftCtx,
 }
 
 pub(super) struct TranslationProduct<'a> {
     pub model: &'a Model,
     pub used_op_names: HashSet<String>,
     pub target_dir: PathBuf,
+}
+
+#[allow(dead_code)]
+struct CraneliftCtx {
+    module: ObjectModule,
 }
 
 impl<'a> Translator<'a> {
@@ -80,6 +90,7 @@ impl<'a> Translator<'a> {
             enable_profiling: false,
             intra_op_num_threads: 1,
             prev_code_hash,
+            clif_ctx: CraneliftCtx::default(),
         })
     }
 
@@ -2356,6 +2367,22 @@ for (int i = 0; i < {size} / {axis_len}; i++) {{
 impl<'a> TranslationProduct<'a> {
     pub fn value_name(&self, id: ValueId) -> String {
         value_name(self.model, id)
+    }
+}
+
+impl Default for CraneliftCtx {
+    fn default() -> Self {
+        let mut flag_builder = cranelift_codegen::settings::builder();
+        flag_builder.enable("is_pic").unwrap();
+        let isa_builder = cranelift_codegen::isa::lookup(Triple::host()).unwrap();
+        let isa = isa_builder
+            .finish(cranelift_codegen::settings::Flags::new(flag_builder))
+            .unwrap();
+        let builder =
+            ObjectBuilder::new(isa, "builder", cranelift_module::default_libcall_names()).unwrap();
+        Self {
+            module: ObjectModule::new(builder),
+        }
     }
 }
 

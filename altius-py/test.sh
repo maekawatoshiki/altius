@@ -18,4 +18,6 @@ if [ ${1:-nobuild} = "build" ]; then
   fi
 fi
 
+unset GOMP_CPU_AFFINITY
+
 python -m pytest . -n 8

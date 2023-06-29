@@ -23,8 +23,12 @@ use cranelift::{
     codegen::settings::Configurable,
     prelude::{FunctionBuilder, FunctionBuilderContext},
 };
-use cranelift_codegen::{entity::EntityRef, ir, Context};
-use cranelift_module::Module;
+use cranelift_codegen::{
+    entity::EntityRef,
+    ir::{self, Function},
+    Context,
+};
+use cranelift_module::{Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use indent::indent_all_by;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -46,8 +50,8 @@ pub(super) struct Translator<'a> {
     enable_profiling: bool,
     intra_op_num_threads: usize,
     prev_code_hash: Option<[u8; 20]>,
-    #[allow(dead_code)]
     clif_ctx: CraneliftCtx,
+    enable_clif: bool,
 }
 
 pub(super) struct TranslationProduct<'a> {
@@ -56,11 +60,10 @@ pub(super) struct TranslationProduct<'a> {
     pub target_dir: PathBuf,
 }
 
-#[allow(dead_code)]
 struct CraneliftCtx {
     ctx: Context,
     module: ObjectModule,
-    builder_ctx: FunctionBuilderContext,
+    num_vars: usize,
 }
 
 impl<'a> Translator<'a> {
@@ -99,6 +102,7 @@ impl<'a> Translator<'a> {
             intra_op_num_threads: 1,
             prev_code_hash,
             clif_ctx: CraneliftCtx::default(),
+            enable_clif: false,
         })
     }
 
@@ -116,6 +120,16 @@ impl<'a> Translator<'a> {
         log::debug!("Compiling the model...");
 
         self.translate_into_c()?;
+
+        // TODO: For cranelift
+        // TODO: Clean this code
+        let mut objects = Vec::new();
+        if self.enable_clif {
+            let product = self.clif_ctx.module.finish();
+            let filename = self.target_dir.join("clif.o");
+            File::create(&filename)?.write_all(product.emit().unwrap().as_slice())?;
+            objects.push(filename);
+        }
 
         let new_hash = compute_sha1_from_files(
             &glob::glob(self.target_dir.join("*.c").as_path().to_str().unwrap())
@@ -163,52 +177,56 @@ impl<'a> Translator<'a> {
 
         let num_compilied_kernels = Arc::new(AtomicUsize::new(0));
         let num_kernels_to_compile = self.created_kernels.len();
-        let objects = self
-            .created_kernels
-            .chunks(self.created_kernels.len() / num_cpus::get() + 1)
-            .enumerate()
-            .map(|(i, chunks)| {
-                let num_kernels = chunks.len();
-                let target_dir = self.target_dir.clone();
-                #[cfg(target_os = "linux")]
-                let blis_include_dir = blis_path.join("include").to_str().unwrap().to_string();
-                let num_compilied_kernels = num_compilied_kernels.clone();
-                let thread = std::thread::spawn(move || -> Result<(), SessionError> {
-                    let mut cmd = std::process::Command::new("clang");
-                    cmd.arg("-O3")
-                        .arg("-c")
-                        .arg("-o")
-                        .arg(target_dir.join(format!("kernels-{i:05}.o")))
-                        .arg(target_dir.join(format!("kernels-{i:05}.c")))
-                        .arg("-fno-math-errno")
-                        .arg("-fopenmp")
-                        .arg("-fvectorize")
-                        .arg("-fPIC");
+        objects.append(
+            &mut self
+                .created_kernels
+                .chunks(self.created_kernels.len() / num_cpus::get() + 1)
+                .enumerate()
+                .map(|(i, chunks)| {
+                    let num_kernels = chunks.len();
+                    let target_dir = self.target_dir.clone();
                     #[cfg(target_os = "linux")]
-                    {
-                        cmd.arg("-march=native");
-                        cmd.arg(format!("-I{}", blis_include_dir));
-                    }
-                    if !cmd.status()?.success() {
-                        return Err(SessionError::Message("Failed to compile the model".into()));
-                    }
-                    num_compilied_kernels.fetch_add(num_kernels, Ordering::SeqCst);
-                    log::debug!(
-                        "Compiled {}/{} kernels",
-                        num_compilied_kernels.load(Ordering::SeqCst),
-                        num_kernels_to_compile
-                    );
-                    Ok(())
-                });
-                (thread, self.target_dir.join(format!("kernels-{i:05}.o")))
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
-            .map(|(t, file)| {
-                t.join().unwrap()?;
-                Ok(file)
-            })
-            .collect::<Result<Vec<_>, SessionError>>()?;
+                    let blis_include_dir = blis_path.join("include").to_str().unwrap().to_string();
+                    let num_compilied_kernels = num_compilied_kernels.clone();
+                    let thread = std::thread::spawn(move || -> Result<(), SessionError> {
+                        let mut cmd = std::process::Command::new("clang");
+                        cmd.arg("-O3")
+                            .arg("-c")
+                            .arg("-o")
+                            .arg(target_dir.join(format!("kernels-{i:05}.o")))
+                            .arg(target_dir.join(format!("kernels-{i:05}.c")))
+                            .arg("-fno-math-errno")
+                            .arg("-fopenmp")
+                            .arg("-fvectorize")
+                            .arg("-fPIC");
+                        #[cfg(target_os = "linux")]
+                        {
+                            cmd.arg("-march=native");
+                            cmd.arg(format!("-I{}", blis_include_dir));
+                        }
+                        if !cmd.status()?.success() {
+                            return Err(SessionError::Message(
+                                "Failed to compile the model".into(),
+                            ));
+                        }
+                        num_compilied_kernels.fetch_add(num_kernels, Ordering::SeqCst);
+                        log::debug!(
+                            "Compiled {}/{} kernels",
+                            num_compilied_kernels.load(Ordering::SeqCst),
+                            num_kernels_to_compile
+                        );
+                        Ok(())
+                    });
+                    (thread, self.target_dir.join(format!("kernels-{i:05}.o")))
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|(t, file)| {
+                    t.join().unwrap()?;
+                    Ok(file)
+                })
+                .collect::<Result<Vec<_>, SessionError>>()?,
+        );
 
         cmd.arg("-O3")
             .arg("-o")
@@ -578,36 +596,52 @@ static struct timespec now() {{
         );
         self.created_kernel_protos.push(format!("{decl};"));
 
-        let kernel = format!(
-            "{decl} {{
+        if kernel == "/* Cranelift */" {
+            self.clif_ctx
+                .ctx
+                .optimize(self.clif_ctx.module.isa())
+                .unwrap();
+            let id = self.clif_ctx.module.declare_function(
+                &node_name,
+                Linkage::Export,
+                &self.clif_ctx.ctx.func.signature,
+            )?;
+            self.clif_ctx
+                .module
+                .define_function(id, &mut self.clif_ctx.ctx)?;
+            self.clif_ctx.module.clear_context(&mut self.clif_ctx.ctx);
+        } else {
+            let kernel = format!(
+                "{decl} {{
 {start_profiling}
 {body}
 {end_profiling}
 }}",
-            body = indent_all_by(4, kernel),
-            start_profiling = if self.enable_profiling {
-                indent_all_by(4, "const struct timespec _start = now();".to_string())
-            } else {
-                String::new()
-            },
-            end_profiling = if self.enable_profiling {
-                indent_all_by(
-                    4,
-                    format!(
-                        "{{
+                body = indent_all_by(4, kernel),
+                start_profiling = if self.enable_profiling {
+                    indent_all_by(4, "const struct timespec _start = now();".to_string())
+                } else {
+                    String::new()
+                },
+                end_profiling = if self.enable_profiling {
+                    indent_all_by(
+                        4,
+                        format!(
+                            "{{
     const struct timespec _end = now();
     const double start_in_sec = (double)_start.tv_sec + (double)_start.tv_nsec / 1e9;
     const double end_in_sec = (double)_end.tv_sec + (double)_end.tv_nsec / 1e9;
     elapsed_{} += end_in_sec - start_in_sec;
 }}",
-                        op.name(),
-                    ),
-                )
-            } else {
-                String::new()
-            },
-        );
-        self.created_kernels.push(kernel);
+                            op.name(),
+                        ),
+                    )
+                } else {
+                    String::new()
+                },
+            );
+            self.created_kernels.push(kernel);
+        }
 
         Ok(())
     }
@@ -1879,7 +1913,8 @@ for (int i = 0; i < {num_blocks}; i++) {{
         outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
         // TODO: Use cranelift for code generation
-        if false {
+        // TODO: Clean this code
+        if self.enable_clif {
             // let input_names = &args[0..inputs.len()];
             // let output_name = &args[inputs.len()];
             let output = &outputs[0];
@@ -1906,25 +1941,16 @@ for (int i = 0; i < {num_blocks}; i++) {{
             let i64 = ir::types::I64;
             let ptr = self.clif_ctx.module.target_config().pointer_type();
 
+            let mut func = Function::new();
+            let mut builder_ctx = FunctionBuilderContext::new();
             for _input in inputs {
-                self.clif_ctx
-                    .ctx
-                    .func
-                    .signature
-                    .params
-                    .push(ir::AbiParam::new(ptr));
+                func.signature.params.push(ir::AbiParam::new(ptr));
             }
             for _out in outputs {
-                self.clif_ctx
-                    .ctx
-                    .func
-                    .signature
-                    .params
-                    .push(ir::AbiParam::new(ptr));
+                func.signature.params.push(ir::AbiParam::new(ptr));
             }
 
-            let mut builder =
-                FunctionBuilder::new(&mut self.clif_ctx.ctx.func, &mut self.clif_ctx.builder_ctx);
+            let mut builder = FunctionBuilder::new(&mut func, &mut builder_ctx);
             let entry = builder.create_block();
             let header = builder.create_block();
             let body = builder.create_block();
@@ -1943,20 +1969,17 @@ for (int i = 0; i < {num_blocks}; i++) {{
             builder.append_block_params_for_function_params(entry);
             let f_inputs = builder.block_params(entry)[0..inputs.len()].to_vec();
             let f_output = builder.block_params(entry)[inputs.len()];
-            let mut num_vars = 0;
             let f_var_inputs = f_inputs
                 .iter()
                 .map(|&f_input| {
-                    let f_var_input = Variable::new(num_vars);
-                    num_vars += 1;
+                    let f_var_input = self.clif_ctx.new_var();
                     builder.declare_var(f_var_input, ptr);
                     builder.def_var(f_var_input, f_input);
                     f_var_input
                 })
                 .collect::<Vec<_>>();
             let f_var_output = {
-                let f_var_output = Variable::new(num_vars);
-                // num_vars += 1;
+                let f_var_output = self.clif_ctx.new_var();
                 builder.declare_var(f_var_output, ptr);
                 builder.def_var(f_var_output, f_output);
                 f_var_output
@@ -1990,10 +2013,12 @@ for (int i = 0; i < {num_blocks}; i++) {{
                     let num_elems = input.dims[axis..].iter().product::<usize>();
                     let sz = sizeof(&output.elem_ty);
                     let size = builder.ins().iconst(i64, sz as i64 * num_elems as i64);
-                    let q = builder.ins().imul_imm(offset, 8);
+                    let q = builder.ins().imul_imm(offset, sz as i64);
                     let out_ = builder.use_var(f_var_output);
                     let dest = builder.ins().iadd(out_, q);
-                    let q = builder.ins().imul_imm(counter, 8 * num_elems as i64);
+                    let q = builder
+                        .ins()
+                        .imul_imm(counter, sz as i64 * num_elems as i64);
                     let in_ = builder.use_var(*name);
                     let src = builder.ins().iadd(in_, q);
                     builder.call_memcpy(self.clif_ctx.module.target_config(), dest, src, size);
@@ -2007,7 +2032,9 @@ for (int i = 0; i < {num_blocks}; i++) {{
                 builder.ins().return_(&[]);
                 builder.seal_block(merge);
             }
+            self.clif_ctx.ctx.func = func;
             log::debug!("Func: {}", self.clif_ctx.ctx.func);
+            return Ok("/* Cranelift */".to_string());
         }
 
         let input_names = &args[0..inputs.len()];
@@ -2522,10 +2549,18 @@ impl Default for CraneliftCtx {
             ObjectBuilder::new(isa, "builder", cranelift_module::default_libcall_names()).unwrap();
         let module = ObjectModule::new(builder);
         Self {
-            builder_ctx: FunctionBuilderContext::new(),
             ctx: module.make_context(),
             module,
+            num_vars: 0,
         }
+    }
+}
+
+impl CraneliftCtx {
+    pub fn new_var(&mut self) -> Variable {
+        let var = Variable::new(self.num_vars);
+        self.num_vars += 1;
+        var
     }
 }
 

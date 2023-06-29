@@ -18,17 +18,13 @@ use altius_core::{
     tensor::{TensorElemType, TypedFixedShape},
     value::ValueId,
 };
-use cranelift::prelude::InstBuilder;
+use cranelift::prelude::{InstBuilder, IntCC, Variable};
 use cranelift::{
     codegen::settings::Configurable,
     prelude::{FunctionBuilder, FunctionBuilderContext},
 };
-use cranelift_codegen::{
-    ir::{self, AbiParam, Signature},
-    isa::CallConv,
-    Context,
-};
-use cranelift_module::{Linkage, Module};
+use cranelift_codegen::{entity::EntityRef, ir, Context};
+use cranelift_module::Module;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use indent::indent_all_by;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -1653,44 +1649,6 @@ for (int outer = 0; outer < {outer}; outer++) {{
         inputs: &[&TypedFixedShape],
         outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
-        // TODO: Use cranelift for code generation
-        if false {
-            let mut sig = Signature::new(CallConv::SystemV);
-            let i32 = ir::types::I32;
-            let float = ir::types::F32;
-            let ptr = self.clif_ctx.module.target_config().pointer_type();
-            sig.params.push(AbiParam::new(i32)); // order
-            sig.params.push(AbiParam::new(i32)); // trans
-            sig.params.push(AbiParam::new(i32)); // trans
-            sig.params.push(AbiParam::new(i32)); // m
-            sig.params.push(AbiParam::new(i32)); // n
-            sig.params.push(AbiParam::new(i32)); // k
-            sig.params.push(AbiParam::new(float)); // alpha
-            sig.params.push(AbiParam::new(ptr)); // a
-            sig.params.push(AbiParam::new(i32)); // lda
-            sig.params.push(AbiParam::new(ptr)); // b
-            sig.params.push(AbiParam::new(i32)); // ldb
-            sig.params.push(AbiParam::new(float)); // beta
-            sig.params.push(AbiParam::new(ptr)); // c
-            sig.params.push(AbiParam::new(i32)); // n
-            let cblas_sgemm =
-                self.clif_ctx
-                    .module
-                    .declare_function("cblas_sgemm", Linkage::Import, &sig)?;
-            let cblas_sgemm_ref = self
-                .clif_ctx
-                .module
-                .declare_func_in_func(cblas_sgemm, &mut self.clif_ctx.ctx.func);
-            let mut builder =
-                FunctionBuilder::new(&mut self.clif_ctx.ctx.func, &mut self.clif_ctx.builder_ctx);
-            let entry = builder.create_block();
-            builder.append_block_params_for_function_params(entry);
-            builder.switch_to_block(entry);
-            builder.ins().call(cblas_sgemm_ref, &[]);
-            builder.seal_block(entry);
-            log::debug!("Func: {}", self.clif_ctx.ctx.func);
-        }
-
         let input_0 = inputs[0];
         let input_1 = inputs[1];
         let output = &outputs[0];
@@ -1920,6 +1878,138 @@ for (int i = 0; i < {num_blocks}; i++) {{
         inputs: &[&TypedFixedShape],
         outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
+        // TODO: Use cranelift for code generation
+        if false {
+            // let input_names = &args[0..inputs.len()];
+            // let output_name = &args[inputs.len()];
+            let output = &outputs[0];
+
+            assert!(output.elem_ty.is_f32());
+            let axis = if concat.axis < 0 {
+                (output.dims.len() as i64 + concat.axis) as usize
+            } else {
+                concat.axis as usize
+            };
+            assert!(axis < output.dims.len());
+
+            let sum_num_elems = inputs
+                .iter()
+                .map(|input| {
+                    assert_eq!(input.dims.len(), output.dims.len());
+                    assert_eq!(input.dims[0..axis], output.dims[0..axis]);
+                    assert_eq!(input.dims[axis + 1..], output.dims[axis + 1..]);
+                    input.dims[axis..].iter().product::<usize>()
+                })
+                .sum::<usize>();
+            let outer = output.dims.total_elems() / sum_num_elems;
+
+            let i64 = ir::types::I64;
+            let ptr = self.clif_ctx.module.target_config().pointer_type();
+
+            for _input in inputs {
+                self.clif_ctx
+                    .ctx
+                    .func
+                    .signature
+                    .params
+                    .push(ir::AbiParam::new(ptr));
+            }
+            for _out in outputs {
+                self.clif_ctx
+                    .ctx
+                    .func
+                    .signature
+                    .params
+                    .push(ir::AbiParam::new(ptr));
+            }
+
+            let mut builder =
+                FunctionBuilder::new(&mut self.clif_ctx.ctx.func, &mut self.clif_ctx.builder_ctx);
+            let entry = builder.create_block();
+            let header = builder.create_block();
+            let body = builder.create_block();
+            let merge = builder.create_block();
+
+            let sizeof = |t: &TensorElemType| -> usize {
+                match t {
+                    TensorElemType::F32 => 4,
+                    TensorElemType::I32 => 4,
+                    TensorElemType::I64 => 8,
+                    TensorElemType::Bool => 1,
+                }
+            };
+
+            builder.switch_to_block(entry);
+            builder.append_block_params_for_function_params(entry);
+            let f_inputs = builder.block_params(entry)[0..inputs.len()].to_vec();
+            let f_output = builder.block_params(entry)[inputs.len()];
+            let mut num_vars = 0;
+            let f_var_inputs = f_inputs
+                .iter()
+                .map(|&f_input| {
+                    let f_var_input = Variable::new(num_vars);
+                    num_vars += 1;
+                    builder.declare_var(f_var_input, ptr);
+                    builder.def_var(f_var_input, f_input);
+                    f_var_input
+                })
+                .collect::<Vec<_>>();
+            let f_var_output = {
+                let f_var_output = Variable::new(num_vars);
+                // num_vars += 1;
+                builder.declare_var(f_var_output, ptr);
+                builder.def_var(f_var_output, f_output);
+                f_var_output
+            };
+            let zero = builder.ins().iconst(i64, 0);
+            let offset = builder.ins().iconst(i64, 0);
+            builder.ins().jump(header, &[zero, offset]);
+            builder.seal_block(entry);
+
+            {
+                builder.switch_to_block(header);
+                builder.append_block_param(header, i64);
+                builder.append_block_param(header, i64);
+                let max = builder.ins().iconst(i64, outer as i64);
+                let counter = builder.block_params(header)[0];
+                let offset = builder.block_params(header)[1];
+                let cond = builder.ins().icmp(IntCC::UnsignedLessThan, counter, max);
+                builder
+                    .ins()
+                    .brif(cond, body, &[counter, offset], merge, &[]);
+                builder.seal_block(header);
+            }
+            {
+                builder.switch_to_block(body);
+                builder.append_block_param(body, i64);
+                builder.append_block_param(body, i64);
+                let counter = builder.block_params(body)[0];
+                let mut offset = builder.block_params(body)[1];
+                let inc_counter = builder.ins().iadd_imm(counter, 1);
+                for (name, input) in f_var_inputs.iter().zip(inputs.iter()) {
+                    let num_elems = input.dims[axis..].iter().product::<usize>();
+                    let sz = sizeof(&output.elem_ty);
+                    let size = builder.ins().iconst(i64, sz as i64 * num_elems as i64);
+                    let q = builder.ins().imul_imm(offset, 8);
+                    let out_ = builder.use_var(f_var_output);
+                    let dest = builder.ins().iadd(out_, q);
+                    let q = builder.ins().imul_imm(counter, 8 * num_elems as i64);
+                    let in_ = builder.use_var(*name);
+                    let src = builder.ins().iadd(in_, q);
+                    builder.call_memcpy(self.clif_ctx.module.target_config(), dest, src, size);
+                    offset = builder.ins().iadd_imm(offset, num_elems as i64);
+                }
+                builder.ins().jump(header, &[inc_counter, offset]);
+                builder.seal_block(body);
+            }
+            {
+                builder.switch_to_block(merge);
+                builder.ins().return_(&[]);
+                builder.seal_block(merge);
+            }
+            log::debug!("Func: {}", self.clif_ctx.ctx.func);
+        }
+
         let input_names = &args[0..inputs.len()];
         let output_name = &args[inputs.len()];
         let output = &outputs[0];

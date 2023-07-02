@@ -454,8 +454,7 @@ static struct timespec now() {{
             writer.write_all(b"\n")?;
 
             for call in created_calls {
-                writer.write_all(b"    ")?;
-                writer.write_all(call.as_bytes())?;
+                writer.write_all(indent_all_by(4, call).as_bytes())?;
                 writer.write_all(b"\n")?;
             }
 
@@ -541,7 +540,33 @@ static struct timespec now() {{
                 args[0]
             ))
         } else {
-            created_calls.push(format!("{node_name}({});", args.join(", ")));
+            let start_profiling = if self.enable_profiling {
+                indent_all_by(4, "const struct timespec _start = now();".to_string())
+            } else {
+                String::new()
+            };
+            let end_profiling = if self.enable_profiling {
+                indent_all_by(
+                    4,
+                    format!(
+                        "const struct timespec _end = now();
+const double start_in_sec = (double)_start.tv_sec + (double)_start.tv_nsec / 1e9;
+const double end_in_sec = (double)_end.tv_sec + (double)_end.tv_nsec / 1e9;
+elapsed_{opname} += end_in_sec - start_in_sec;",
+                        opname = op.name()
+                    ),
+                )
+            } else {
+                String::new()
+            };
+            created_calls.push(format!(
+                "{{
+{start_profiling}
+    {node_name}({});
+{end_profiling}
+}}",
+                args.join(", ")
+            ));
         }
 
         let kernel = match op {
@@ -617,32 +642,9 @@ static struct timespec now() {{
         } else {
             let kernel = format!(
                 "{decl} {{
-{start_profiling}
 {body}
-{end_profiling}
 }}",
                 body = indent_all_by(4, kernel),
-                start_profiling = if self.enable_profiling {
-                    indent_all_by(4, "const struct timespec _start = now();".to_string())
-                } else {
-                    String::new()
-                },
-                end_profiling = if self.enable_profiling {
-                    indent_all_by(
-                        4,
-                        format!(
-                            "{{
-    const struct timespec _end = now();
-    const double start_in_sec = (double)_start.tv_sec + (double)_start.tv_nsec / 1e9;
-    const double end_in_sec = (double)_end.tv_sec + (double)_end.tv_nsec / 1e9;
-    elapsed_{} += end_in_sec - start_in_sec;
-}}",
-                            op.name(),
-                        ),
-                    )
-                } else {
-                    String::new()
-                },
             );
             self.created_kernels.push(kernel);
         }

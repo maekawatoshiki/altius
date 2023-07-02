@@ -2033,54 +2033,65 @@ for (int i = 0; i < {outer}; i++) {{
             builder.def_var(f_var_output, f_output);
             f_var_output
         };
-        let zero = builder.ins().iconst(i64, 0);
-        let offset = builder.ins().iconst(i64, 0);
-        builder.ins().jump(header, &[zero, offset]);
-        builder.seal_block(entry);
+        let counter = {
+            let counter = self.clif_ctx.new_var();
+            builder.declare_var(counter, i64);
+            let zero = builder.ins().iconst(i64, 0);
+            builder.def_var(counter, zero);
+            counter
+        };
+        let offset = {
+            let offset = self.clif_ctx.new_var();
+            builder.declare_var(offset, i64);
+            let zero = builder.ins().iconst(i64, 0);
+            builder.def_var(offset, zero);
+            offset
+        };
+        builder.ins().jump(header, &[]);
 
         {
             builder.switch_to_block(header);
-            builder.append_block_param(header, i64);
-            builder.append_block_param(header, i64);
             let max = builder.ins().iconst(i64, outer as i64);
-            let counter = builder.block_params(header)[0];
-            let offset = builder.block_params(header)[1];
-            let cond = builder.ins().icmp(IntCC::UnsignedLessThan, counter, max);
-            builder
-                .ins()
-                .brif(cond, body, &[counter, offset], merge, &[]);
-            builder.seal_block(header);
+            let counter_ = builder.use_var(counter);
+            let cond = builder.ins().icmp(IntCC::UnsignedLessThan, counter_, max);
+            builder.ins().brif(cond, body, &[], merge, &[]);
         }
         {
             builder.switch_to_block(body);
-            builder.append_block_param(body, i64);
-            builder.append_block_param(body, i64);
-            let counter = builder.block_params(body)[0];
-            let mut offset = builder.block_params(body)[1];
-            let inc_counter = builder.ins().iadd_imm(counter, 1);
+            let counter_ = builder.use_var(counter);
+            let offset_ = builder.use_var(offset);
+            let inc_counter = builder.ins().iadd_imm(counter_, 1);
             for (name, input) in f_var_inputs.iter().zip(inputs.iter()) {
                 let num_elems = input.dims[axis..].iter().product::<usize>();
                 let sz = sizeof(&output.elem_ty);
                 let size = builder.ins().iconst(i64, sz as i64 * num_elems as i64);
-                let q = builder.ins().imul_imm(offset, sz as i64);
+                let q = builder.ins().imul_imm(offset_, sz as i64);
                 let out_ = builder.use_var(f_var_output);
                 let dest = builder.ins().iadd(out_, q);
                 let q = builder
                     .ins()
-                    .imul_imm(counter, sz as i64 * num_elems as i64);
+                    .imul_imm(counter_, sz as i64 * num_elems as i64);
                 let in_ = builder.use_var(*name);
                 let src = builder.ins().iadd(in_, q);
                 builder.call_memcpy(self.clif_ctx.module.target_config(), dest, src, size);
-                offset = builder.ins().iadd_imm(offset, num_elems as i64);
+                let new_offset = builder.ins().iadd_imm(offset_, num_elems as i64);
+                builder.def_var(offset, new_offset);
             }
-            builder.ins().jump(header, &[inc_counter, offset]);
-            builder.seal_block(body);
+            builder.def_var(counter, inc_counter);
+            builder.ins().jump(header, &[]);
         }
         {
             builder.switch_to_block(merge);
             builder.ins().return_(&[]);
-            builder.seal_block(merge);
         }
+
+        builder.seal_block(entry);
+        builder.seal_block(header);
+        builder.seal_block(body);
+        builder.seal_block(merge);
+
+        builder.finalize();
+
         self.clif_ctx.ctx.func = func;
 
         Ok("/* Cranelift */".to_string())

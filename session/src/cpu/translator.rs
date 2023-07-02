@@ -18,14 +18,18 @@ use altius_core::{
     tensor::{TensorElemType, TypedFixedShape},
     value::ValueId,
 };
-use cranelift::prelude::{InstBuilder, IntCC, Variable};
+use cranelift::prelude::{InstBuilder, IntCC, Type, Variable};
 use cranelift::{
     codegen::settings::Configurable,
     prelude::{FunctionBuilder, FunctionBuilderContext},
 };
 use cranelift_codegen::{
     entity::EntityRef,
-    ir::{self, Function},
+    ir::{
+        self,
+        types::{F32, I32, I64, I8},
+        Function, Value,
+    },
     Context,
 };
 use cranelift_module::{Linkage, Module};
@@ -1964,8 +1968,6 @@ for (int i = 0; i < {outer}; i++) {{
     ) -> Result<String, SessionError> {
         // TODO: Clean this code
 
-        // let input_names = &args[0..inputs.len()];
-        // let output_name = &args[inputs.len()];
         let output = &outputs[0];
 
         assert!(output.elem_ty.is_f32());
@@ -1987,15 +1989,11 @@ for (int i = 0; i < {outer}; i++) {{
             .sum::<usize>();
         let outer = output.dims.total_elems() / sum_num_elems;
 
-        let i64 = ir::types::I64;
-        let ptr = self.clif_ctx.module.target_config().pointer_type();
-
         let mut func = Function::new();
         let mut builder_ctx = FunctionBuilderContext::new();
-        for _input in inputs {
-            func.signature.params.push(ir::AbiParam::new(ptr));
-        }
-        for _out in outputs {
+
+        let ptr = self.clif_ctx.module.target_config().pointer_type();
+        for _param in 0..inputs.len() + outputs.len() {
             func.signature.params.push(ir::AbiParam::new(ptr));
         }
 
@@ -2005,53 +2003,23 @@ for (int i = 0; i < {outer}; i++) {{
         let body = builder.create_block();
         let merge = builder.create_block();
 
-        let sizeof = |t: &TensorElemType| -> usize {
-            match t {
-                TensorElemType::F32 => 4,
-                TensorElemType::I32 => 4,
-                TensorElemType::I64 => 8,
-                TensorElemType::Bool => 1,
-            }
-        };
-
         builder.switch_to_block(entry);
         builder.append_block_params_for_function_params(entry);
-        let f_inputs = builder.block_params(entry)[0..inputs.len()].to_vec();
-        let f_output = builder.block_params(entry)[inputs.len()];
-        let f_var_inputs = f_inputs
+        let zero = builder.ins().iconst(I64, 0);
+        let input_params = builder.block_params(entry)[..inputs.len()].to_vec();
+        let output_param = builder.block_params(entry)[inputs.len()];
+        let input_params = input_params
             .iter()
-            .map(|&f_input| {
-                let f_var_input = self.clif_ctx.new_var();
-                builder.declare_var(f_var_input, ptr);
-                builder.def_var(f_var_input, f_input);
-                f_var_input
-            })
+            .map(|&i| self.clif_ctx.create_var(ptr, i, &mut builder))
             .collect::<Vec<_>>();
-        let f_var_output = {
-            let f_var_output = self.clif_ctx.new_var();
-            builder.declare_var(f_var_output, ptr);
-            builder.def_var(f_var_output, f_output);
-            f_var_output
-        };
-        let counter = {
-            let counter = self.clif_ctx.new_var();
-            builder.declare_var(counter, i64);
-            let zero = builder.ins().iconst(i64, 0);
-            builder.def_var(counter, zero);
-            counter
-        };
-        let offset = {
-            let offset = self.clif_ctx.new_var();
-            builder.declare_var(offset, i64);
-            let zero = builder.ins().iconst(i64, 0);
-            builder.def_var(offset, zero);
-            offset
-        };
+        let output_param = self.clif_ctx.create_var(ptr, output_param, &mut builder);
+        let counter = self.clif_ctx.create_var(I64, zero, &mut builder);
+        let offset = self.clif_ctx.create_var(I64, zero, &mut builder);
         builder.ins().jump(header, &[]);
 
         {
             builder.switch_to_block(header);
-            let max = builder.ins().iconst(i64, outer as i64);
+            let max = builder.ins().iconst(I64, outer as i64);
             let counter_ = builder.use_var(counter);
             let cond = builder.ins().icmp(IntCC::UnsignedLessThan, counter_, max);
             builder.ins().brif(cond, body, &[], merge, &[]);
@@ -2059,20 +2027,20 @@ for (int i = 0; i < {outer}; i++) {{
         {
             builder.switch_to_block(body);
             let counter_ = builder.use_var(counter);
-            let offset_ = builder.use_var(offset);
             let inc_counter = builder.ins().iadd_imm(counter_, 1);
-            for (name, input) in f_var_inputs.iter().zip(inputs.iter()) {
+            for (name, input) in input_params.iter().zip(inputs.iter()) {
+                let offset_ = builder.use_var(offset);
                 let num_elems = input.dims[axis..].iter().product::<usize>();
-                let sz = sizeof(&output.elem_ty);
-                let size = builder.ins().iconst(i64, sz as i64 * num_elems as i64);
-                let q = builder.ins().imul_imm(offset_, sz as i64);
-                let out_ = builder.use_var(f_var_output);
-                let dest = builder.ins().iadd(out_, q);
-                let q = builder
+                let sz = get_clif_type(output.elem_ty).lane_bits() / 8;
+                let size = builder.ins().iconst(I64, sz as i64 * num_elems as i64);
+                let inc = builder.ins().imul_imm(offset_, sz as i64);
+                let out_ = builder.use_var(output_param);
+                let dest = builder.ins().iadd(out_, inc);
+                let inc = builder
                     .ins()
                     .imul_imm(counter_, sz as i64 * num_elems as i64);
                 let in_ = builder.use_var(*name);
-                let src = builder.ins().iadd(in_, q);
+                let src = builder.ins().iadd(in_, inc);
                 builder.call_memcpy(self.clif_ctx.module.target_config(), dest, src, size);
                 let new_offset = builder.ins().iadd_imm(offset_, num_elems as i64);
                 builder.def_var(offset, new_offset);
@@ -2583,6 +2551,22 @@ impl CraneliftCtx {
         self.num_vars += 1;
         var
     }
+
+    pub fn create_var(&mut self, ty: Type, init: Value, builder: &mut FunctionBuilder) -> Variable {
+        let var = self.new_var();
+        builder.declare_var(var, ty);
+        builder.def_var(var, init);
+        var
+    }
+}
+
+const fn get_clif_type(t: TensorElemType) -> Type {
+    match t {
+        TensorElemType::F32 => F32,
+        TensorElemType::I32 => I32,
+        TensorElemType::I64 => I64,
+        TensorElemType::Bool => I8,
+    }
 }
 
 fn value_name(model: &Model, id: ValueId) -> String {
@@ -2621,7 +2605,7 @@ fn compute_sha1_from_files(paths: &[PathBuf]) -> Option<[u8; 20]> {
     hash.get(..20)?.try_into().ok()
 }
 
-fn get_c_type(ty: TensorElemType) -> &'static str {
+const fn get_c_type(ty: TensorElemType) -> &'static str {
     match ty {
         TensorElemType::F32 => "float",
         TensorElemType::I32 => "int32_t",

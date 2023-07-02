@@ -1969,8 +1969,8 @@ for (int i = 0; i < {outer}; i++) {{
         // TODO: Clean this code
 
         let output = &outputs[0];
-
         assert!(output.elem_ty.is_f32());
+
         let axis = if concat.axis < 0 {
             (output.dims.len() as i64 + concat.axis) as usize
         } else {
@@ -1978,16 +1978,19 @@ for (int i = 0; i < {outer}; i++) {{
         };
         assert!(axis < output.dims.len());
 
-        let sum_num_elems = inputs
-            .iter()
-            .map(|input| {
-                assert_eq!(input.dims.len(), output.dims.len());
-                assert_eq!(input.dims[0..axis], output.dims[0..axis]);
-                assert_eq!(input.dims[axis + 1..], output.dims[axis + 1..]);
-                input.dims[axis..].iter().product::<usize>()
-            })
-            .sum::<usize>();
-        let outer = output.dims.total_elems() / sum_num_elems;
+        let outer;
+        {
+            let total_elems_along_axis = inputs
+                .iter()
+                .map(|input| {
+                    assert_eq!(input.dims.len(), output.dims.len());
+                    assert_eq!(input.dims[0..axis], output.dims[0..axis]);
+                    assert_eq!(input.dims[axis + 1..], output.dims[axis + 1..]);
+                    input.dims[axis..].iter().product::<usize>()
+                })
+                .sum::<usize>();
+            outer = output.dims.total_elems() / total_elems_along_axis;
+        }
 
         let mut func = Function::new();
         let mut builder_ctx = FunctionBuilderContext::new();
@@ -2003,20 +2006,33 @@ for (int i = 0; i < {outer}; i++) {{
         let body = builder.create_block();
         let merge = builder.create_block();
 
-        builder.switch_to_block(entry);
-        builder.append_block_params_for_function_params(entry);
-        let zero = builder.ins().iconst(I64, 0);
-        let input_params = builder.block_params(entry)[..inputs.len()].to_vec();
-        let output_param = builder.block_params(entry)[inputs.len()];
-        let input_params = input_params
-            .iter()
-            .map(|&i| self.clif_ctx.create_var(ptr, i, &mut builder))
-            .collect::<Vec<_>>();
-        let output_param = self.clif_ctx.create_var(ptr, output_param, &mut builder);
-        let counter = self.clif_ctx.create_var(I64, zero, &mut builder);
-        let offset = self.clif_ctx.create_var(I64, zero, &mut builder);
-        builder.ins().jump(header, &[]);
-
+        // int offset = 0;
+        // for (int i = 0; i < {outer}; i++) {
+        //     memcpy({output_name} + offset, {name} + i * {num_elems}, sizeof({ty}) * {num_elems});
+        //     offset += {num_elems};
+        // }
+        let counter;
+        let offset;
+        let input_params;
+        let output_param;
+        {
+            builder.switch_to_block(entry);
+            builder.append_block_params_for_function_params(entry);
+            let zero = builder.ins().iconst(I64, 0);
+            input_params = builder.block_params(entry)[..inputs.len()]
+                .to_vec()
+                .into_iter()
+                .map(|i| self.clif_ctx.create_var(ptr, i, &mut builder))
+                .collect::<Vec<_>>();
+            output_param = self.clif_ctx.create_var(
+                ptr,
+                builder.block_params(entry)[inputs.len()],
+                &mut builder,
+            );
+            counter = self.clif_ctx.create_var(I64, zero, &mut builder);
+            offset = self.clif_ctx.create_var(I64, zero, &mut builder);
+            builder.ins().jump(header, &[]);
+        }
         {
             builder.switch_to_block(header);
             let max = builder.ins().iconst(I64, outer as i64);
@@ -2026,25 +2042,25 @@ for (int i = 0; i < {outer}; i++) {{
         }
         {
             builder.switch_to_block(body);
-            let counter_ = builder.use_var(counter);
-            let inc_counter = builder.ins().iadd_imm(counter_, 1);
-            for (name, input) in input_params.iter().zip(inputs.iter()) {
-                let offset_ = builder.use_var(offset);
-                let num_elems = input.dims[axis..].iter().product::<usize>();
-                let sz = get_clif_type(output.elem_ty).lane_bits() / 8;
-                let size = builder.ins().iconst(I64, sz as i64 * num_elems as i64);
-                let inc = builder.ins().imul_imm(offset_, sz as i64);
+            let val_counter = builder.use_var(counter);
+            for (param, shape) in input_params.iter().zip(inputs.iter()) {
+                let val_offset = builder.use_var(offset);
+                let num_elems = shape.dims[axis..].iter().product::<usize>();
+                let tysz = get_clif_type(output.elem_ty).lane_bits() / 8;
+                let size = builder.ins().iconst(I64, tysz as i64 * num_elems as i64);
+                let inc = builder.ins().imul_imm(val_offset, tysz as i64);
                 let out_ = builder.use_var(output_param);
                 let dest = builder.ins().iadd(out_, inc);
                 let inc = builder
                     .ins()
-                    .imul_imm(counter_, sz as i64 * num_elems as i64);
-                let in_ = builder.use_var(*name);
-                let src = builder.ins().iadd(in_, inc);
+                    .imul_imm(val_counter, tysz as i64 * num_elems as i64);
+                let val_input = builder.use_var(*param);
+                let src = builder.ins().iadd(val_input, inc);
                 builder.call_memcpy(self.clif_ctx.module.target_config(), dest, src, size);
-                let new_offset = builder.ins().iadd_imm(offset_, num_elems as i64);
+                let new_offset = builder.ins().iadd_imm(val_offset, num_elems as i64);
                 builder.def_var(offset, new_offset);
             }
+            let inc_counter = builder.ins().iadd_imm(val_counter, 1);
             builder.def_var(counter, inc_counter);
             builder.ins().jump(header, &[]);
         }

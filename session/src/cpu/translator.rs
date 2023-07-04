@@ -28,7 +28,7 @@ use cranelift_codegen::{
     ir::{
         self,
         types::{F32, I32, I64, I8},
-        Function, Value,
+        AbiParam, Function, MemFlags, Value,
     },
     Context,
 };
@@ -2160,6 +2160,7 @@ for (int i = 0; i < {outer}; i++) {{
             "Unsupported indices shape: {:?}",
             indices.dims
         );
+        assert!(indices.elem_ty.is_i64());
 
         if indices.dims.is_scalar() {
             let axis = gather.axis as usize;
@@ -2167,15 +2168,52 @@ for (int i = 0; i < {outer}; i++) {{
             assert_eq!(data.dims.len(), 3);
             assert_eq!(data.dims[0], 1);
 
-            let kernel = format!(
-                "memcpy({}, {} + {} * ({}[0]), sizeof(float) * {});",
-                output_name,
-                data_name,
-                data.dims.strides()[axis],
-                indices_name,
-                data.dims[2]
-            );
-            Ok(kernel)
+            let mut func = Function::new();
+            let mut builder_ctx = FunctionBuilderContext::new();
+
+            let ptr = self.clif_ctx.module.target_config().pointer_type();
+            for _param in 0..inputs.len() + outputs.len() {
+                func.signature.params.push(AbiParam::new(ptr))
+            }
+
+            let mut builder = FunctionBuilder::new(&mut func, &mut builder_ctx);
+            let entry = builder.create_block();
+
+            // memcpy({output}, {data} + data.dims.strides()[axis]} * ({indices}[0]), sizeof(float) * {data.dims[2]});
+            {
+                builder.switch_to_block(entry);
+                builder.append_block_params_for_function_params(entry);
+                let [var_data, var_indices] = builder.block_params(entry)[..inputs.len()]
+                    .to_vec()
+                    .into_iter()
+                    .map(|i| self.clif_ctx.create_var(ptr, i, &mut builder))
+                    .collect::<Vec<_>>()[..] else { panic!() };
+                let var_out = self.clif_ctx.create_var(
+                    ptr,
+                    builder.block_params(entry)[inputs.len()],
+                    &mut builder,
+                );
+                let tysz = get_clif_type(data.elem_ty).lane_bits() / 8;
+                let off = builder
+                    .ins()
+                    .iconst(I64, tysz as i64 * data.dims.strides()[axis] as i64);
+                let val_indices = builder.use_var(var_indices);
+                let idx = builder.ins().load(I64, MemFlags::new(), val_indices, 0);
+                let src = builder.ins().imul(idx, off);
+                let val_data = builder.use_var(var_data);
+                let src = builder.ins().iadd(val_data, src);
+                let val_out = builder.use_var(var_out);
+                let size = builder.ins().iconst(I64, tysz as i64 * data.dims[2] as i64);
+                builder.call_memcpy(self.clif_ctx.module.target_config(), val_out, src, size);
+                builder.ins().return_(&[]);
+            }
+
+            builder.seal_block(entry);
+            builder.finalize();
+
+            self.clif_ctx.ctx.func = func;
+
+            Ok("/* Cranelift */".to_string())
         } else {
             let axis = gather.axis as usize;
             assert_eq!(axis, 0);

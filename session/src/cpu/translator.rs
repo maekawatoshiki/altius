@@ -1968,8 +1968,6 @@ for (int i = 0; i < {outer}; i++) {{
         inputs: &[&TypedFixedShape],
         outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
-        // TODO: Clean this code
-
         let output = &outputs[0];
         assert!(output.elem_ty.is_f32());
 
@@ -2090,6 +2088,64 @@ for (int i = 0; i < {outer}; i++) {{
         inputs: &[&TypedFixedShape],
         outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
+        if self.enable_clif {
+            return self.translate_gather_clif(gather, args, inputs, outputs);
+        }
+
+        let data = inputs[0];
+        let indices = inputs[1];
+        let _output = &outputs[0];
+        let data_name = &args[0];
+        let indices_name = &args[1];
+        let output_name = &args[inputs.len()..][0];
+
+        assert!(data.elem_ty.is_f32());
+        assert!(gather.axis >= 0);
+        assert!(
+            indices.dims.is_scalar() || (indices.dims.len() == 2 && indices.dims[0] == 1),
+            "Unsupported indices shape: {:?}",
+            indices.dims
+        );
+
+        if indices.dims.is_scalar() {
+            let axis = gather.axis as usize;
+            assert_eq!(axis, 1);
+            assert_eq!(data.dims.len(), 3);
+            assert_eq!(data.dims[0], 1);
+
+            let kernel = format!(
+                "memcpy({}, {} + {} * ({}[0]), sizeof(float) * {});",
+                output_name,
+                data_name,
+                data.dims.strides()[axis],
+                indices_name,
+                data.dims[2]
+            );
+            Ok(kernel)
+        } else {
+            let axis = gather.axis as usize;
+            assert_eq!(axis, 0);
+
+            let len = indices.dims.total_elems();
+            let size = data.dims[1];
+            let stride = data.dims.strides()[axis];
+            let kernel = format!(
+                "for (int i = 0; i < {len}; i++) {{
+    memcpy({output_name} + i * {size}, {data_name} + {stride} * ({indices_name}[i]), sizeof(float) * {size});
+}}"
+            );
+            Ok(kernel)
+        }
+    }
+
+    fn translate_gather_clif(
+        &mut self,
+        gather: &Gather,
+        args: &[String],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
+    ) -> Result<String, SessionError> {
+        // TODO: Copied from translate_gather()
         let data = inputs[0];
         let indices = inputs[1];
         let _output = &outputs[0];

@@ -2141,17 +2141,14 @@ for (int i = 0; i < {outer}; i++) {{
     fn translate_gather_clif(
         &mut self,
         gather: &Gather,
-        args: &[String],
+        _args: &[String],
         inputs: &[&TypedFixedShape],
         outputs: &[TypedFixedShape],
     ) -> Result<String, SessionError> {
-        // TODO: Copied from translate_gather()
         let data = inputs[0];
         let indices = inputs[1];
         let _output = &outputs[0];
-        let data_name = &args[0];
-        let indices_name = &args[1];
-        let output_name = &args[inputs.len()..][0];
+        let mut func = Function::new();
 
         assert!(data.elem_ty.is_f32());
         assert!(gather.axis >= 0);
@@ -2168,7 +2165,6 @@ for (int i = 0; i < {outer}; i++) {{
             assert_eq!(data.dims.len(), 3);
             assert_eq!(data.dims[0], 1);
 
-            let mut func = Function::new();
             let mut builder_ctx = FunctionBuilderContext::new();
 
             let ptr = self.clif_ctx.module.target_config().pointer_type();
@@ -2210,10 +2206,6 @@ for (int i = 0; i < {outer}; i++) {{
 
             builder.seal_block(entry);
             builder.finalize();
-
-            self.clif_ctx.ctx.func = func;
-
-            Ok("/* Cranelift */".to_string())
         } else {
             let axis = gather.axis as usize;
             assert_eq!(axis, 0);
@@ -2221,13 +2213,93 @@ for (int i = 0; i < {outer}; i++) {{
             let len = indices.dims.total_elems();
             let size = data.dims[1];
             let stride = data.dims.strides()[axis];
-            let kernel = format!(
-                "for (int i = 0; i < {len}; i++) {{
-    memcpy({output_name} + i * {size}, {data_name} + {stride} * ({indices_name}[i]), sizeof(float) * {size});
-}}"
-            );
-            Ok(kernel)
+
+            // for (int i = 0; i < {len}; i++) {
+            //     memcpy(
+            //         {output_name} + i * {size},
+            //         {data_name} + {stride} * ({indices_name}[i]),
+            //         sizeof(float) * {size});
+            // }
+
+            let mut builder_ctx = FunctionBuilderContext::new();
+
+            let ptr = self.clif_ctx.module.target_config().pointer_type();
+            for _param in 0..inputs.len() + outputs.len() {
+                func.signature.params.push(AbiParam::new(ptr))
+            }
+
+            let mut builder = FunctionBuilder::new(&mut func, &mut builder_ctx);
+            let entry = builder.create_block();
+            let header = builder.create_block();
+            let body = builder.create_block();
+            let merge = builder.create_block();
+
+            let var_data;
+            let var_indices;
+            let var_out;
+            let var_counter;
+            {
+                builder.switch_to_block(entry);
+                builder.append_block_params_for_function_params(entry);
+                let var_inputs = builder.block_params(entry)[..inputs.len()]
+                    .to_vec()
+                    .into_iter()
+                    .map(|i| self.clif_ctx.create_var(ptr, i, &mut builder))
+                    .collect::<Vec<_>>();
+                var_data = var_inputs[0];
+                var_indices = var_inputs[1];
+                var_out = self.clif_ctx.create_var(
+                    ptr,
+                    builder.block_params(entry)[inputs.len()],
+                    &mut builder,
+                );
+                let zero = builder.ins().iconst(I64, 0);
+                var_counter = self.clif_ctx.create_var(I64, zero, &mut builder);
+                builder.ins().jump(header, &[]);
+            }
+            {
+                builder.switch_to_block(header);
+                let max = builder.ins().iconst(I64, len as i64);
+                let counter = builder.use_var(var_counter);
+                let cond = builder.ins().icmp(IntCC::UnsignedLessThan, counter, max);
+                builder.ins().brif(cond, body, &[], merge, &[]);
+            }
+            {
+                builder.switch_to_block(body);
+                let counter = builder.use_var(var_counter);
+                let tysz = get_clif_type(data.elem_ty).lane_bits() / 8;
+                let off = builder.ins().iconst(I64, tysz as i64 * stride as i64);
+                let indices = builder.use_var(var_indices);
+                let t = builder.ins().imul_imm(counter, 8);
+                let idx_addr = builder.ins().iadd(indices, t);
+                let idx = builder.ins().load(I64, MemFlags::new(), idx_addr, 0);
+                let src = builder.ins().imul(idx, off);
+                let data = builder.use_var(var_data);
+                let src = builder.ins().iadd(data, src);
+                let val_out = builder.use_var(var_out);
+                let idx = builder.ins().imul_imm(counter, tysz as i64 * size as i64);
+                let dst = builder.ins().iadd(val_out, idx);
+                let size = builder.ins().iconst(I64, tysz as i64 * size as i64);
+                builder.call_memcpy(self.clif_ctx.module.target_config(), dst, src, size);
+                let inc_counter = builder.ins().iadd_imm(counter, 1);
+                builder.def_var(var_counter, inc_counter);
+                builder.ins().jump(header, &[]);
+            }
+            {
+                builder.switch_to_block(merge);
+                builder.ins().return_(&[]);
+            }
+
+            builder.seal_block(entry);
+            builder.seal_block(header);
+            builder.seal_block(body);
+            builder.seal_block(merge);
+            builder.finalize();
         }
+
+        self.clif_ctx.ctx.func = func;
+
+        Ok("/* Cranelift */".to_string())
     }
 
     fn translate_reduce_mean(

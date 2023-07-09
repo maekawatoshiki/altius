@@ -1852,6 +1852,10 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
             .collect::<Vec<_>>()
             .join(", ");
 
+        if self.enable_clif {
+            return self.translate_transpose_clif(transpose, args, inputs, outputs);
+        }
+
         let kernel = if num_elems_in_block == 1 {
             format!("int src_indices[{num_blocks}] = {{ {indices} }};
 for (int i = 0; i < {num_blocks}; i++) {{
@@ -1882,6 +1886,16 @@ for (int i = 0; i < {num_blocks}; i++) {{
         };
 
         Ok(kernel)
+    }
+
+    fn translate_transpose_clif(
+        &mut self,
+        _transpose: &Transpose,
+        _args: &[String],
+        _inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
+    ) -> Result<String, SessionError> {
+        todo!()
     }
 
     fn translate_expand(

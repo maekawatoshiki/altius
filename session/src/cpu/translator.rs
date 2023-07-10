@@ -1455,9 +1455,13 @@ float *output_ptr = {};\n",
         assert!(output.dims.len() == 4);
 
         let Some(&[n, c, h, w]) = input.dims.get(0..4) else {
-            return Err(SessionError::Message("Input must be four dimensions".into()))
+            return Err(SessionError::Message(
+                "Input must be four dimensions".into(),
+            ));
         };
-        let Some(&[isn, isc, _, _]) = input.dims.strides().get(0..4) else { panic!() };
+        let Some(&[isn, isc, _, _]) = input.dims.strides().get(0..4) else {
+            panic!()
+        };
         let area = h * w;
         let osn = output.dims.strides()[0];
 
@@ -1840,49 +1844,52 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
             stride: new_strides[0..reduced_num_axes].to_vec(),
         };
 
-        let mut src_idx = 0;
-        let mut indices = vec![];
-        for _ in 0..num_blocks {
-            indices.push(src_idx);
-            src_idx = next_index(&mut perm, src_idx);
-        }
-        let indices = indices
-            .iter()
-            .map(|&idx| idx.to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-
         if self.enable_clif {
-            return self.translate_transpose_clif(transpose, args, inputs, outputs);
+            if num_blocks == 1 {
+                return self.translate_transpose_clif(
+                    num_elems_in_block,
+                    num_blocks,
+                    inputs[0].elem_ty,
+                );
+            }
         }
 
-        let kernel = if num_elems_in_block == 1 {
-            format!("int src_indices[{num_blocks}] = {{ {indices} }};
-for (int i = 0; i < {num_blocks}; i++) {{
-    {out}[i] = {in}[src_indices[i]];
-}}",
-                out = output_name,
-                in = input_name,
-                indices = indices
-            )
-        } else if num_blocks == 1 {
+        let kernel = if num_blocks == 1 {
             format!(
                 "memcpy({}, {}, sizeof(float) * {});",
                 output_name, input_name, num_elems_in_block
             )
         } else {
-            format!("int src_indices[{num_blocks}] = {{ {indices} }};
+            let mut src_idx = 0;
+            let mut indices = vec![];
+            for _ in 0..num_blocks {
+                indices.push(src_idx);
+                src_idx = next_index(&mut perm, src_idx);
+            }
+            let indices = indices
+                .iter()
+                .map(|&idx| idx.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            if num_elems_in_block == 1 {
+                format!("int src_indices[{num_blocks}] = {{ {indices} }};
+for (int i = 0; i < {num_blocks}; i++) {{
+    {out}[i] = {in}[src_indices[i]];
+}}",
+                    out = output_name,
+                    in = input_name,
+                )
+            } else {
+                format!("int src_indices[{num_blocks}] = {{ {indices} }};
 for (int i = 0; i < {num_blocks}; i++) {{
     memcpy({out} + i * {num_elems_in_block},
             {in} + src_indices[i],
             sizeof(float) * {num_elems_in_block});
 }}",
-                out = output_name,
-                in = input_name,
-                num_blocks = num_blocks,
-                num_elems_in_block = num_elems_in_block,
-                indices = indices
-            )
+                    out = output_name,
+                    in = input_name,
+                )
+            }
         };
 
         Ok(kernel)
@@ -1890,12 +1897,44 @@ for (int i = 0; i < {num_blocks}; i++) {{
 
     fn translate_transpose_clif(
         &mut self,
-        _transpose: &Transpose,
-        _args: &[String],
-        _inputs: &[&TypedFixedShape],
-        _outputs: &[TypedFixedShape],
+        num_elems_in_block: usize,
+        num_blocks: usize,
+        elem_ty: TensorElemType,
     ) -> Result<String, SessionError> {
-        todo!()
+        assert_eq!(num_blocks, 1); // TODO
+
+        let mut func = Function::new();
+        let mut builder_ctx = FunctionBuilderContext::new();
+
+        let ptr = self.clif_ctx.module.target_config().pointer_type();
+        for _param in 0..2 {
+            func.signature.params.push(ir::AbiParam::new(ptr));
+        }
+
+        let mut builder = FunctionBuilder::new(&mut func, &mut builder_ctx);
+        let entry = builder.create_block();
+
+        {
+            builder.switch_to_block(entry);
+            builder.append_block_params_for_function_params(entry);
+            let elem_sz = get_clif_type(elem_ty).lane_bits() / 8;
+            let input_param = builder.block_params(entry)[0];
+            let output_param = builder.block_params(entry)[1];
+            let size = builder
+                .ins()
+                .iconst(ptr, elem_sz as i64 * num_elems_in_block as i64);
+            let dst = output_param;
+            let src = input_param;
+            builder.call_memcpy(self.clif_ctx.module.target_config(), dst, src, size);
+            builder.ins().return_(&[]);
+        }
+
+        builder.seal_block(entry);
+        builder.finalize();
+
+        self.clif_ctx.ctx.func = func;
+
+        Ok("/* Cranelift */".to_string())
     }
 
     fn translate_expand(
@@ -2197,7 +2236,10 @@ for (int i = 0; i < {outer}; i++) {{
                     .to_vec()
                     .into_iter()
                     .map(|i| self.clif_ctx.create_var(ptr, i, &mut builder))
-                    .collect::<Vec<_>>()[..] else { panic!() };
+                    .collect::<Vec<_>>()[..]
+                else {
+                    panic!()
+                };
                 let var_out = self.clif_ctx.create_var(
                     ptr,
                     builder.block_params(entry)[inputs.len()],

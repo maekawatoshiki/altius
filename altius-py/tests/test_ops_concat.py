@@ -33,7 +33,7 @@ def op_concat(filepath, shape_x, shape_y, shape_z, **kwargs):
     ort_sess = ort.InferenceSession(filepath, providers=["CPUExecutionProvider"])
 
     for backend in ["interpreter", "cpu"]:
-        altius_sess = altius_py.InferenceSession(filepath, backend="cpu")
+        altius_sess = altius_py.InferenceSession(filepath, backend=backend)
 
         x = np.random.random_sample(shape_x).astype(np.float32)
         y = np.random.random_sample(shape_y).astype(np.float32)

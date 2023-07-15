@@ -19,6 +19,7 @@ use altius_core::{analysis::shape::ShapeError, tensor::Tensor};
 use blas_src; // For accelerate, this is necessary to link the library.
 #[cfg(all(feature = "cblas", target_os = "linux"))]
 #[allow(unused)]
+#[allow(clippy::single_component_path_imports)]
 use blis_src;
 use cranelift_module::ModuleError;
 use thiserror::Error;

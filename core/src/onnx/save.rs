@@ -54,14 +54,15 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
     let mut graph_proto = GraphProto::default();
 
     // Encode graph inputs and outputs.
-    for (vals, proto) in vec![
+    for (vals, proto) in [
         (&model.inputs, &mut graph_proto.input),
         (&model.outputs, &mut graph_proto.output),
     ] {
         for &id in vals {
             let val = &model.values.inner()[id];
-            let Some(TypedShape { dims, elem_ty }) =
-                &val.shape else { return Err(ModelSaveError::NoGraphInputShape) };
+            let Some(TypedShape { dims, elem_ty }) = &val.shape else {
+                return Err(ModelSaveError::NoGraphInputShape);
+            };
             let elem_ty: DataType = (*elem_ty).into();
 
             let ty = TypeProto {

@@ -194,7 +194,7 @@ pub fn compute(ctx: &mut Conv2dCtx) {
                             col_ptr as *const _,
                             output_hw as i32,
                             1.0f32,
-                            output_ptr as *mut f32,
+                            output_ptr,
                             output_hw as i32,
                         );
                     }

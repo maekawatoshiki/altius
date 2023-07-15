@@ -639,7 +639,7 @@ impl Op {
                     }
                     prev_output_id = Some(output[0]);
                 }
-                shapes.extend(prev_output_shape.into_iter());
+                shapes.extend(prev_output_shape);
             }
         }
 
@@ -694,7 +694,9 @@ fn infer_shape(
     let mut op = node.op.clone();
     let mut inputs = vec![];
     for input in &node.inputs {
-        let Some(input) = values.get(input) else { return Ok(()); };
+        let Some(input) = values.get(input) else {
+            return Ok(());
+        };
         inputs.push(input);
     }
     let output_shapes =
@@ -703,7 +705,7 @@ fn infer_shape(
     for shape in &output_shapes {
         outputs.push(Tensor::empty_of_type(shape.elem_ty, shape.dims.clone()));
     }
-    for (&val, output) in node.outputs.iter().zip(outputs.into_iter()) {
+    for (&val, output) in node.outputs.iter().zip(outputs) {
         values.insert(val, output);
     }
     shapes.insert(node_id, (op, output_shapes));

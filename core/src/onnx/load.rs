@@ -91,7 +91,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
     }
 
     // Load inputs.
-    for (vals, vec) in vec![
+    for (vals, vec) in [
         (&graph.input, &mut model.inputs),
         (&graph.output, &mut model.outputs),
     ] {
@@ -102,11 +102,12 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                 .ok_or_else(|| ModelLoadError::NoValueType)?
                 .value
                 .as_ref()
-                .ok_or_else(|| ModelLoadError::NoValueType)? else {
-                    return Err(ModelLoadError::Todo(
-                        "Graph input must be tensor type".into(),
-                    ));
-                };
+                .ok_or_else(|| ModelLoadError::NoValueType)?
+            else {
+                return Err(ModelLoadError::Todo(
+                    "Graph input must be tensor type".into(),
+                ));
+            };
 
             let dims: Vec<Dimension> = tensor
                 .shape

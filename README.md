@@ -21,8 +21,7 @@
 
 # Requirements
 
-- [rye](https://github.com/mitsuhiko/rye)
-    - To use Python
+- poetry
 
 # Run
 
@@ -60,8 +59,7 @@ yarn serve
 
 ```sh
 cd altius-py
-rye shell
-rye sync
-rye run maturin develop -r
-rye run python mobilenet.py
+poetry install
+poetry run maturin develop -r
+poetry run python mobilenet.py
 ```

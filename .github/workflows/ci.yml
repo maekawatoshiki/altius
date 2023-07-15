@@ -39,8 +39,8 @@ jobs:
       run: cargo install grcov
     - name: Install dependencies
       run: sudo apt install libomp-dev
-    - name: Install rye
-      run: cargo install --git https://github.com/mitsuhiko/rye rye
+    - name: Install poetry
+      run: curl -sSL https://install.python-poetry.org | python3 -
     - name: Test
       run: |
         cargo test --release

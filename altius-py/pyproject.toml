@@ -1,36 +1,28 @@
-[project]
+[tool.poetry]
 name = "altius-py"
 version = "0.1.0"
-dependencies = [
-    "matplotlib==3.5.2",
-    "Pillow==9.2.0",
-    "torchvision==0.13.0",
-    "torch==1.12.0",
-    "pytest~=7.3.1",
-    "pytest-xdist~=3.2.1",
-    "onnxruntime==1.15.1",
-    "onnx==1.14.0",
-    "transformers[onnx]~=4.28.1",
-    "onnxsim==0.4.17",
-    "numpy==1.22.3",
-]
-requires-python = ">= 3.10"
-classifiers = [
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
-]
+description = ""
+authors = ["uint256_t <maekawatoshiki@github.com>"]
+readme = "README.md"
+packages = [{include = "altius_py"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+matplotlib = "^3.5.2"
+pillow = "^9.2.0"
+maturin = "^1.1.0"
+patchelf = "^0.17.2.1"
+onnx = "^1.14.0"
+transformers = {extras = ["onnx"], version = "^4.30.2"}
+onnxsim = "^0.4.33"
+numpy = "^1.25.1"
+torch = "1.12.0"
+torchvision = "0.13.0"
+onnxruntime = "^1.15.1"
+pytest = "^7.4.0"
+pytest-xdist = "^3.3.1"
 
 [build-system]
-requires = ["maturin>=0.15"]
+requires = ["maturin>=1.0"]
 build-backend = "maturin"
 
-[tool.rye]
-managed = true
-dev-dependencies = [
-    "maturin~=1.1.0",
-    "pip~=23.1.2",
-    "patchelf~=0.17.2.1",
-]
-[tool.hatch.metadata]
-allow-direct-references = true

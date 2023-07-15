@@ -1,14 +1,10 @@
 #!/bin/bash -eux
 
-VENVDIR=.venv
-
-if [ ! -e $VENVDIR ]; then
-  rye sync
+if [ "$(poetry env info -p)" = "" ]; then
+  poetry install
 fi
 
-source $VENVDIR/bin/activate
-
-export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+source $(poetry env info -p)/bin/activate
 
 if [ ${1:-nobuild} = "build" ]; then
   if [ -z "${GITHUB_ACTIONS}" ]; then

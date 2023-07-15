@@ -1860,15 +1860,12 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
                 output_name, input_name, num_elems_in_block
             )
         } else {
-            let mut src_idx = 0;
-            let mut indices = vec![];
-            for _ in 0..num_blocks {
-                indices.push(src_idx);
-                src_idx = next_index(&mut perm, src_idx);
-            }
-            let indices = indices
-                .iter()
-                .map(|&idx| idx.to_string())
+            let indices = (0..num_blocks)
+                .scan(0, |src_idx, _| {
+                    let idx = *src_idx;
+                    *src_idx = next_index(&mut perm, *src_idx);
+                    Some(idx.to_string())
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             if num_elems_in_block == 1 {

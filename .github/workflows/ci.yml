@@ -49,7 +49,7 @@ jobs:
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
     - name: Run examples
       run: |
-        (cd altius-py && source .venv/bin/activate && python deit.py)
+        (cd altius-py && poetry run python deit.py)
         cargo run --release --example mnist
         cargo run --release --example mobilenet
         cargo run --release --example deit

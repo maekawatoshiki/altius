@@ -1,6 +1,7 @@
 use std::{
     fs::{create_dir_all, remove_file, File},
     io::{BufWriter, Write},
+    mem::{size_of, ManuallyDrop},
     path::PathBuf,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -32,7 +33,7 @@ use cranelift_codegen::{
     },
     Context,
 };
-use cranelift_module::{Linkage, Module};
+use cranelift_module::{DataDescription, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use indent::indent_all_by;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -590,7 +591,9 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
             Op::MatMul => self.translate_mat_mul(&args, &inputs, outputs)?,
             Op::Flatten(ref f) => self.translate_flatten(f, &args, &inputs, outputs)?,
             Op::Gemm(ref g) => self.translate_gemm(g, &args, &inputs, outputs)?,
-            Op::Transpose(ref t) => self.translate_transpose(t, &args, &inputs, outputs)?,
+            Op::Transpose(ref t) => {
+                self.translate_transpose(node_name.as_str(), t, &args, &inputs, outputs)?
+            }
             Op::Expand => self.translate_expand(&args, &inputs, outputs)?,
             Op::Concat(ref c) => self.translate_concat(c, &args, &inputs, outputs)?,
             Op::Gather(ref g) => self.translate_gather(g, &args, &inputs, outputs)?,
@@ -1760,6 +1763,7 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
 
     fn translate_transpose(
         &mut self,
+        name: &str,
         transpose: &Transpose,
         args: &[String],
         inputs: &[&TypedFixedShape],
@@ -1851,6 +1855,21 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
                     num_blocks,
                     inputs[0].elem_ty,
                 );
+            } else if num_elems_in_block == 1 {
+                let indices = (0..num_blocks)
+                    .scan(0, |src_idx, _| {
+                        let idx = *src_idx;
+                        *src_idx = next_index(&mut perm, *src_idx);
+                        Some(idx as u64)
+                    })
+                    .collect::<Vec<_>>();
+                return self.translate_transpose_clif_2(
+                    name,
+                    indices,
+                    num_elems_in_block,
+                    num_blocks,
+                    inputs[0].elem_ty,
+                );
             }
         }
 
@@ -1927,6 +1946,124 @@ for (int i = 0; i < {num_blocks}; i++) {{
         }
 
         builder.seal_block(entry);
+        builder.finalize();
+
+        self.clif_ctx.ctx.func = func;
+
+        Ok("/* Cranelift */".to_string())
+    }
+
+    fn translate_transpose_clif_2(
+        &mut self,
+        name: &str,
+        indices: Vec<u64>,
+        num_elems_in_block: usize,
+        num_blocks: usize,
+        elem_ty: TensorElemType,
+    ) -> Result<String, SessionError> {
+        assert_eq!(num_elems_in_block, 1);
+
+        let mut func = Function::new();
+        let mut builder_ctx = FunctionBuilderContext::new();
+
+        let ptr = self.clif_ctx.module.target_config().pointer_type();
+        for _param in 0..2 {
+            func.signature.params.push(ir::AbiParam::new(ptr));
+        }
+
+        let mut builder = FunctionBuilder::new(&mut func, &mut builder_ctx);
+        let entry = builder.create_block();
+        let header = builder.create_block();
+        let body = builder.create_block();
+        let merge = builder.create_block();
+
+        let indices_id = self.clif_ctx.module.declare_data(
+            format!("{name}.indices.{}", indices.len()).as_str(),
+            Linkage::Local,
+            false,
+            false,
+        )?;
+        let mut desc = DataDescription::new();
+        desc.define(
+            unsafe {
+                let mut indices = ManuallyDrop::new(indices);
+                Vec::from_raw_parts(
+                    indices.as_mut_ptr() as *mut u8,
+                    indices.len() * size_of::<usize>(),
+                    indices.capacity() * size_of::<usize>(),
+                )
+            }
+            .into_boxed_slice(),
+        );
+        self.clif_ctx.module.define_data(indices_id, &desc)?;
+        let val_indices = self
+            .clif_ctx
+            .module
+            .declare_data_in_func(indices_id, builder.func);
+
+        assert!(num_blocks % 4 == 0);
+
+        // int src_indices[{num_blocks}] = { {indices} };
+        // for (int i = 0; i < {num_blocks}; i++) {
+        //     {out}[i] = {in}[src_indices[i]];
+        // }
+        let var_input;
+        let var_output;
+        let var_counter;
+        {
+            builder.switch_to_block(entry);
+            builder.append_block_params_for_function_params(entry);
+            let input_param = builder.block_params(entry)[0];
+            let output_param = builder.block_params(entry)[1];
+            let zero = builder.ins().iconst(I64, 0);
+            var_input = self.clif_ctx.create_var(ptr, input_param, &mut builder);
+            var_output = self.clif_ctx.create_var(ptr, output_param, &mut builder);
+            var_counter = self.clif_ctx.create_var(I64, zero, &mut builder);
+            builder.ins().jump(header, &[]);
+        }
+        {
+            builder.switch_to_block(header);
+            let max = builder.ins().iconst(I64, num_blocks as i64);
+            let val_counter = builder.use_var(var_counter);
+            let cond = builder
+                .ins()
+                .icmp(IntCC::UnsignedLessThan, val_counter, max);
+            builder.ins().brif(cond, body, &[], merge, &[]);
+        }
+        {
+            builder.switch_to_block(body);
+            let elem_ty = get_clif_type(elem_ty);
+            let elem_sz = elem_ty.lane_bits() / 8;
+
+            for _ in 0..1 {
+                let val_counter = builder.use_var(var_counter);
+                let val_input = builder.use_var(var_input);
+                let val_output = builder.use_var(var_output);
+                let val_indices = builder.ins().global_value(I64, val_indices);
+                let off = builder.ins().ishl_imm(val_counter, 3);
+                let ptr_indices = builder.ins().iadd(val_indices, off);
+                let in_idx = builder.ins().load(I64, MemFlags::new(), ptr_indices, 0);
+                let off = builder.ins().imul_imm(in_idx, elem_sz as i64);
+                let ptr_input = builder.ins().iadd(val_input, off);
+                let val_in = builder.ins().load(elem_ty, MemFlags::new(), ptr_input, 0);
+                let off = builder.ins().imul_imm(val_counter, elem_sz as i64);
+                let ptr_output = builder.ins().iadd(val_output, off);
+                builder.ins().store(MemFlags::new(), val_in, ptr_output, 0);
+                let inc_counter = builder.ins().iadd_imm(val_counter, 1);
+                builder.def_var(var_counter, inc_counter);
+            }
+
+            builder.ins().jump(header, &[]);
+        }
+        {
+            builder.switch_to_block(merge);
+            builder.ins().return_(&[]);
+        }
+
+        builder.seal_block(entry);
+        builder.seal_block(header);
+        builder.seal_block(body);
+        builder.seal_block(merge);
         builder.finalize();
 
         self.clif_ctx.ctx.func = func;

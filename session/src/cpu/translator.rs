@@ -1973,7 +1973,6 @@ for (int i = 0; i < {num_blocks}; i++) {{
 
         let mut builder = FunctionBuilder::new(&mut func, &mut builder_ctx);
         let entry = builder.create_block();
-        let header = builder.create_block();
         let body = builder.create_block();
         let merge = builder.create_block();
 
@@ -1996,7 +1995,7 @@ for (int i = 0; i < {num_blocks}; i++) {{
             .into_boxed_slice(),
         );
         self.clif_ctx.module.define_data(indices_id, &desc)?;
-        let val_indices = self
+        let gbl_indices = self
             .clif_ctx
             .module
             .declare_data_in_func(indices_id, builder.func);
@@ -2008,48 +2007,48 @@ for (int i = 0; i < {num_blocks}; i++) {{
         let var_input;
         let var_output;
         let var_counter;
+        let var_indices;
+        let zero;
         {
             builder.switch_to_block(entry);
             builder.append_block_params_for_function_params(entry);
             let input_param = builder.block_params(entry)[0];
             let output_param = builder.block_params(entry)[1];
-            let zero = builder.ins().iconst(I64, 0);
+            zero = builder.ins().iconst(I64, 0);
             var_input = self.clif_ctx.create_var(ptr, input_param, &mut builder);
             var_output = self.clif_ctx.create_var(ptr, output_param, &mut builder);
-            var_counter = self.clif_ctx.create_var(I64, zero, &mut builder);
-            builder.ins().jump(header, &[]);
-        }
-        {
-            builder.switch_to_block(header);
             let max = builder.ins().iconst(I64, num_blocks as i64);
-            let val_counter = builder.use_var(var_counter);
-            let cond = builder
-                .ins()
-                .icmp(IntCC::UnsignedLessThan, val_counter, max);
-            builder.ins().brif(cond, body, &[], merge, &[]);
+            var_counter = self.clif_ctx.create_var(I64, max, &mut builder);
+            let val_indices = builder.ins().global_value(I64, gbl_indices);
+            var_indices = self.clif_ctx.create_var(ptr, val_indices, &mut builder);
+            builder.ins().jump(body, &[]);
         }
         {
             builder.switch_to_block(body);
             let elem_ty = get_clif_type(elem_ty);
             let elem_sz = elem_ty.lane_bits() / 8;
 
-            let val_counter = builder.use_var(var_counter);
+            // Changing the instruction order here might cause a performance degradation.
+            let val_indices = builder.use_var(var_indices);
+            let in_idx = builder.ins().load(I64, MemFlags::new(), val_indices, 0);
+            let next_indices = builder.ins().iadd_imm(val_indices, 8);
+            builder.def_var(var_indices, next_indices);
+            assert!(elem_sz.is_power_of_two());
+            let off = builder.ins().ishl_imm(in_idx, elem_sz.ilog2() as i64);
             let val_input = builder.use_var(var_input);
-            let val_output = builder.use_var(var_output);
-            let val_indices = builder.ins().global_value(I64, val_indices);
-            let off = builder.ins().ishl_imm(val_counter, 3);
-            let ptr_indices = builder.ins().iadd(val_indices, off);
-            let in_idx = builder.ins().load(I64, MemFlags::new(), ptr_indices, 0);
-            let off = builder.ins().imul_imm(in_idx, elem_sz as i64);
             let ptr_input = builder.ins().iadd(val_input, off);
             let val_in = builder.ins().load(elem_ty, MemFlags::new(), ptr_input, 0);
-            let off = builder.ins().imul_imm(val_counter, elem_sz as i64);
-            let ptr_output = builder.ins().iadd(val_output, off);
-            builder.ins().store(MemFlags::new(), val_in, ptr_output, 0);
-            let inc_counter = builder.ins().iadd_imm(val_counter, 1);
-            builder.def_var(var_counter, inc_counter);
+            let val_output = builder.use_var(var_output);
+            builder.ins().store(MemFlags::new(), val_in, val_output, 0);
+            let next_output = builder.ins().iadd_imm(val_output, elem_sz as i64);
+            builder.def_var(var_output, next_output);
 
-            builder.ins().jump(header, &[]);
+            let val_counter = builder.use_var(var_counter);
+            let dec_counter = builder.ins().iadd_imm(val_counter, -1);
+            builder.def_var(var_counter, dec_counter);
+
+            let cond = builder.ins().icmp(IntCC::NotEqual, zero, dec_counter);
+            builder.ins().brif(cond, body, &[], merge, &[]);
         }
         {
             builder.switch_to_block(merge);
@@ -2057,7 +2056,6 @@ for (int i = 0; i < {num_blocks}; i++) {{
         }
 
         builder.seal_block(entry);
-        builder.seal_block(header);
         builder.seal_block(body);
         builder.seal_block(merge);
         builder.finalize();

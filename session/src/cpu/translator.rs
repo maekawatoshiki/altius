@@ -2001,8 +2001,6 @@ for (int i = 0; i < {num_blocks}; i++) {{
             .module
             .declare_data_in_func(indices_id, builder.func);
 
-        assert!(num_blocks % 4 == 0);
-
         // int src_indices[{num_blocks}] = { {indices} };
         // for (int i = 0; i < {num_blocks}; i++) {
         //     {out}[i] = {in}[src_indices[i]];
@@ -2035,23 +2033,21 @@ for (int i = 0; i < {num_blocks}; i++) {{
             let elem_ty = get_clif_type(elem_ty);
             let elem_sz = elem_ty.lane_bits() / 8;
 
-            for _ in 0..1 {
-                let val_counter = builder.use_var(var_counter);
-                let val_input = builder.use_var(var_input);
-                let val_output = builder.use_var(var_output);
-                let val_indices = builder.ins().global_value(I64, val_indices);
-                let off = builder.ins().ishl_imm(val_counter, 3);
-                let ptr_indices = builder.ins().iadd(val_indices, off);
-                let in_idx = builder.ins().load(I64, MemFlags::new(), ptr_indices, 0);
-                let off = builder.ins().imul_imm(in_idx, elem_sz as i64);
-                let ptr_input = builder.ins().iadd(val_input, off);
-                let val_in = builder.ins().load(elem_ty, MemFlags::new(), ptr_input, 0);
-                let off = builder.ins().imul_imm(val_counter, elem_sz as i64);
-                let ptr_output = builder.ins().iadd(val_output, off);
-                builder.ins().store(MemFlags::new(), val_in, ptr_output, 0);
-                let inc_counter = builder.ins().iadd_imm(val_counter, 1);
-                builder.def_var(var_counter, inc_counter);
-            }
+            let val_counter = builder.use_var(var_counter);
+            let val_input = builder.use_var(var_input);
+            let val_output = builder.use_var(var_output);
+            let val_indices = builder.ins().global_value(I64, val_indices);
+            let off = builder.ins().ishl_imm(val_counter, 3);
+            let ptr_indices = builder.ins().iadd(val_indices, off);
+            let in_idx = builder.ins().load(I64, MemFlags::new(), ptr_indices, 0);
+            let off = builder.ins().imul_imm(in_idx, elem_sz as i64);
+            let ptr_input = builder.ins().iadd(val_input, off);
+            let val_in = builder.ins().load(elem_ty, MemFlags::new(), ptr_input, 0);
+            let off = builder.ins().imul_imm(val_counter, elem_sz as i64);
+            let ptr_output = builder.ins().iadd(val_output, off);
+            builder.ins().store(MemFlags::new(), val_in, ptr_output, 0);
+            let inc_counter = builder.ins().iadd_imm(val_counter, 1);
+            builder.def_var(var_counter, inc_counter);
 
             builder.ins().jump(header, &[]);
         }

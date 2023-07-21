@@ -107,7 +107,16 @@ impl<'a> Translator<'a> {
             intra_op_num_threads: 1,
             prev_code_hash,
             clif_ctx: CraneliftCtx::default(),
-            enable_clif: false,
+            enable_clif: {
+                // TODO: In the future when we no longer depend on C compiler to compile the model,
+                //       we should remove this environment variable.
+                let val = std::env::var("ALTIUS_ENABLE_CLIF").unwrap_or_else(|_| "0".to_string());
+                assert!(
+                    val == "0" || val == "1",
+                    "ALTIUS_ENABLE_CLIF must be 0 or 1"
+                );
+                val == "1"
+            },
         })
     }
 

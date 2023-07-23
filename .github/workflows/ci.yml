@@ -44,6 +44,7 @@ jobs:
     - name: Test
       run: |
         cargo test --release
+        ALTIUS_ENABLE_CLIF=1 cargo test --release
       env:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw

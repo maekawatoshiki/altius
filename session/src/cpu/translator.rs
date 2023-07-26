@@ -77,8 +77,10 @@ impl<'a> Translator<'a> {
         inferred_shapes: &'a HashMap<NodeId, (Op, Vec<TypedFixedShape>)>,
         value_shapes: &'a HashMap<ValueId, TypedFixedShape>,
     ) -> Result<Self, SessionError> {
-        // let target_dir = PathBuf::from("/tmp/model"); // For debugging
-        let target_dir = tempfile::TempDir::new()?.into_path();
+        let target_dir = std::env::var("ALTIUS_MODEL_OUT_DIR").map_or_else(
+            |_| Ok::<_, SessionError>(tempfile::TempDir::new()?.into_path()),
+            |dir| Ok(PathBuf::from(dir)),
+        )?;
         #[allow(unused_mut)]
         let mut prev_code_hash = None;
         if target_dir.as_path().exists() {

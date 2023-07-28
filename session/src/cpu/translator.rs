@@ -1866,7 +1866,7 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
                     num_blocks,
                     inputs[0].elem_ty,
                 );
-            } else if num_elems_in_block == 1 {
+            } else {
                 let indices = (0..num_blocks)
                     .scan(0, |src_idx, _| {
                         let idx = *src_idx;
@@ -1874,13 +1874,23 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
                         Some(idx as u64)
                     })
                     .collect::<Vec<_>>();
-                return self.translate_transpose_clif_2(
-                    name,
-                    indices,
-                    num_elems_in_block,
-                    num_blocks,
-                    inputs[0].elem_ty,
-                );
+                if num_elems_in_block == 1 {
+                    return self.translate_transpose_clif_2(
+                        name,
+                        indices,
+                        num_elems_in_block,
+                        num_blocks,
+                        inputs[0].elem_ty,
+                    );
+                } else {
+                    return self.translate_transpose_clif_3(
+                        name,
+                        indices,
+                        num_elems_in_block,
+                        num_blocks,
+                        inputs[0].elem_ty,
+                    );
+                }
             }
         }
 
@@ -2053,6 +2063,129 @@ for (int i = 0; i < {num_blocks}; i++) {{
             builder.ins().store(MemFlags::new(), val_in, val_output, 0);
             let next_output = builder.ins().iadd_imm(val_output, elem_sz as i64);
             builder.def_var(var_output, next_output);
+
+            let val_counter = builder.use_var(var_counter);
+            let dec_counter = builder.ins().iadd_imm(val_counter, -1);
+            builder.def_var(var_counter, dec_counter);
+
+            let cond = builder.ins().icmp(IntCC::NotEqual, zero, dec_counter);
+            builder.ins().brif(cond, body, &[], merge, &[]);
+        }
+        {
+            builder.switch_to_block(merge);
+            builder.ins().return_(&[]);
+        }
+
+        builder.seal_block(entry);
+        builder.seal_block(body);
+        builder.seal_block(merge);
+        builder.finalize();
+
+        self.clif_ctx.ctx.func = func;
+
+        Ok("/* Cranelift */".to_string())
+    }
+
+    fn translate_transpose_clif_3(
+        &mut self,
+        name: &str,
+        indices: Vec<u64>,
+        num_elems_in_block: usize,
+        num_blocks: usize,
+        elem_ty: TensorElemType,
+    ) -> Result<String, SessionError> {
+        let mut func = Function::new();
+        let mut builder_ctx = FunctionBuilderContext::new();
+
+        let ptr = self.clif_ctx.module.target_config().pointer_type();
+        for _param in 0..2 {
+            func.signature.params.push(ir::AbiParam::new(ptr));
+        }
+
+        let mut builder = FunctionBuilder::new(&mut func, &mut builder_ctx);
+        let entry = builder.create_block();
+        let body = builder.create_block();
+        let merge = builder.create_block();
+
+        let indices_id = self.clif_ctx.module.declare_data(
+            format!("{name}.indices.{}", indices.len()).as_str(),
+            Linkage::Local,
+            false,
+            false,
+        )?;
+        let mut desc = DataDescription::new();
+        desc.define(
+            unsafe {
+                let mut indices = ManuallyDrop::new(indices);
+                Vec::from_raw_parts(
+                    indices.as_mut_ptr() as *mut u8,
+                    indices.len() * size_of::<usize>(),
+                    indices.capacity() * size_of::<usize>(),
+                )
+            }
+            .into_boxed_slice(),
+        );
+        self.clif_ctx.module.define_data(indices_id, &desc)?;
+        let gbl_indices = self
+            .clif_ctx
+            .module
+            .declare_data_in_func(indices_id, builder.func);
+
+        // int src_indices[{num_blocks}] = { {indices} };
+        // for (int i = 0; i < {num_blocks}; i++) {
+        //     memcpy({out} + i * {num_elems_in_block},
+        //            {in} + src_indices[i],
+        //            sizeof(float) * {num_elems_in_block});
+        // }
+        let var_input;
+        let var_output;
+        let var_counter;
+        let var_indices;
+        let zero;
+        {
+            builder.switch_to_block(entry);
+            builder.append_block_params_for_function_params(entry);
+            let input_param = builder.block_params(entry)[0];
+            let output_param = builder.block_params(entry)[1];
+            zero = builder.ins().iconst(I64, 0);
+            var_input = self.clif_ctx.create_var(ptr, input_param, &mut builder);
+            var_output = self.clif_ctx.create_var(ptr, output_param, &mut builder);
+            let max = builder.ins().iconst(I64, num_blocks as i64);
+            var_counter = self.clif_ctx.create_var(I64, max, &mut builder);
+            let val_indices = builder.ins().global_value(I64, gbl_indices);
+            var_indices = self.clif_ctx.create_var(ptr, val_indices, &mut builder);
+            builder.ins().jump(body, &[]);
+        }
+        {
+            builder.switch_to_block(body);
+            let elem_ty = get_clif_type(elem_ty);
+            let elem_sz = elem_ty.lane_bits() / 8;
+
+            // Changing the instruction order here might cause a performance degradation.
+
+            let val_indices = builder.use_var(var_indices);
+            let in_idx = builder.ins().load(I64, MemFlags::new(), val_indices, 0);
+            let next_indices = builder.ins().iadd_imm(val_indices, 8);
+            builder.def_var(var_indices, next_indices);
+            assert!(elem_sz.is_power_of_two());
+
+            let off = builder.ins().ishl_imm(in_idx, elem_sz.ilog2() as i64);
+            let val_input = builder.use_var(var_input);
+            let ptr_input = builder.ins().iadd(val_input, off);
+            let src = ptr_input;
+
+            let val_output = builder.use_var(var_output);
+            let next_output = builder
+                .ins()
+                .iadd_imm(val_output, elem_sz as i64 * num_elems_in_block as i64);
+            builder.def_var(var_output, next_output);
+            let dest = val_output;
+
+            let size = builder
+                .ins()
+                .iconst(I64, elem_sz as i64 * num_elems_in_block as i64);
+
+            builder.call_memcpy(self.clif_ctx.module.target_config(), dest, src, size);
 
             let val_counter = builder.use_var(var_counter);
             let dec_counter = builder.ins().iadd_imm(val_counter, -1);

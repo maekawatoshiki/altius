@@ -18,7 +18,7 @@ pub fn fuse_gelu(model: &mut Model) {
         }
         let approx_sqrt_two = 1.4142099618911743f32;
         if model.inits.get(&div.inputs[1]).map_or(true, |rhs| {
-            !rhs.elem_ty().is_f32() || !allclose(rhs.data::<f32>(), &[approx_sqrt_two])
+            !rhs.elem_ty().is_f32() || !rhs.allclose_f32(&[approx_sqrt_two])
         }) {
             continue;
         }
@@ -106,18 +106,4 @@ pub fn fuse_gelu(model: &mut Model) {
     model.remove_unnecessary_nodes();
 
     log::info!("fuse_gelu({count}): {:?}", start.elapsed());
-}
-
-fn allclose(x: &[f32], y: &[f32]) -> bool {
-    let atol = 1e-5;
-    let rtol = 1e-8;
-
-    if x.len() != y.len() {
-        return false;
-    }
-
-    x.iter().zip(y.iter()).all(|(x, y)| {
-        ((x - y).abs() <= (atol + rtol * y.abs()))
-            || (x.is_infinite() && y.is_infinite() && x.is_sign_positive() == y.is_sign_positive())
-    })
 }

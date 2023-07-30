@@ -19,12 +19,16 @@ pub fn fuse_fast_gelu(model: &mut Model) {
 
         let x = node.outputs[0];
 
-        let Some(nodes) = value_users.get(&x) else { continue };
+        let Some(nodes) = value_users.get(&x) else {
+            continue;
+        };
 
         let Some(&pow_id) = nodes.iter().find(|&&node_id| {
             let node = &model.nodes[node_id];
             matches!(node.op, Op::Pow)
-        }) else { continue };
+        }) else {
+            continue;
+        };
         let pow = &model.nodes[pow_id];
         if model.inits.get(&pow.inputs[1]).map_or(true, |rhs| {
             !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 3.
@@ -41,7 +45,7 @@ pub fn fuse_fast_gelu(model: &mut Model) {
             continue;
         }
         if model.inits.get(&mul1.inputs[1]).map_or(true, |rhs| {
-            !rhs.elem_ty().is_f32() || !allclose(rhs.data::<f32>(), &[0.044714998453855515])
+            !rhs.elem_ty().is_f32() || !rhs.allclose_f32(&[0.044714998453855515])
         }) {
             continue;
         }
@@ -71,7 +75,7 @@ pub fn fuse_fast_gelu(model: &mut Model) {
             continue;
         }
         if model.inits.get(&mul2.inputs[1]).map_or(true, |rhs| {
-            !rhs.elem_ty().is_f32() || !allclose(rhs.data::<f32>(), &[0.7978845834732056])
+            !rhs.elem_ty().is_f32() || !rhs.allclose_f32(&[0.7978845834732056])
         }) {
             continue;
         }
@@ -168,18 +172,4 @@ pub fn fuse_fast_gelu(model: &mut Model) {
     model.remove_unnecessary_nodes();
 
     log::info!("fuse_fast_gelu({count}): {:?}", start.elapsed());
-}
-
-fn allclose(x: &[f32], y: &[f32]) -> bool {
-    let atol = 1e-5;
-    let rtol = 1e-8;
-
-    if x.len() != y.len() {
-        return false;
-    }
-
-    x.iter().zip(y.iter()).all(|(x, y)| {
-        ((x - y).abs() <= (atol + rtol * y.abs()))
-            || (x.is_infinite() && y.is_infinite() && x.is_sign_positive() == y.is_sign_positive())
-    })
 }

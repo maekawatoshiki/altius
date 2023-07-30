@@ -347,6 +347,27 @@ impl Tensor {
         self.stride.as_slice()
     }
 
+    // TODO: Support other types
+    pub fn allclose_f32(&self, other: &[f32]) -> bool {
+        if !self.elem_ty.is_f32() {
+            return false;
+        }
+
+        let x = self.data::<f32>();
+        if x.len() != other.len() {
+            return false;
+        }
+
+        let atol = 1e-5;
+        let rtol = 1e-8;
+        x.iter().zip(other.iter()).all(|(x, y)| {
+            ((x - y).abs() <= (atol + rtol * y.abs()))
+                || (x.is_infinite()
+                    && y.is_infinite()
+                    && x.is_sign_positive() == y.is_sign_positive())
+        })
+    }
+
     pub fn verify(&self) -> bool {
         self.data.len() / self.elem_ty.size() == self.dims.total_elems()
     }

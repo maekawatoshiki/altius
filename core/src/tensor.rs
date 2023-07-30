@@ -54,6 +54,7 @@ pub enum TensorElemType {
 pub trait TensorElemTypeExt: PartialEq + PartialOrd + Copy {
     fn get_type() -> TensorElemType;
     fn zero() -> Self;
+    fn close(a: Self, b: Self) -> bool;
 }
 
 impl Tensor {
@@ -347,25 +348,19 @@ impl Tensor {
         self.stride.as_slice()
     }
 
-    // TODO: Support other types
-    pub fn allclose_f32(&self, other: &[f32]) -> bool {
-        if !self.elem_ty.is_f32() {
+    pub fn allclose<T: TensorElemTypeExt>(&self, other: &[T]) -> bool {
+        if self.elem_ty != T::get_type() {
             return false;
         }
 
-        let x = self.data::<f32>();
+        let x = self.data::<T>();
         if x.len() != other.len() {
             return false;
         }
 
-        let atol = 1e-5;
-        let rtol = 1e-8;
-        x.iter().zip(other.iter()).all(|(x, y)| {
-            ((x - y).abs() <= (atol + rtol * y.abs()))
-                || (x.is_infinite()
-                    && y.is_infinite()
-                    && x.is_sign_positive() == y.is_sign_positive())
-        })
+        x.into_iter()
+            .zip(other.into_iter())
+            .all(|(&x, &y)| T::close(x, y))
     }
 
     pub fn verify(&self) -> bool {
@@ -486,6 +481,10 @@ impl TensorElemTypeExt for u8 {
     fn zero() -> Self {
         0
     }
+
+    fn close(a: Self, b: Self) -> bool {
+        a == b
+    }
 }
 
 impl TensorElemTypeExt for bool {
@@ -495,6 +494,10 @@ impl TensorElemTypeExt for bool {
 
     fn zero() -> Self {
         false
+    }
+
+    fn close(a: Self, b: Self) -> bool {
+        a == b
     }
 }
 
@@ -506,6 +509,13 @@ impl TensorElemTypeExt for f32 {
     fn zero() -> Self {
         0f32
     }
+
+    fn close(a: Self, b: Self) -> bool {
+        let atol = 1e-5;
+        let rtol = 1e-8;
+        ((a - b).abs() <= (atol + rtol * b.abs()))
+            || (a.is_infinite() && b.is_infinite() && a.is_sign_positive() == b.is_sign_positive())
+    }
 }
 
 impl TensorElemTypeExt for i32 {
@@ -516,6 +526,10 @@ impl TensorElemTypeExt for i32 {
     fn zero() -> Self {
         0i32
     }
+
+    fn close(a: Self, b: Self) -> bool {
+        a == b
+    }
 }
 
 impl TensorElemTypeExt for i64 {
@@ -525,6 +539,10 @@ impl TensorElemTypeExt for i64 {
 
     fn zero() -> Self {
         0i64
+    }
+
+    fn close(a: Self, b: Self) -> bool {
+        a == b
     }
 }
 

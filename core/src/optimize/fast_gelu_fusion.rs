@@ -44,9 +44,11 @@ pub fn fuse_fast_gelu(model: &mut Model) {
         if !matches!(mul1.op, Op::Mul) {
             continue;
         }
-        if model.inits.get(&mul1.inputs[1]).map_or(true, |rhs| {
-            !rhs.elem_ty().is_f32() || !rhs.allclose_f32(&[0.044714998453855515])
-        }) {
+        if model
+            .inits
+            .get(&mul1.inputs[1])
+            .map_or(true, |rhs| !rhs.allclose(&[0.044714998453855515]))
+        {
             continue;
         }
         if value_users[&mul1.outputs[0]].len() != 1 {
@@ -74,9 +76,11 @@ pub fn fuse_fast_gelu(model: &mut Model) {
         if !matches!(mul2.op, Op::Mul) {
             continue;
         }
-        if model.inits.get(&mul2.inputs[1]).map_or(true, |rhs| {
-            !rhs.elem_ty().is_f32() || !rhs.allclose_f32(&[0.7978845834732056])
-        }) {
+        if model
+            .inits
+            .get(&mul2.inputs[1])
+            .map_or(true, |rhs| !rhs.allclose(&[0.7978845834732056]))
+        {
             continue;
         }
         if value_users[&mul2.outputs[0]].len() != 1 {

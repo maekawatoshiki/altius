@@ -17,9 +17,11 @@ pub fn fuse_gelu(model: &mut Model) {
             continue;
         }
         let approx_sqrt_two = 1.4142099618911743f32;
-        if model.inits.get(&div.inputs[1]).map_or(true, |rhs| {
-            !rhs.elem_ty().is_f32() || !rhs.allclose_f32(&[approx_sqrt_two])
-        }) {
+        if model
+            .inits
+            .get(&div.inputs[1])
+            .map_or(true, |rhs| !rhs.allclose(&[approx_sqrt_two]))
+        {
             continue;
         }
 

@@ -30,56 +30,72 @@ pub fn fuse_layer_norm(model: &mut Model) {
             continue;
         }
 
-        let Some(users) = value_users.get(&mean.outputs[0]) else { continue };
+        let Some(users) = value_users.get(&mean.outputs[0]) else {
+            continue;
+        };
         let sub_id = users.iter().next().copied().unwrap();
         let sub = &model.nodes[sub_id];
         if !matches!(sub.op, Op::Sub) {
             continue;
         }
 
-        let Some(users) = value_users.get(&sub.outputs[0]) else { continue };
+        let Some(users) = value_users.get(&sub.outputs[0]) else {
+            continue;
+        };
         let pow_id = users.iter().next().copied().unwrap();
         let pow = &model.nodes[pow_id];
         if !matches!(pow.op, Op::Pow) {
             continue;
         }
 
-        let Some(users) = value_users.get(&pow.outputs[0]) else { continue };
+        let Some(users) = value_users.get(&pow.outputs[0]) else {
+            continue;
+        };
         let mean2_id = users.iter().next().copied().unwrap();
         let mean2 = &model.nodes[mean2_id];
         if !matches!(mean2.op, Op::ReduceMean(_)) {
             continue;
         }
 
-        let Some(users) = value_users.get(&mean2.outputs[0]) else { continue };
+        let Some(users) = value_users.get(&mean2.outputs[0]) else {
+            continue;
+        };
         let add_id = users.iter().next().copied().unwrap();
         let add = &model.nodes[add_id];
         if !matches!(add.op, Op::Add) {
             continue;
         }
 
-        let Some(users) = value_users.get(&add.outputs[0]) else { continue };
+        let Some(users) = value_users.get(&add.outputs[0]) else {
+            continue;
+        };
         let sqrt_id = users.iter().next().copied().unwrap();
         let sqrt = &model.nodes[sqrt_id];
         if !matches!(sqrt.op, Op::Sqrt) {
             continue;
         }
 
-        let Some(users) = value_users.get(&sqrt.outputs[0]) else { continue };
+        let Some(users) = value_users.get(&sqrt.outputs[0]) else {
+            continue;
+        };
         let div_id = users.iter().next().copied().unwrap();
         let div = &model.nodes[div_id];
         if !matches!(div.op, Op::Div) {
             continue;
         }
 
-        let Some(users) = value_users.get(&div.outputs[0]) else { continue };
+        let Some(users) = value_users.get(&div.outputs[0]) else {
+            continue;
+        };
         let mul_id = users.iter().next().copied().unwrap();
         let mul = &model.nodes[mul_id];
         if !matches!(mul.op, Op::Mul) {
             continue;
         }
 
-        let Some(users) = value_users.get(&mul.outputs[0]) else { continue };
+        let Some(users) = value_users.get(&mul.outputs[0]) else {
+            continue;
+        };
         let add2_id = users.iter().next().copied().unwrap();
         let add2 = &model.nodes[add2_id];
         if !matches!(add2.op, Op::Add) {
@@ -125,7 +141,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
         let Some(users) = value_users.get(&end) else {
             let idx = model.outputs.iter().position(|&i| i == end).unwrap();
             model.outputs[idx] = ln_out;
-            continue
+            continue;
         };
         for user_id in users {
             let user = &mut model.nodes[*user_id];

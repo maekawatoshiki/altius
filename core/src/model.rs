@@ -1,10 +1,6 @@
 use std::mem;
 
-use crate::{
-    graph::Graph,
-    node::{Node, NodeId},
-    value::ValueId,
-};
+use crate::{graph::Graph, node::NodeId, value::ValueId};
 use id_arena::Arena;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -15,16 +11,6 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn get_num_actual_inputs(&self) -> usize {
-        let mut inputs = self.graph.inputs.clone();
-        inputs.retain(|i| !self.graph.inits.contains_key(i));
-        inputs.len()
-    }
-
-    pub fn add_node(&mut self, node: Node) -> NodeId {
-        self.graph.nodes.alloc(node)
-    }
-
     pub fn lookup_named_value(&self, name: &str) -> Option<ValueId> {
         self.graph.values.inner().iter().find_map(|(id, value)| {
             if value.name.as_ref().map_or(false, |nm| nm == name) {

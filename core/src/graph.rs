@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap as HashMap;
 
 use crate::{
-    node::NodeArena,
+    node::{Node, NodeArena, NodeId},
     tensor::Tensor,
     value::{ValueArena, ValueId},
 };
@@ -13,4 +13,10 @@ pub struct Graph {
     pub inits: HashMap<ValueId, Tensor>,
     pub inputs: Vec<ValueId>,
     pub outputs: Vec<ValueId>,
+}
+
+impl Graph {
+    pub fn add_node(&mut self, node: Node) -> NodeId {
+        self.nodes.alloc(node)
+    }
 }

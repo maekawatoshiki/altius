@@ -136,7 +136,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
         .with_in(scale)
         .with_in(bias)
         .with_out(ln_out);
-        let _ln_id = model.add_node(ln);
+        let _ln_id = model.graph.add_node(ln);
 
         let Some(users) = value_users.get(&end) else {
             let idx = model.graph.outputs.iter().position(|&i| i == end).unwrap();

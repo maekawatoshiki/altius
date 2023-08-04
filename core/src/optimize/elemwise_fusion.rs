@@ -125,7 +125,7 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
         }))
         .with_ins(input_map)
         .with_out(last_node.outputs[0]);
-        model.add_node(fused_elemwise);
+        model.graph.add_node(fused_elemwise);
 
         for &node_id in &chain {
             model.graph.nodes[node_id].deleted = true;

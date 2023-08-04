@@ -29,7 +29,7 @@ macro_rules! op {
             let y = model.graph.values.new_val_named("y");
             let z = model.graph.values.new_val_named("z");
 
-            model.add_node(Node::new(Op::$op).with_ins(vec![x, y]).with_out(z));
+            model.graph.add_node(Node::new(Op::$op).with_ins(vec![x, y]).with_out(z));
             model.graph.inputs.push(x);
             model.graph.inputs.push(y);
             model.graph.outputs.push(z);

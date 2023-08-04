@@ -354,7 +354,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             op => return Err(ModelLoadError::Todo(format!("Unsupported op: {op}").into())),
         };
 
-        model.add_node(
+        model.graph.add_node(
             Node::new(op)
                 .with_name(node.name.to_owned())
                 .with_ins(inputs)

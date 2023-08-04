@@ -51,7 +51,7 @@ impl CPUSessionBuilder {
             unsafe { lib.get(b"trampoline")? };
         let trampoline = *trampoline;
 
-        for (&val_id, tensor) in &self.model.inits {
+        for (&val_id, tensor) in &self.model.graph.inits {
             let name = product.value_name(val_id);
             let entry: libloading::Symbol<*const *const u8> = unsafe { lib.get(name.as_bytes())? };
             unsafe { *entry.cast_mut() = tensor.data_as_ptr() };

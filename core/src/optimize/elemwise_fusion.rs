@@ -30,7 +30,7 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
         let mut last_node_id = None;
         let mut cur_node_id = node_id;
         loop {
-            let node = &model.nodes[cur_node_id];
+            let node = &model.graph.nodes[cur_node_id];
             let fusible = node.op.is_elemwise()
                 && node.outputs.len() == 1
                 && node.inputs.iter().all(|id| {
@@ -43,7 +43,7 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
                         || last_node_id.is_none()
                 })
                 && (last_node_id.map_or(true, |last_node_id| {
-                    let last_node = &model.nodes[last_node_id];
+                    let last_node = &model.graph.nodes[last_node_id];
                     last_node.inputs.len() == 2
                         && last_node.outputs[0] == node.inputs[0]
                         && (node.inputs.len() == 1
@@ -78,10 +78,10 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
             "Fusible chain: {}",
             nodes
                 .iter()
-                .map(|&id| model.nodes[id]
+                .map(|&id| model.graph.nodes[id]
                     .name
                     .as_deref()
-                    .unwrap_or(model.nodes[id].op.name()))
+                    .unwrap_or(model.graph.nodes[id].op.name()))
                 .collect::<Vec<_>>()
                 .join(" -> ")
         );
@@ -94,12 +94,12 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
         {
             let mut prev_node_id = None;
             for &node_id in &chain {
-                let node = &model.nodes[node_id];
+                let node = &model.graph.nodes[node_id];
                 if let Some(prev) = prev_node_id {
                     input_map.extend(
                         node.inputs
                             .iter()
-                            .filter(|i| !model.nodes[prev].outputs.contains(i)),
+                            .filter(|i| !model.graph.nodes[prev].outputs.contains(i)),
                     );
                 } else {
                     input_map.extend(node.inputs.iter());
@@ -111,14 +111,14 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
             let mut present = FxHashSet::default();
             input_map.retain(|&id| present.insert(id));
         }
-        let last_node = &model.nodes[*chain.last().unwrap()];
+        let last_node = &model.graph.nodes[*chain.last().unwrap()];
 
         let fused_elemwise = Node::new(Op::FusedElemwise(FusedElemwise {
             input_map: input_map.clone(),
             chain: chain
                 .iter()
                 .map(|&id| {
-                    let node = &model.nodes[id];
+                    let node = &model.graph.nodes[id];
                     (node.op.clone(), node.inputs.clone(), node.outputs.clone())
                 })
                 .collect(),
@@ -128,7 +128,7 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
         model.add_node(fused_elemwise);
 
         for &node_id in &chain {
-            model.nodes[node_id].deleted = true;
+            model.graph.nodes[node_id].deleted = true;
         }
     }
 

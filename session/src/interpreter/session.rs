@@ -97,18 +97,18 @@ impl InterpreterSession {
         #[cfg(not(target_arch = "wasm32"))]
         let start = Instant::now();
 
-        if self.model.outputs.len() > 1 {
-            log::debug!("Number of outputs: {}", self.model.outputs.len());
+        if self.model.graph.outputs.len() > 1 {
+            log::debug!("Number of outputs: {}", self.model.graph.outputs.len());
         }
 
         let mut profile = FxHashMap::default();
         let values = &mut *self
             .values
-            .get_or(|| RefCell::new(self.model.inits.clone()))
+            .get_or(|| RefCell::new(self.model.graph.inits.clone()))
             .borrow_mut();
 
         // Set inputs.
-        for (id, tensor) in self.model.inputs.iter().zip(inputs) {
+        for (id, tensor) in self.model.graph.inputs.iter().zip(inputs) {
             values.insert(*id, tensor);
         }
 
@@ -131,8 +131,8 @@ impl InterpreterSession {
                 "{}/{} {}({}) {:?}",
                 i,
                 self.execution_plans.len(),
-                self.model.nodes[node.node_id].op.name(),
-                self.model.nodes[node.node_id]
+                self.model.graph.nodes[node.node_id].op.name(),
+                self.model.graph.nodes[node.node_id]
                     .name
                     .as_ref()
                     .unwrap_or(&"".to_string()),
@@ -156,6 +156,7 @@ impl InterpreterSession {
 
         Ok(self
             .model
+            .graph
             .outputs
             .iter()
             .map(|id| values.remove(id).unwrap())
@@ -168,7 +169,7 @@ impl InterpreterSession {
         values: &mut FxHashMap<ValueId, Tensor>,
         node_id: NodeId,
     ) -> Result<(), SessionError> {
-        let node = &self.model.nodes[node_id];
+        let node = &self.model.graph.nodes[node_id];
         let inputs = node
             .inputs
             .iter()
@@ -301,9 +302,13 @@ fn compute_gavg_pool(
     assert!(output.dims().len() == 4);
 
     let Some(&[_, _, h, w]) = input.dims().get(0..4) else {
-        return Err(SessionError::Message("Input must be four dimensions".into()))
+        return Err(SessionError::Message(
+            "Input must be four dimensions".into(),
+        ));
     };
-    let Some([isn, isc, _, _]) = input.strides().get(0..4) else { panic!() };
+    let Some([isn, isc, _, _]) = input.strides().get(0..4) else {
+        panic!()
+    };
     let area = h * w;
     let osn = output.strides()[0];
     let input = input.data::<f32>();

@@ -31,6 +31,7 @@ impl CPUSession {
     pub fn run(&self, inputs: Vec<Tensor>) -> Result<Vec<Tensor>, SessionError> {
         let mut outputs = self
             .model
+            .graph
             .outputs
             .iter()
             .map(|id| {

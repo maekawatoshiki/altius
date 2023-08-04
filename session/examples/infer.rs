@@ -50,15 +50,17 @@ fn main() {
     log::info!("create session: finished in {:?}", start.elapsed());
 
     let mut inputs = vec![];
-    for (i, &input_id) in sess.model().inputs.iter().enumerate() {
-        if sess.model().inits.contains_key(&input_id) {
+    for (i, &input_id) in sess.model().graph.inputs.iter().enumerate() {
+        if sess.model().graph.inits.contains_key(&input_id) {
             continue;
         }
 
-        let input = &sess.model().values.inner()[input_id];
+        let input = &sess.model().graph.values.inner()[input_id];
         let name = input.name.as_deref().unwrap_or("");
         let Some(shape) = input.shape.as_ref() else {
-            log::error!("failed to feed input({i}, name={name}): unknown shape (or dynamic shape?)");
+            log::error!(
+                "failed to feed input({i}, name={name}): unknown shape (or dynamic shape?)"
+            );
             exit(1);
         };
 
@@ -83,8 +85,12 @@ fn main() {
         }
     };
 
-    for (i, (output, output_id)) in outputs.iter().zip(sess.model().outputs.iter()).enumerate() {
-        let name = sess.model().values.inner()[*output_id]
+    for (i, (output, output_id)) in outputs
+        .iter()
+        .zip(sess.model().graph.outputs.iter())
+        .enumerate()
+    {
+        let name = sess.model().graph.values.inner()[*output_id]
             .name
             .as_deref()
             .unwrap_or("");

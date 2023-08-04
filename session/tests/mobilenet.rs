@@ -12,7 +12,7 @@ fn mobilenet() {
     let input_value = model.lookup_named_value("input").unwrap();
 
     // Change input batch size from 1 to 4.
-    model.values.inner_mut()[input_value]
+    model.graph.values.inner_mut()[input_value]
         .shape
         .as_mut()
         .unwrap()

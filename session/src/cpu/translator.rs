@@ -288,12 +288,12 @@ impl<'a> Translator<'a> {
         let mut created_extern_values = vec![];
 
         for plan in execution_plans {
-            let node = &self.model.nodes[plan.node_id];
+            let node = &self.model.graph.nodes[plan.node_id];
             // Allocate temporary tensors.
             for output in node
                 .outputs
                 .iter()
-                .filter(|id| !self.model.outputs.contains(id))
+                .filter(|id| !self.model.graph.outputs.contains(id))
             {
                 if matches!(node.op, Op::Reshape | Op::Squeeze(_) | Op::Unsqueeze(_)) {
                     continue;
@@ -319,8 +319,8 @@ impl<'a> Translator<'a> {
         }
 
         for (&id, shape) in self.value_shapes {
-            if (self.model.inputs.contains(&id) || self.model.outputs.contains(&id))
-                && !self.model.inits.contains_key(&id)
+            if (self.model.graph.inputs.contains(&id) || self.model.graph.outputs.contains(&id))
+                && !self.model.graph.inits.contains_key(&id)
             {
                 continue;
             }
@@ -328,7 +328,7 @@ impl<'a> Translator<'a> {
             let name = self.value_name(id);
             let ty = get_c_type(shape.elem_ty);
 
-            if self.model.inits.contains_key(&id) {
+            if self.model.graph.inits.contains_key(&id) {
                 &mut created_extern_values
             } else {
                 &mut created_tmp_values
@@ -430,16 +430,17 @@ static struct timespec now() {{
                 format!(
                     "void model_entry({}) {{\n",
                     self.model
+                        .graph
                         .inputs
                         .iter()
-                        .filter(|&id| !self.model.inits.contains_key(id))
+                        .filter(|&id| !self.model.graph.inits.contains_key(id))
                         .map(|&id| {
                             let name = self.value_name(id);
                             let shape = &self.value_shapes[&id];
                             let ty = get_c_type(shape.elem_ty);
                             format!("const {ty} *{name}")
                         })
-                        .chain(self.model.outputs.iter().map(|&id| {
+                        .chain(self.model.graph.outputs.iter().map(|&id| {
                             let name = self.value_name(id);
                             let shape = &self.value_shapes[&id];
                             let ty = get_c_type(shape.elem_ty);
@@ -479,16 +480,17 @@ static struct timespec now() {{
 }}\n",
                     args = self
                         .model
+                        .graph
                         .inputs
                         .iter()
-                        .filter(|&id| !self.model.inits.contains_key(id))
+                        .filter(|&id| !self.model.graph.inits.contains_key(id))
                         .enumerate()
                         .map(|(i, &id)| {
                             let shape = &self.value_shapes[&id];
                             let ty = get_c_type(shape.elem_ty);
                             format!("(const {ty} *)ins[{i}]")
                         })
-                        .chain(self.model.outputs.iter().enumerate().map(|(i, &id)| {
+                        .chain(self.model.graph.outputs.iter().enumerate().map(|(i, &id)| {
                             let shape = &self.value_shapes[&id];
                             let ty = get_c_type(shape.elem_ty);
                             format!("({ty} *)outs[{i}]")
@@ -510,7 +512,7 @@ static struct timespec now() {{
         node_id: NodeId,
         created_calls: &mut Vec<String>,
     ) -> Result<(), SessionError> {
-        let node = &self.model.nodes[node_id];
+        let node = &self.model.graph.nodes[node_id];
         let inputs = node
             .inputs
             .iter()
@@ -539,8 +541,8 @@ static struct timespec now() {{
         if matches!(op, Op::Reshape | Op::Squeeze(_) | Op::Unsqueeze(_)) {
             // TODO: Support 'Flatten'.
             self.reshaped_values.insert(node.inputs[0]);
-            if self.model.inputs.contains(&node.inputs[0])
-                || self.model.inits.contains_key(&node.inputs[0])
+            if self.model.graph.inputs.contains(&node.inputs[0])
+                || self.model.graph.inits.contains_key(&node.inputs[0])
                 || self.propagated_inits.contains(&node.inputs[0])
             {
                 self.propagated_inits.insert(node.outputs[0]);
@@ -983,7 +985,7 @@ for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
                                     Op::Sub => format!("({out} - *input_{opr_idx}_ptr_{i})"),
                                     Op::Mul => format!("({out} * *input_{opr_idx}_ptr_{i})"),
                                     Op::Div => format!("({out} / *input_{opr_idx}_ptr_{i})"),
-                                    Op::Pow => match self.model.inits.get(&inputs[1]) {
+                                    Op::Pow => match self.model.graph.inits.get(&inputs[1]) {
                                         Some(init) if init.data::<f32>()[0] == 2. => {
                                             format!("({out} * {out})")
                                         }
@@ -1185,7 +1187,7 @@ for (int i = 0; i < {size}; i++) {{
                 size = outputs[0].dims.total_elems(),
             )
         } else if inputs[1].dims.is_scalar() {
-            match self.model.inits.get(&node.inputs[1]) {
+            match self.model.graph.inits.get(&node.inputs[1]) {
                 Some(init) if init.data::<f32>()[0] == 2. => format!(
                     "#pragma omp parallel for num_threads({num_threads})
 #pragma clang loop vectorize(enable)
@@ -3082,7 +3084,7 @@ const fn get_clif_type(t: TensorElemType) -> Type {
 }
 
 fn value_name(model: &Model, id: ValueId) -> String {
-    let value = &model.values.inner()[id];
+    let value = &model.graph.values.inner()[id];
     escape_name(
         value
             .name

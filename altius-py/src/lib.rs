@@ -146,6 +146,7 @@ trait Session {
 
         let new_inputs = self
             .model()
+            .graph
             .inputs
             .iter()
             .map(|i| new_inputs.remove(i).unwrap())

@@ -12,12 +12,13 @@ pub fn fuse_gelu(model: &mut Model) {
 
     for node_id in nodes {
         let div_id = node_id;
-        let div = &model.nodes[div_id];
+        let div = &model.graph.nodes[div_id];
         if !matches!(div.op, Op::Div) {
             continue;
         }
         let approx_sqrt_two = 1.4142099618911743f32;
         if model
+            .graph
             .inits
             .get(&div.inputs[1])
             .map_or(true, |rhs| !rhs.allclose(&[approx_sqrt_two]))
@@ -26,18 +27,19 @@ pub fn fuse_gelu(model: &mut Model) {
         }
 
         let erf_id = value_users[&div.outputs[0]].iter().next().copied().unwrap();
-        let erf = &model.nodes[erf_id];
+        let erf = &model.graph.nodes[erf_id];
         if !matches!(erf.op, Op::Erf) {
             continue;
         }
 
         let add_id = value_users[&erf.outputs[0]].iter().next().copied().unwrap();
-        let add = &model.nodes[add_id];
+        let add = &model.graph.nodes[add_id];
         if !matches!(add.op, Op::Add) {
             continue;
         }
         let is_erf_add_lhs = add.inputs[0] == erf.outputs[0];
         if model
+            .graph
             .inits
             .get(&add.inputs[is_erf_add_lhs as usize])
             .map_or(true, |one| {
@@ -48,7 +50,7 @@ pub fn fuse_gelu(model: &mut Model) {
         }
 
         let mul1_id = value_users[&add.outputs[0]].iter().next().copied().unwrap();
-        let mul1 = &model.nodes[mul1_id];
+        let mul1 = &model.graph.nodes[mul1_id];
         if !matches!(mul1.op, Op::Mul) {
             continue;
         }
@@ -62,12 +64,13 @@ pub fn fuse_gelu(model: &mut Model) {
             .next()
             .copied()
             .unwrap();
-        let mul2 = &model.nodes[mul2_id];
+        let mul2 = &model.graph.nodes[mul2_id];
         if !matches!(mul2.op, Op::Mul) {
             continue;
         }
         let is_mul1_mul2_lhs = mul2.inputs[0] == mul1.outputs[0];
         if model
+            .graph
             .inits
             .get(&mul2.inputs[is_mul1_mul2_lhs as usize])
             .map_or(true, |half| {
@@ -90,19 +93,19 @@ pub fn fuse_gelu(model: &mut Model) {
     let count = list.len();
 
     for (start, end) in list {
-        let gelu_out = model.values.new_val();
+        let gelu_out = model.graph.values.new_val();
         let gelu = Node::new(Op::Gelu).with_in(start).with_out(gelu_out);
         let _gelu_id = model.add_node(gelu);
 
         for user_id in &value_users[&end] {
-            let user = &mut model.nodes[*user_id];
+            let user = &mut model.graph.nodes[*user_id];
             let idx = user.inputs.iter().position(|&i| i == end).unwrap();
             user.inputs[idx] = gelu_out
         }
     }
 
     for node in delete_list {
-        model.nodes[node].deleted = true
+        model.graph.nodes[node].deleted = true
     }
 
     model.remove_unnecessary_nodes();

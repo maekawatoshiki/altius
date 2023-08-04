@@ -23,7 +23,7 @@ pub fn create_execution_plan(model: &Model) -> Vec<NodeExecutionPlan> {
     let value_users = model.get_value_users();
 
     for node_id in sorted_nodes {
-        let node = &model.nodes[node_id];
+        let node = &model.graph.nodes[node_id];
         let mut plan = NodeExecutionPlan {
             node_id,
             free_vals: Vec::new(),

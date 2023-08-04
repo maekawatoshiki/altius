@@ -12,7 +12,7 @@ pub fn fuse_fast_gelu(model: &mut Model) {
     let mut delete_list = vec![];
 
     for node_id in nodes {
-        let node = &model.nodes[node_id];
+        let node = &model.graph.nodes[node_id];
         if node.outputs.len() != 1 {
             continue;
         }
@@ -24,13 +24,13 @@ pub fn fuse_fast_gelu(model: &mut Model) {
         };
 
         let Some(&pow_id) = nodes.iter().find(|&&node_id| {
-            let node = &model.nodes[node_id];
+            let node = &model.graph.nodes[node_id];
             matches!(node.op, Op::Pow)
         }) else {
             continue;
         };
-        let pow = &model.nodes[pow_id];
-        if model.inits.get(&pow.inputs[1]).map_or(true, |rhs| {
+        let pow = &model.graph.nodes[pow_id];
+        if model.graph.inits.get(&pow.inputs[1]).map_or(true, |rhs| {
             !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 3.
         }) {
             continue;
@@ -40,11 +40,12 @@ pub fn fuse_fast_gelu(model: &mut Model) {
         }
 
         let mul1_id = value_users[&pow.outputs[0]].iter().next().copied().unwrap();
-        let mul1 = &model.nodes[mul1_id];
+        let mul1 = &model.graph.nodes[mul1_id];
         if !matches!(mul1.op, Op::Mul) {
             continue;
         }
         if model
+            .graph
             .inits
             .get(&mul1.inputs[1])
             .map_or(true, |rhs| !rhs.allclose(&[0.044714998453855515]))
@@ -60,7 +61,7 @@ pub fn fuse_fast_gelu(model: &mut Model) {
             .next()
             .copied()
             .unwrap();
-        let add = &model.nodes[add1_id];
+        let add = &model.graph.nodes[add1_id];
         if !matches!(add.op, Op::Add) {
             continue;
         }
@@ -72,11 +73,12 @@ pub fn fuse_fast_gelu(model: &mut Model) {
         }
 
         let mul2_id = value_users[&add.outputs[0]].iter().next().copied().unwrap();
-        let mul2 = &model.nodes[mul2_id];
+        let mul2 = &model.graph.nodes[mul2_id];
         if !matches!(mul2.op, Op::Mul) {
             continue;
         }
         if model
+            .graph
             .inits
             .get(&mul2.inputs[1])
             .map_or(true, |rhs| !rhs.allclose(&[0.7978845834732056]))
@@ -92,7 +94,7 @@ pub fn fuse_fast_gelu(model: &mut Model) {
             .next()
             .copied()
             .unwrap();
-        let tanh = &model.nodes[tanh_id];
+        let tanh = &model.graph.nodes[tanh_id];
         if !matches!(tanh.op, Op::Tanh) {
             continue;
         }
@@ -105,11 +107,11 @@ pub fn fuse_fast_gelu(model: &mut Model) {
             .next()
             .copied()
             .unwrap();
-        let add = &model.nodes[add2_id];
+        let add = &model.graph.nodes[add2_id];
         if !matches!(add.op, Op::Add) {
             continue;
         }
-        if model.inits.get(&add.inputs[1]).map_or(true, |rhs| {
+        if model.graph.inits.get(&add.inputs[1]).map_or(true, |rhs| {
             !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 1.
         }) {
             continue;
@@ -119,21 +121,21 @@ pub fn fuse_fast_gelu(model: &mut Model) {
         }
 
         let mul3_id = value_users[&add.outputs[0]].iter().next().copied().unwrap();
-        let mul3 = &model.nodes[mul3_id];
+        let mul3 = &model.graph.nodes[mul3_id];
         assert_eq!(mul3.inputs[1], add.outputs[0]);
         if !matches!(mul3.op, Op::Mul) {
             continue;
         }
 
         let mul4_id = value_parents[&mul3.inputs[0]];
-        let mul4 = &model.nodes[mul4_id];
+        let mul4 = &model.graph.nodes[mul4_id];
         if !matches!(mul4.op, Op::Mul) {
             continue;
         }
         if mul4.inputs[0] != x {
             continue;
         }
-        if model.inits.get(&mul4.inputs[1]).map_or(true, |rhs| {
+        if model.graph.inits.get(&mul4.inputs[1]).map_or(true, |rhs| {
             !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 0.5
         }) {
             continue;
@@ -158,19 +160,19 @@ pub fn fuse_fast_gelu(model: &mut Model) {
     let count = list.len();
 
     for (start, end) in list {
-        let gelu_out = model.values.new_val();
+        let gelu_out = model.graph.values.new_val();
         let gelu = Node::new(Op::Gelu).with_in(start).with_out(gelu_out);
         let _gelu_id = model.add_node(gelu);
 
         for user_id in &value_users[&end] {
-            let user = &mut model.nodes[*user_id];
+            let user = &mut model.graph.nodes[*user_id];
             let idx = user.inputs.iter().position(|&i| i == end).unwrap();
             user.inputs[idx] = gelu_out
         }
     }
 
     for node in delete_list {
-        model.nodes[node].deleted = true
+        model.graph.nodes[node].deleted = true
     }
 
     model.remove_unnecessary_nodes();

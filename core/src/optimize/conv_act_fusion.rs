@@ -15,7 +15,7 @@ pub fn fuse_conv_act(model: &mut Model) {
 
     for node_id in nodes {
         let conv_id = node_id;
-        let conv = &model.nodes[conv_id];
+        let conv = &model.graph.nodes[conv_id];
         if !matches!(conv.op, Op::Conv2d(_)) {
             continue;
         }
@@ -28,7 +28,7 @@ pub fn fuse_conv_act(model: &mut Model) {
             .next()
             .copied()
             .unwrap();
-        let act = &model.nodes[act_id];
+        let act = &model.graph.nodes[act_id];
         let fused_act = match act.op {
             Op::ReLU => FusedActivation::Relu,
             Op::HardSigmoid(ref h) => FusedActivation::HardSigmoid(*h),
@@ -44,19 +44,19 @@ pub fn fuse_conv_act(model: &mut Model) {
     let count = list.len();
 
     for (fused_act, conv_id, conv_out, act) in list {
-        if let Op::Conv2d(ref mut c) = &mut model.nodes[conv_id].op {
+        if let Op::Conv2d(ref mut c) = &mut model.graph.nodes[conv_id].op {
             c.activation = Some(fused_act);
         }
 
         for user_id in &value_users[&act] {
-            let user = &mut model.nodes[*user_id];
+            let user = &mut model.graph.nodes[*user_id];
             let idx = user.inputs.iter().position(|&i| i == act).unwrap();
             user.inputs[idx] = conv_out
         }
     }
 
     for node in delete_list {
-        model.nodes[node].deleted = true
+        model.graph.nodes[node].deleted = true
     }
 
     model.remove_unnecessary_nodes();

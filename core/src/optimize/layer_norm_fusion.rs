@@ -25,7 +25,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
 
     for node_id in nodes {
         let mean_id = node_id;
-        let mean = &model.nodes[mean_id];
+        let mean = &model.graph.nodes[mean_id];
         if !matches!(mean.op, Op::ReduceMean(_)) {
             continue;
         }
@@ -34,7 +34,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
             continue;
         };
         let sub_id = users.iter().next().copied().unwrap();
-        let sub = &model.nodes[sub_id];
+        let sub = &model.graph.nodes[sub_id];
         if !matches!(sub.op, Op::Sub) {
             continue;
         }
@@ -43,7 +43,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
             continue;
         };
         let pow_id = users.iter().next().copied().unwrap();
-        let pow = &model.nodes[pow_id];
+        let pow = &model.graph.nodes[pow_id];
         if !matches!(pow.op, Op::Pow) {
             continue;
         }
@@ -52,7 +52,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
             continue;
         };
         let mean2_id = users.iter().next().copied().unwrap();
-        let mean2 = &model.nodes[mean2_id];
+        let mean2 = &model.graph.nodes[mean2_id];
         if !matches!(mean2.op, Op::ReduceMean(_)) {
             continue;
         }
@@ -61,7 +61,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
             continue;
         };
         let add_id = users.iter().next().copied().unwrap();
-        let add = &model.nodes[add_id];
+        let add = &model.graph.nodes[add_id];
         if !matches!(add.op, Op::Add) {
             continue;
         }
@@ -70,7 +70,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
             continue;
         };
         let sqrt_id = users.iter().next().copied().unwrap();
-        let sqrt = &model.nodes[sqrt_id];
+        let sqrt = &model.graph.nodes[sqrt_id];
         if !matches!(sqrt.op, Op::Sqrt) {
             continue;
         }
@@ -79,7 +79,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
             continue;
         };
         let div_id = users.iter().next().copied().unwrap();
-        let div = &model.nodes[div_id];
+        let div = &model.graph.nodes[div_id];
         if !matches!(div.op, Op::Div) {
             continue;
         }
@@ -88,7 +88,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
             continue;
         };
         let mul_id = users.iter().next().copied().unwrap();
-        let mul = &model.nodes[mul_id];
+        let mul = &model.graph.nodes[mul_id];
         if !matches!(mul.op, Op::Mul) {
             continue;
         }
@@ -97,7 +97,7 @@ pub fn fuse_layer_norm(model: &mut Model) {
             continue;
         };
         let add2_id = users.iter().next().copied().unwrap();
-        let add2 = &model.nodes[add2_id];
+        let add2 = &model.graph.nodes[add2_id];
         if !matches!(add2.op, Op::Add) {
             continue;
         }
@@ -125,8 +125,8 @@ pub fn fuse_layer_norm(model: &mut Model) {
     let count = list.len();
 
     for (data, end, scale, bias, epsilon) in list {
-        let epsilon = model.inits.get(&epsilon).unwrap().data::<f32>()[0];
-        let ln_out = model.values.new_val();
+        let epsilon = model.graph.inits.get(&epsilon).unwrap().data::<f32>()[0];
+        let ln_out = model.graph.values.new_val();
         let ln = Node::new(Op::LayerNormalization(LayerNormalization {
             axis: -1,
             epsilon,
@@ -139,19 +139,19 @@ pub fn fuse_layer_norm(model: &mut Model) {
         let _ln_id = model.add_node(ln);
 
         let Some(users) = value_users.get(&end) else {
-            let idx = model.outputs.iter().position(|&i| i == end).unwrap();
-            model.outputs[idx] = ln_out;
+            let idx = model.graph.outputs.iter().position(|&i| i == end).unwrap();
+            model.graph.outputs[idx] = ln_out;
             continue;
         };
         for user_id in users {
-            let user = &mut model.nodes[*user_id];
+            let user = &mut model.graph.nodes[*user_id];
             let idx = user.inputs.iter().position(|&i| i == end).unwrap();
             user.inputs[idx] = ln_out;
         }
     }
 
     for node in delete_list {
-        model.nodes[node].deleted = true
+        model.graph.nodes[node].deleted = true
     }
 
     model.remove_unnecessary_nodes();

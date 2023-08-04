@@ -55,11 +55,11 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
 
     // Encode graph inputs and outputs.
     for (vals, proto) in [
-        (&model.inputs, &mut graph_proto.input),
-        (&model.outputs, &mut graph_proto.output),
+        (&model.graph.inputs, &mut graph_proto.input),
+        (&model.graph.outputs, &mut graph_proto.output),
     ] {
         for &id in vals {
-            let val = &model.values.inner()[id];
+            let val = &model.graph.values.inner()[id];
             let Some(TypedShape { dims, elem_ty }) = &val.shape else {
                 return Err(ModelSaveError::NoGraphInputShape);
             };
@@ -94,7 +94,7 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
 
     // Encode nodes.
     for &node_id in &model.topo_sort_nodes() {
-        let node = &model.nodes[node_id];
+        let node = &model.graph.nodes[node_id];
         let mut node_proto = NodeProto {
             name: node.name.clone(),
             op_type: node.op.name().to_string().into(),
@@ -102,7 +102,7 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
         };
 
         for &input_id in &node.inputs {
-            let input = &model.values.inner()[input_id];
+            let input = &model.graph.values.inner()[input_id];
             let name = input
                 .name
                 .clone()
@@ -111,7 +111,7 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
         }
 
         for &output_id in &node.outputs {
-            let output = &model.values.inner()[output_id];
+            let output = &model.graph.values.inner()[output_id];
             let name = output
                 .name
                 .clone()

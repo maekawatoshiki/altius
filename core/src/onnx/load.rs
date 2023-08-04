@@ -86,14 +86,14 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
         let tensor = get_tensor(init)?;
         let val = *name_to_val
             .entry(init.name())
-            .or_insert_with(|| model.values.new_val_named(init.name()));
-        model.inits.insert(val, tensor);
+            .or_insert_with(|| model.graph.values.new_val_named(init.name()));
+        model.graph.inits.insert(val, tensor);
     }
 
     // Load inputs.
     for (vals, vec) in [
-        (&graph.input, &mut model.inputs),
-        (&graph.output, &mut model.outputs),
+        (&graph.input, &mut model.graph.inputs),
+        (&graph.output, &mut model.graph.outputs),
     ] {
         for x in vals {
             let TensorType(tensor) = x
@@ -123,7 +123,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
 
             let input = match name_to_val.entry(x.name()) {
                 Entry::Occupied(o) => *o.get(),
-                Entry::Vacant(v) => *v.insert(model.values.new_val_named_and_shaped(
+                Entry::Vacant(v) => *v.insert(model.graph.values.new_val_named_and_shaped(
                     x.name(),
                     TypedShape::new(
                         dims.into(),
@@ -137,7 +137,10 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
     }
 
     // Remove initializers from inputs if needed.
-    model.inputs.retain(|&x| !model.inits.contains_key(&x));
+    model
+        .graph
+        .inputs
+        .retain(|&x| !model.graph.inits.contains_key(&x));
 
     // Load nodes.
     for node in graph.node.iter() {
@@ -147,7 +150,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             .map(|input| {
                 *name_to_val
                     .entry(input)
-                    .or_insert_with(|| model.values.new_val_named(input))
+                    .or_insert_with(|| model.graph.values.new_val_named(input))
             })
             .collect();
         let outputs = node
@@ -156,7 +159,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             .map(|input| {
                 *name_to_val
                     .entry(input)
-                    .or_insert_with(|| model.values.new_val_named(input))
+                    .or_insert_with(|| model.graph.values.new_val_named(input))
             })
             .collect();
 
@@ -450,7 +453,7 @@ fn load_mnist() {
         .join("../models")
         .join("mnist-8.onnx");
     let model = load_onnx(model_path).unwrap();
-    println!("{:#?}", model.nodes);
-    println!("{:#?}", model.inputs);
-    println!("{:#?}", model.outputs);
+    println!("{:#?}", model.graph.nodes);
+    println!("{:#?}", model.graph.inputs);
+    println!("{:#?}", model.graph.outputs);
 }

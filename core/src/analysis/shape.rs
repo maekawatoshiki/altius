@@ -655,10 +655,10 @@ pub fn infer_shapes(
     value_shapes: &mut FxHashMap<ValueId, TypedFixedShape>,
 ) -> Result<(), ShapeError> {
     let sorted_nodes = model.topo_sort_nodes();
-    let mut values = model.inits.clone();
+    let mut values = model.graph.inits.clone();
 
-    for &val_id in &model.inputs {
-        let shape = &model.values.inner()[val_id].shape;
+    for &val_id in &model.graph.inputs {
+        let shape = &model.graph.values.inner()[val_id].shape;
         let Some(shape) = shape else { continue };
         let tensor = Tensor::zeros_of_type(
             shape.elem_ty,
@@ -690,7 +690,7 @@ fn infer_shape(
     shapes: &mut FxHashMap<NodeId, (Op, Vec<TypedFixedShape>)>,
     node_id: NodeId,
 ) -> Result<(), ShapeError> {
-    let node = &model.nodes[node_id];
+    let node = &model.graph.nodes[node_id];
     let mut op = node.op.clone();
     let mut inputs = vec![];
     for input in &node.inputs {

@@ -25,14 +25,14 @@ macro_rules! op {
         #[cfg(test)]
         fn $name(shape: FixedDimensions) {
             let mut model = Model::default();
-            let x = model.values.new_val_named("x");
-            let y = model.values.new_val_named("y");
-            let z = model.values.new_val_named("z");
+            let x = model.graph.values.new_val_named("x");
+            let y = model.graph.values.new_val_named("y");
+            let z = model.graph.values.new_val_named("z");
 
             model.add_node(Node::new(Op::$op).with_ins(vec![x, y]).with_out(z));
-            model.inputs.push(x);
-            model.inputs.push(y);
-            model.outputs.push(z);
+            model.graph.inputs.push(x);
+            model.graph.inputs.push(y);
+            model.graph.outputs.push(z);
 
             let sess = InterpreterSessionBuilder::new(model).build().unwrap();
             let x_val = Tensor::rand::<f32>(shape.to_owned());

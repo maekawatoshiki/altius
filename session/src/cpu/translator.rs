@@ -1110,9 +1110,10 @@ for (int i = 0; i < {size}; i++) {{
                 .unwrap();
 
             let mut kernel = String::new();
-            for (i, ((odim, i0str), i1str)) in outputs[0]
+            for (i, (((odim, ostr), i0str), i1str)) in outputs[0]
                 .dims
                 .iter()
+                .zip(outputs[0].dims.strides().iter())
                 .zip(input_0_strides.iter())
                 .zip(input_1_strides.iter())
                 .enumerate()
@@ -1122,26 +1123,26 @@ for (int i = 0; i < {size}; i++) {{
                     kernel = format!(
                         "#pragma clang loop vectorize(enable)
 for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
-    *output_ptr = *input_0_ptr_{i} {op} *input_1_ptr_{i};
-    input_0_ptr_{i} += {i0str};
-    input_1_ptr_{i} += {i1str};
-    output_ptr += 1;
+    *(output_ptr_{i} + {ostr} * i{i}) = 
+        *(input_0_ptr_{i} + {i0str} * i{i}) {op}
+        *(input_1_ptr_{i} + {i1str} * i{i});
 }}"
                     );
                 } else {
                     kernel = format!(
-                        "{}for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
-    {in_ty} *input_0_ptr_{iplus1} = input_0_ptr_{i};
-    {in_ty} *input_1_ptr_{iplus1} = input_1_ptr_{i};
+                        "{}
+{omp}
+for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
+    {in_ty} *input_0_ptr_{iplus1} = input_0_ptr_{i} + {i0str} * i{i};
+    {in_ty} *input_1_ptr_{iplus1} = input_1_ptr_{i} + {i1str} * i{i};
+    {out_ty} *output_ptr_{iplus1} = output_ptr_{i} + {ostr} * i{i};
 {}
-    input_0_ptr_{i} += {i0str};
-    input_1_ptr_{i} += {i1str};
 }}",
                         if i == 0 {
                             format!(
                                 "{in_ty} *input_0_ptr_0 = ({in_ty} *){};
 {in_ty} *input_1_ptr_0 = ({in_ty} *){};
-{out_ty} *output_ptr = {};\n",
+{out_ty} *output_ptr_0 = {};\n",
                                 input_names[0],
                                 input_names[1],
                                 output_name,
@@ -1154,6 +1155,13 @@ for (int i{i} = 0; i{i} < {odim}; i{i}++) {{
                         indent_all_by(4, kernel),
                         iplus1 = i + 1,
                         in_ty = get_c_type(inputs[0].elem_ty),
+                        out_ty = get_c_type(outputs[0].elem_ty),
+                        omp = "// TODO",
+                        // omp = if *odim == 12 {
+                        //     format!("#pragma omp parallel for num_threads({th})")
+                        // } else {
+                        //     String::new()
+                        // }
                     );
                 }
             }

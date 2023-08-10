@@ -6,7 +6,7 @@ pub mod cpu;
 pub mod interpreter;
 #[cfg(feature = "opencl")]
 pub mod opencl;
-mod plan;
+pub mod plan;
 #[cfg(feature = "wgpu-backend")]
 pub mod wgpu;
 

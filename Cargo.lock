@@ -128,6 +128,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "altius-session-cpu"
+version = "0.1.0"
+dependencies = [
+ "altius-core",
+ "altius-session",
+ "color-backtrace",
+ "cranelift",
+ "cranelift-codegen",
+ "cranelift-module",
+ "cranelift-object",
+ "criterion",
+ "env_logger",
+ "glob",
+ "image",
+ "indent",
+ "libloading",
+ "log",
+ "ndarray",
+ "num_cpus",
+ "rustc-hash",
+ "sha1",
+ "structopt",
+ "target-lexicon",
+ "tempfile",
+]
+
+[[package]]
+name = "altius-session-interpreter"
+version = "0.1.0"
+
+[[package]]
 name = "altius-wasm"
 version = "0.1.0"
 dependencies = [

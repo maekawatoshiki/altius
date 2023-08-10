@@ -2,6 +2,8 @@
 members = [
   "core",
   "session",
+  "session-cpu",
+  "session-interpreter",
   "altius-py",
   "wasm"
 ]

@@ -1,6 +1,6 @@
 use altius_core::dim::Dimension;
 use altius_core::{onnx::load_onnx, tensor::Tensor};
-use altius_session::interpreter::InterpreterSessionBuilder;
+use altius_session_interpreter::InterpreterSessionBuilder;
 use std::cmp::Ordering;
 use std::path::Path;
 

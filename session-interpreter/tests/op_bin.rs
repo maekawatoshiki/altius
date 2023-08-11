@@ -1,5 +1,5 @@
 use altius_core::{fixed_dim::FixedDimensions, model::Model, node::Node, op::Op, tensor::Tensor};
-use altius_session::interpreter::InterpreterSessionBuilder;
+use altius_session_interpreter::InterpreterSessionBuilder;
 
 macro_rules! test_op {
     ($name:ident, $op:ident, $shape:expr) => {

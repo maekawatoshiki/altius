@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 wasm-bindgen = "0.2"
 altius-core = { path = "../core" }
 altius-session = { path = "../session" }
+altius-session-interpreter = { path = "../session-interpreter" }
 console_error_panic_hook = "0.1.7"
 image = "0.24.2"
 ndarray = "0.15.6"

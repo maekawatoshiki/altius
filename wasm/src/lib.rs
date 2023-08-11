@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, io::Cursor};
 
 use altius_core::{onnx::load_onnx_from_buffer, tensor::Tensor};
-use altius_session::interpreter::InterpreterSessionBuilder;
+use altius_session_interpreter::InterpreterSessionBuilder;
 use image::io::Reader;
 use wasm_bindgen::prelude::*;
 

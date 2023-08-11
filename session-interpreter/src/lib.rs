@@ -1,14 +1,12 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+#![feature(portable_simd)]
+#![allow(clippy::excessive_precision)]
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod builder;
+mod conv2d;
+mod fast_math;
+mod gemm;
+mod session;
+mod thread;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use builder::InterpreterSessionBuilder;
+pub use session::InterpreterSession;

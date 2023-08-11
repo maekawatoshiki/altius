@@ -1,6 +1,6 @@
 use altius_core::optimize::gelu_fusion::fuse_gelu;
 use altius_core::{onnx::load_onnx, tensor::Tensor};
-use altius_session::interpreter::InterpreterSessionBuilder;
+use altius_session_interpreter::InterpreterSessionBuilder;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;

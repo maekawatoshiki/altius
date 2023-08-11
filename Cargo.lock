@@ -76,6 +76,7 @@ dependencies = [
  "altius-core",
  "altius-session",
  "altius-session-cpu",
+ "altius-session-interpreter",
  "cargo-util",
  "numpy",
  "pyo3",
@@ -158,6 +159,28 @@ dependencies = [
 [[package]]
 name = "altius-session-interpreter"
 version = "0.1.0"
+dependencies = [
+ "altius-core",
+ "altius-session",
+ "blas-src",
+ "blis-src",
+ "cblas-sys",
+ "color-backtrace",
+ "core_affinity",
+ "criterion",
+ "env_logger",
+ "fastapprox",
+ "image",
+ "log",
+ "matrixmultiply",
+ "ndarray",
+ "paste",
+ "procfs",
+ "rustc-hash",
+ "structopt",
+ "thread_local",
+ "threadpool",
+]
 
 [[package]]
 name = "altius-wasm"
@@ -165,6 +188,7 @@ version = "0.1.0"
 dependencies = [
  "altius-core",
  "altius-session",
+ "altius-session-interpreter",
  "console_error_panic_hook",
  "image",
  "ndarray",

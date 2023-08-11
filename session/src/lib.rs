@@ -1,7 +1,6 @@
 #![feature(portable_simd)]
 #![allow(clippy::excessive_precision)]
 
-pub mod interpreter;
 #[cfg(feature = "opencl")]
 pub mod opencl;
 pub mod plan;

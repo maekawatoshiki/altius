@@ -7,9 +7,9 @@ use altius_core::optimize;
 use altius_core::tensor::{TensorElemType, TensorElemTypeExt};
 use altius_core::value::ValueId;
 use altius_core::{model::Model, tensor::Tensor};
-use altius_session::interpreter::{InterpreterSession, InterpreterSessionBuilder};
 use altius_session::SessionError;
 use altius_session_cpu::{CPUSession, CPUSessionBuilder};
+use altius_session_interpreter::{InterpreterSession, InterpreterSessionBuilder};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 
 use numpy::ndarray::ArrayD;

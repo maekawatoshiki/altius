@@ -1,6 +1,6 @@
 use altius_core::onnx::load_onnx;
 use altius_core::tensor::*;
-use altius_session::interpreter::InterpreterSessionBuilder;
+use altius_session_interpreter::InterpreterSessionBuilder;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;

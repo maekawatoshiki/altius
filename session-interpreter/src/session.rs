@@ -7,7 +7,7 @@ use super::{
     thread::ThreadCtx,
 };
 
-use crate::{interpreter::fast_math::fast_sum_exp, plan::NodeExecutionPlan, SessionError};
+use crate::fast_math::fast_sum_exp;
 use altius_core::{
     model::Model,
     node::{Node, NodeId},
@@ -19,6 +19,7 @@ use altius_core::{
     tensor::{Tensor, TensorElemType, TypedFixedShape},
     value::ValueId,
 };
+use altius_session::{plan::NodeExecutionPlan, SessionError};
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
 #[cfg(feature = "x64-fusion")]

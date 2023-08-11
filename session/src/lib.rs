@@ -1,8 +1,6 @@
 #![feature(portable_simd)]
 #![allow(clippy::excessive_precision)]
 
-#[cfg(feature = "cpu-backend")]
-pub mod cpu;
 pub mod interpreter;
 #[cfg(feature = "opencl")]
 pub mod opencl;

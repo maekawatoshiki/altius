@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 altius-core = { path = "../core" }
 altius-session = { path = "../session" }
+altius-session-cpu = { path = "../session-cpu" }
 pyo3 = { version = "^0.17.3", features = ["extension-module"] }
 pyo3-log = "^0.7.0"
 numpy = "^0.17.0"

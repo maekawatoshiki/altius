@@ -75,6 +75,7 @@ version = "0.1.0"
 dependencies = [
  "altius-core",
  "altius-session",
+ "altius-session-cpu",
  "cargo-util",
  "numpy",
  "pyo3",

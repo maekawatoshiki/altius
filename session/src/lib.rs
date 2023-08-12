@@ -30,11 +30,9 @@ pub enum SessionError {
     #[error("Io: {0}")]
     Io(#[from] std::io::Error),
 
-    #[cfg(feature = "cpu-backend")]
     #[error("Libloading: {0}")]
     Libloading(#[from] libloading::Error),
 
-    #[cfg(feature = "cpu-backend")]
     #[error("Cranelift: {0}")]
     Cranelift(#[from] ModuleError),
 

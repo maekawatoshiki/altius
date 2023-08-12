@@ -7,35 +7,12 @@ edition = "2021"
 altius-core = { path = "../core" }
 log = { workspace = true }
 rustc-hash = { workspace = true }
+thiserror = { workspace = true }
 cudnn = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
-ndarray = "0.15.6"
-matrixmultiply = "0.3.2"
-thiserror = { workspace = true }
-cblas-sys = { version = "0.1.4" }
-fastapprox = "^0.3.0"
-threadpool = "^1.8.1"
-thread_local = "^1.1"
-core_affinity = "^0.7.6"
-wgpu = { version = "^0.14.0", optional = true }
-futures-intrusive = { version = "^0.4", optional = true }
-pollster = { version = "^0.2.5", optional = true }
-bytemuck = { version = "^1.12.1", optional = true }
 opencl3 = { version = "^0.9.1", optional = true }
-dynasm = "^2.0.0"
-dynasmrt = "^2.0.0"
-paste = "1.0.11"
-indent = { version = "0.1.1", optional = true }
-libloading = { version = "0.7.4", optional = true }
-sha1 = { version = "0.10.5", optional = true }
-glob = { version = "0.3.1", optional = true }
-num_cpus = { version = "1.15.0", optional = true }
-tempfile = { version = "3.5.0", optional = true }
-cranelift = { version = "^0.97.0", optional = true }
-cranelift-module = { version = "^0.97.0", optional = true }
-cranelift-object = { version = "^0.97.0", optional = true }
-cranelift-codegen = { version = "^0.97.0", optional = true }
-target-lexicon = { version = "^0.12.7", optional = true }
+libloading = "0.7.4"
+cranelift-module = "^0.97.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 blis-src = { version = "*", features = [ "openmp" ], default-features = false }
@@ -45,25 +22,9 @@ procfs = "0.14.2"
 blas-src = { version = "0.8", features = ["accelerate"] }
 
 [features]
-default = ["cpu-backend", "cblas"]
-cpu-backend = [
-  "indent",
-  "libloading",
-  "sha1",
-  "glob",
-  "num_cpus",
-  "tempfile",
-  "cranelift",
-  "cranelift-module",
-  "cranelift-object",
-  "cranelift-codegen",
-  "target-lexicon",
-]
+default = ["cblas"]
 cuda = ["cudnn", "cust"]
-matrixmultiply-threading = ["matrixmultiply/threading"]
 opencl = ["opencl3"]
-wgpu-backend = ["wgpu"]
-heavy-log = []
 x64-codegen = []
 cblas = []
 
@@ -75,5 +36,5 @@ structopt = "0.3.26"
 criterion = "0.4.0"
 
 [[bench]]
-name = "interpreter"
+name = "cpu"
 harness = false

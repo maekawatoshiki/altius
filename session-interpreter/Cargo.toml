@@ -28,6 +28,7 @@ blas-src = { version = "0.8", features = ["accelerate"] }
 default = ["cblas"]
 matrixmultiply-threading = ["matrixmultiply/threading"]
 cblas = []
+heavy-log = []
 
 [dev-dependencies]
 color-backtrace = "0.5.1"

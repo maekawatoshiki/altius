@@ -7,11 +7,10 @@ pub struct Opt {
     pub iters: usize,
 }
 
-#[cfg(feature = "cpu-backend")]
 fn main() {
     use altius_core::onnx::load_onnx;
     use altius_core::tensor::*;
-    use altius_session::cpu::CPUSessionBuilder;
+    use altius_session_cpu::CPUSessionBuilder;
     use std::cmp::Ordering;
     use std::fs;
     use std::path::Path;
@@ -75,6 +74,3 @@ fn main() {
         println!("accuracy: {}", correct as f32 / validation_count as f32);
     }
 }
-
-#[cfg(not(feature = "cpu-backend"))]
-fn main() {}

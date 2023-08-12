@@ -17,13 +17,12 @@ pub struct Opt {
     pub threads: usize,
 }
 
-#[cfg(feature = "cpu-backend")]
 fn main() {
     use altius_core::optimize::elemwise_fusion::fuse_elemwise_ops;
     use altius_core::optimize::gelu_fusion::fuse_gelu;
     use altius_core::optimize::layer_norm_fusion::fuse_layer_norm;
     use altius_core::{onnx::load_onnx, tensor::Tensor};
-    use altius_session::cpu::CPUSessionBuilder;
+    use altius_session_cpu::CPUSessionBuilder;
     use std::cmp::Ordering;
     use std::fs;
     use std::path::Path;
@@ -64,6 +63,3 @@ fn main() {
         println!("top5: {:?}", &out[..5]);
     }
 }
-
-#[cfg(not(feature = "cpu-backend"))]
-fn main() {}

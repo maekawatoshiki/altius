@@ -20,6 +20,9 @@ num_cpus = "1.15.0"
 target-lexicon = "^0.12.7"
 tempfile = "3.5.0"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+blis-src = { version = "*", features = [ "openmp" ], default-features = false }
+
 [dev-dependencies]
 ndarray = "0.15.6"
 color-backtrace = "0.5.1"

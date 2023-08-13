@@ -14,19 +14,9 @@ opencl3 = { version = "^0.9.1", optional = true }
 libloading = "0.7.4"
 cranelift-module = "^0.97.0"
 
-[target.'cfg(target_os = "linux")'.dependencies]
-blis-src = { version = "*", features = [ "openmp" ], default-features = false }
-procfs = "0.14.2"
-
-[target.'cfg(target_os = "macos")'.dependencies]
-blas-src = { version = "0.8", features = ["accelerate"] }
-
 [features]
-default = ["cblas"]
 cuda = ["cudnn", "cust"]
 opencl = ["opencl3"]
-x64-codegen = []
-cblas = []
 
 [dev-dependencies]
 color-backtrace = "0.5.1"

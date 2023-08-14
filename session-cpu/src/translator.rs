@@ -941,19 +941,46 @@ for (int i = 0; i < {size}; i++) {{
         let output_name = &args[inputs.len()..][0];
 
         let kernel = if inputs[0].dims == inputs[1].dims {
-            todo!()
-        //             format!(
-        //                 "#pragma omp parallel for num_threads({th})
-        // #pragma clang loop vectorize(enable)
-        // for (int i = 0; i < {size}; i++) {{
-        //     {output}[i] = {input_0}[i] {op} {input_1}[i];
-        // }}",
-        //                 th = self.intra_op_num_threads,
-        //                 input_0 = input_names[0],
-        //                 input_1 = input_names[1],
-        //                 size = outputs[0].dims.total_elems(),
-        //                 output = output_name,
-        //             )
+            for inputs in inputs.windows(2) {
+                assert!(inputs[0].elem_ty.is_f32());
+                assert!(inputs[1].elem_ty.is_f32());
+                assert_eq!(inputs[0].dims, inputs[1].dims);
+            }
+
+            let (expr, _) = op.chain.iter().fold(
+                (String::new(), None),
+                |(expr, last_expr_id), (op, op_ins, op_outs)| {
+                    let mut args = vec![];
+                    for op_in in op_ins {
+                        if matches!(last_expr_id, Some(last) if *op_in == last) {
+                            args.push(expr.clone());
+                            continue;
+                        }
+                        args.push(format!("{}[i]", value_name(self.model, *op_in)));
+                    }
+                    let expr = match op {
+                        Op::Add => format!("({} + {})", args[0], args[1]),
+                        Op::Sub => format!("({} - {})", args[0], args[1]),
+                        Op::Mul => format!("({} * {})", args[0], args[1]),
+                        Op::Div => format!("({} / {})", args[0], args[1]),
+                        Op::Sqrt => format!("sqrtf({})", args[0]),
+                        Op::ReLU => format!("fmaxf({}, 0.0f)", args[0]),
+                        _ => todo!("{:?} is not yet supported", op),
+                    };
+                    assert_eq!(op_outs.len(), 1);
+                    return (expr, Some(op_outs[0]));
+                },
+            );
+
+            format!(
+                "#pragma omp parallel for num_threads({th})
+#pragma clang loop vectorize(enable)
+for (int i = 0; i < {size}; i++) {{
+    {output_name}[i] = {expr};
+}}",
+                th = self.intra_op_num_threads,
+                size = outputs[0].dims.total_elems(),
+            )
         } else {
             let rank = outputs[0].dims.len();
             let input_stride_list = inputs

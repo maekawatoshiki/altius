@@ -8,13 +8,8 @@ altius-core = { path = "../core" }
 log = { workspace = true }
 rustc-hash = { workspace = true }
 thiserror = { workspace = true }
-cudnn = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
-cust = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 libloading = "0.7.4"
 cranelift-module = "^0.97.0"
-
-[features]
-cuda = ["cudnn", "cust"]
 
 [dev-dependencies]
 color-backtrace = "0.5.1"

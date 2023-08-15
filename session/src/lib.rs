@@ -2,8 +2,6 @@
 #![allow(clippy::excessive_precision)]
 
 pub mod plan;
-#[cfg(feature = "wgpu-backend")]
-pub mod wgpu;
 
 use std::borrow::Cow;
 

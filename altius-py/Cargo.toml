@@ -22,6 +22,6 @@ cargo-util = "^0.2.1"
 [features]
 default = ["cblas"]
 matrixmultiply-threading = [ "altius-session-interpreter/matrixmultiply-threading" ]
-cuda = [ "altius-session/cuda" ]
+cuda = [ "altius-session-interpreter/cuda" ]
 heavy-log = [ "altius-session-interpreter/heavy-log" ]
 cblas = []

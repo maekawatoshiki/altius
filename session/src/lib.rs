@@ -1,8 +1,6 @@
 #![feature(portable_simd)]
 #![allow(clippy::excessive_precision)]
 
-#[cfg(feature = "opencl")]
-pub mod opencl;
 pub mod plan;
 #[cfg(feature = "wgpu-backend")]
 pub mod wgpu;

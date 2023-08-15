@@ -10,13 +10,11 @@ rustc-hash = { workspace = true }
 thiserror = { workspace = true }
 cudnn = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
-opencl3 = { version = "^0.9.1", optional = true }
 libloading = "0.7.4"
 cranelift-module = "^0.97.0"
 
 [features]
 cuda = ["cudnn", "cust"]
-opencl = ["opencl3"]
 
 [dev-dependencies]
 color-backtrace = "0.5.1"

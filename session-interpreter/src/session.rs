@@ -181,7 +181,8 @@ impl InterpreterSession {
             || {
                 let mut op = node.op.clone();
                 let output_shapes =
-                    op.compute_output_shapes(&inputs, node.outputs.len(), self.model.opset_version);
+                    self.model
+                        .compute_output_shapes(&mut op, &inputs, node.outputs.len());
                 output_shapes.map(|os| (op, os))
             },
             Ok,

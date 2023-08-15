@@ -18,18 +18,19 @@ pub enum ShapeError {
     Message(Cow<'static, str>),
 }
 
-impl Op {
+impl Model {
     /// Computes the output shapes of the operation.
-    /// `self` could be overwritten. (e.g. if auto_pad is given, conv paddings are modified)
+    /// `op` could be overwritten. (e.g. Conv paddings would be modified if auto_pad is given.)
     pub fn compute_output_shapes(
-        &mut self,
+        &self,
+        op: &mut Op,
         inputs: &[&Tensor],
         num_outputs: usize,
-        opset_version: i64,
     ) -> Result<Vec<TypedFixedShape>, ShapeError> {
         let mut shapes = vec![];
+        let opset_version = self.opset_version;
 
-        match self {
+        match op {
             Op::Conv2d(conv) => {
                 let auto_pad = &conv.auto_pad;
                 let kernel = &conv.kernel_shape;
@@ -616,14 +617,14 @@ impl Op {
                     assert_eq!(output.len(), 1);
                     if i == 0 {
                         let ins = inputs.iter().map(|v| map[v]).collect::<Vec<_>>();
-                        prev_output_shape =
-                            op.compute_output_shapes(&ins, output.len(), opset_version)?;
+                        prev_output_shape = self.compute_output_shapes(op, &ins, output.len())?;
                     } else {
                         let prev_output_dummy = Tensor::empty_of_type(
                             prev_output_shape[0].elem_ty,
                             prev_output_shape[0].dims.clone(),
                         );
-                        prev_output_shape = op.compute_output_shapes(
+                        prev_output_shape = self.compute_output_shapes(
+                            op,
                             &inputs
                                 .iter()
                                 .map(|v| {
@@ -634,7 +635,6 @@ impl Op {
                                 })
                                 .collect::<Vec<_>>(),
                             output.len(),
-                            opset_version,
                         )?;
                     }
                     prev_output_id = Some(output[0]);
@@ -699,8 +699,7 @@ fn infer_shape(
         };
         inputs.push(input);
     }
-    let output_shapes =
-        op.compute_output_shapes(&inputs, node.outputs.len(), model.opset_version)?;
+    let output_shapes = model.compute_output_shapes(&mut op, &inputs, node.outputs.len())?;
     let mut outputs = vec![];
     for shape in &output_shapes {
         outputs.push(Tensor::empty_of_type(shape.elem_ty, shape.dims.clone()));

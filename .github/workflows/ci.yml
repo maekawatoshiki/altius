@@ -51,6 +51,7 @@ jobs:
     - name: Run examples
       run: |
         (cd altius-py && poetry run python deit.py)
+        (cd altius-py && poetry run python resnet50.py)
         cargo run --release --example mnist
         cargo run --release --example mobilenet
         cargo run --release --example deit

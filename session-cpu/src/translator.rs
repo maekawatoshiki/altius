@@ -14,7 +14,7 @@ use altius_core::{
     node::{Node, NodeId},
     op::{
         Cast, Concat, Conv2d, Flatten, FusedActivation, FusedElemwise, Gather, Gemm, HardSigmoid,
-        LayerNormalization, MaxPool, Op, ReduceMean, Resize, Softmax, Split, Transpose,
+        LayerNormalization, MaxPool, Op, ReduceMax, ReduceMean, Resize, Softmax, Split, Transpose,
     },
     tensor::{TensorElemType, TypedFixedShape},
     value::ValueId,
@@ -610,6 +610,7 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
             Op::Concat(ref c) => self.translate_concat(c, &args, &inputs, outputs)?,
             Op::Gather(ref g) => self.translate_gather(g, &args, &inputs, outputs)?,
             Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, outputs)?,
+            Op::ReduceMax(ref r) => self.translate_reduce_max(r, &args, &inputs, outputs)?,
             Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, outputs)?,
             Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, outputs)?,
             Op::Gelu => self.translate_gelu(&args, &inputs, outputs)?,
@@ -2709,6 +2710,35 @@ for (int i = 0; i < {outer}; i++) {{
     {output_name}[i] = sum * (1.f / {axis_len});
 }}",
             batch = output.dims.total_elems()
+        );
+
+        Ok(kernel)
+    }
+
+    fn translate_reduce_max(
+        &mut self,
+        rmax: &ReduceMax,
+        args: &[String],
+        inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
+    ) -> Result<String, SessionError> {
+        // TODO: Current implementation only supports reduction over all axes.
+
+        let input = inputs[0];
+        let input_name = &args[0];
+        let output_name = &args[1];
+        assert!(rmax.axes.is_empty());
+        assert!(!rmax.keep_dims);
+
+        let outer = input.dims.total_elems();
+        let kernel = format!(
+            "float max = -INFINITY;
+#pragma clang loop vectorize(enable)
+for (int i = 0; i < {outer}; i++) {{
+    max = fmaxf({input_name}[i], max);
+}}
+{output_name}[0] = max;
+"
         );
 
         Ok(kernel)

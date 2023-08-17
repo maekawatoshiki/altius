@@ -22,10 +22,6 @@ use altius_core::{
 use altius_session::{plan::NodeExecutionPlan, SessionError};
 #[cfg(feature = "cuda")]
 use cudnn::CudnnContext;
-#[cfg(feature = "x64-fusion")]
-use dynasm::dynasm;
-#[cfg(feature = "x64-fusion")]
-use dynasmrt::{x64::Assembler, DynasmApi};
 use ndarray::{s, ArrayView, ArrayView3, Axis, Dim, Ix};
 use rustc_hash::FxHashMap;
 use thread_local::ThreadLocal;
@@ -62,32 +58,6 @@ pub struct InterpreterSession {
     #[cfg(feature = "x64-fusion")]
     asm_ops: Assmembler,
 }
-
-// TODO: Snippets for x64 codegen.
-//
-// #[cfg(feature = "x64-fusion")]
-// let mut ops = Assembler::new().unwrap();
-//
-// #[cfg(feature = "x64-fusion")]
-// let entry = ops.offset();
-// #[cfg(feature = "x64-fusion")]
-// dynasm!(ops
-//     // rdi = input.0 addr (*const f32)
-//     // rsi = input.0 addr (*const f32)
-//     // rdx = output.0 addr (*mut f32)
-//     // rcx = len (u64)
-//     ; .arch x64
-//     ; vmovups ymm0, [rdi]
-//     ; vmovups ymm1, [rsi]
-//     ; vaddps ymm0, ymm0, ymm1
-//     ; vmovups [rdx], ymm0
-//     ; ret
-// );
-// #[cfg(feature = "x64-fusion")]
-// let buf = ops.finalize().unwrap();
-// #[cfg(feature = "x64-fusion")]
-// let entry_fn: extern "C" fn(*const f32, *const f32, *mut f32, u64) -> f32 =
-//     unsafe { std::mem::transmute(buf.ptr(entry)) };
 
 impl InterpreterSession {
     pub fn model(&self) -> &Model {

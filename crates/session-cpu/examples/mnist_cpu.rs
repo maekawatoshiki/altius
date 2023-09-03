@@ -20,7 +20,7 @@ fn main() {
     color_backtrace::install();
 
     let opt = Opt::from_args();
-    let model_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let model_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let model = load_onnx(model_root.join("mnist-8.onnx")).unwrap();
 
     let mut inputs = vec![];

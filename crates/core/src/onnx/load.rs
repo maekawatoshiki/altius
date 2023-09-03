@@ -441,7 +441,7 @@ pub fn load_onnx_model_proto(path: impl AsRef<Path>) -> Result<ModelProto, io::E
 #[test]
 fn load_mnist_proto() {
     let model_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../models")
+        .join("../../models")
         .join("mnist-8.onnx");
     let model = load_onnx_model_proto(model_path).unwrap();
     assert!(model.graph.is_some());
@@ -450,7 +450,7 @@ fn load_mnist_proto() {
 #[test]
 fn load_mnist() {
     let model_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../models")
+        .join("../../models")
         .join("mnist-8.onnx");
     let model = load_onnx(model_path).unwrap();
     println!("{:#?}", model.graph.nodes);

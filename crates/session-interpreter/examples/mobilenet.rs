@@ -1,3 +1,8 @@
+use altius_core::{onnx::load_onnx, tensor::Tensor};
+use altius_session_interpreter::InterpreterSessionBuilder;
+use std::cmp::Ordering;
+use std::fs;
+use std::path::Path;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -8,27 +13,14 @@ pub struct Opt {
 
     #[structopt(long = "iters", help = "The number of iterations", default_value = "1")]
     pub iters: usize,
-
-    #[structopt(
-        long = "threads",
-        help = "The number of computation threads",
-        default_value = "1"
-    )]
-    pub threads: usize,
 }
 
 fn main() {
-    use altius_core::{onnx::load_onnx, tensor::Tensor};
-    use altius_session_cpu::CPUSessionBuilder;
-    use std::cmp::Ordering;
-    use std::fs;
-    use std::path::Path;
-
     env_logger::init();
     color_backtrace::install();
 
     let opt = Opt::from_args();
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
@@ -40,9 +32,8 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
 
-    let session = CPUSessionBuilder::new(model)
+    let session = InterpreterSessionBuilder::new(model)
         .with_profiling_enabled(opt.profile)
-        .with_intra_op_num_threads(opt.threads)
         .build()
         .unwrap();
     let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();

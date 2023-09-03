@@ -139,7 +139,7 @@ impl From<TensorElemType> for DataType {
 #[test]
 fn test_save_onnx() {
     use super::load::{load_onnx, load_onnx_model_proto};
-    let model = load_onnx("../models/mobilenetv3.onnx").unwrap();
+    let model = load_onnx("../../models/mobilenetv3.onnx").unwrap();
     let _ = save_onnx(&model, "/tmp/test.onnx").unwrap();
     insta::assert_debug_snapshot!(load_onnx_model_proto("/tmp/test.onnx").unwrap());
 }

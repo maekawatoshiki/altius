@@ -50,8 +50,8 @@ jobs:
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
     - name: Run examples
       run: |
-        (cd altius-py && poetry run python deit.py)
-        (cd altius-py && poetry run python resnet50.py)
+        (cd crates/altius-py && poetry run python deit.py)
+        (cd crates/altius-py && poetry run python resnet50.py)
         cargo run --release --example mnist
         cargo run --release --example mobilenet
         cargo run --release --example deit

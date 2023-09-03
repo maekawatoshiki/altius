@@ -10,7 +10,7 @@ fn main() {
     env_logger::init();
     color_backtrace::install();
 
-    let mnist_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let mnist_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mnist = load_onnx(mnist_root.join("mnist-8.onnx")).unwrap();
 
     let mut inputs = vec![];

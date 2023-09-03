@@ -44,7 +44,7 @@ pub fn load_and_run(onnx: &[u8], img: &[u8]) -> Option<String> {
         .collect::<Vec<_>>();
     out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 
-    let classes = include_str!("../../models/imagenet_classes.txt");
+    let classes = include_str!("../../../models/imagenet_classes.txt");
     let classes = classes.split('\n').collect::<Vec<_>>();
     let mut result_str = "".to_string();
     for i in 0..5 {

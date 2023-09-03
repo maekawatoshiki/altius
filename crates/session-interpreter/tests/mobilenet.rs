@@ -7,7 +7,7 @@ use std::path::Path;
 #[test]
 fn mobilenet() {
     env_logger::init();
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mut model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
     let input_value = model.lookup_named_value("input").unwrap();
 

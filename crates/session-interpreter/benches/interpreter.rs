@@ -11,7 +11,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 const THREADS: usize = 1;
 
 fn without_gelu(c: &mut Criterion) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let model = load_onnx(root.join("deit.onnx"))
         .expect("Failed to load model. Have you run altius-py/deit.py?");
 
@@ -25,7 +25,7 @@ fn without_gelu(c: &mut Criterion) {
 }
 
 fn with_gelu(c: &mut Criterion) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mut model = load_onnx(root.join("deit.onnx"))
         .expect("Failed to load model. Have you run altius-py/deit.py?");
     fuse_gelu(&mut model);
@@ -40,7 +40,7 @@ fn with_gelu(c: &mut Criterion) {
 }
 
 fn with_gelu_ln(c: &mut Criterion) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mut model = load_onnx(root.join("deit.onnx"))
         .expect("Failed to load model. Have you run altius-py/deit.py?");
     fuse_layer_norm(&mut model);
@@ -58,7 +58,7 @@ fn with_gelu_ln(c: &mut Criterion) {
 }
 
 fn with_gelu_ln2(c: &mut Criterion) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mut model = load_onnx(root.join("deit.onnx"))
         .expect("Failed to load model. Have you run altius-py/deit.py?");
     fuse_gelu(&mut model);

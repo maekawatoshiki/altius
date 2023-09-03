@@ -31,7 +31,7 @@ fn main() {
     color_backtrace::install();
 
     let opt = Opt::from_args();
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mut model = load_onnx(root.join("deit.onnx"))
         .expect("Failed to load model. Have you run altius-py/deit.py?");
     fuse_layer_norm(&mut model);

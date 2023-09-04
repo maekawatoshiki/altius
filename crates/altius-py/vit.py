@@ -15,10 +15,10 @@ import onnxruntime as ort
 def main():
     logging.basicConfig(level=logging.INFO)
     os.environ["OMP_PROC_BIND"] = "TRUE"
-    os.environ["BLIS_NUM_THREADS"] = "1" # Increase this number
+    os.environ["BLIS_NUM_THREADS"] = "1"  # Increase this number
 
-    labels = open("../models/imagenet_classes.txt").readlines()
-    image = Image.open("../models/cat.png")
+    labels = open("../../models/imagenet_classes.txt").readlines()
+    image = Image.open("../../models/cat.png")
 
     preprocess = transforms.Compose(
         [
@@ -34,8 +34,8 @@ def main():
     # opt = ort.SessionOptions()
     # # opt.intra_op_num_threads = 1
     # # opt.inter_op_num_threads = 1
-    # sess = ort.InferenceSession("../models/vit_b_16.onnx", sess_options=opt)
-    sess = altius_py.InferenceSession("../models/vit_b_16.onnx", True)
+    # sess = ort.InferenceSession("../../models/vit_b_16.onnx", sess_options=opt)
+    sess = altius_py.InferenceSession("../../models/vit_b_16.onnx", True)
 
     inputs = {"x": input}
     start = time.time()

@@ -19,7 +19,7 @@ import altius_py
 def main():
     logging.basicConfig(level=logging.INFO)
 
-    path = "../models/cat.png"
+    path = "../../models/cat.png"
     image = Image.open(path).resize((520, 520))
 
     weights = FCN_ResNet50_Weights.DEFAULT
@@ -30,9 +30,9 @@ def main():
     # sess_options.intra_op_num_threads = 1
     # sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
     # sess = ort.InferenceSession(
-    #     "../models/fcn-resnet50.onnx", sess_options=sess_options
+    #     "../../models/fcn-resnet50.onnx", sess_options=sess_options
     # )
-    sess = altius_py.InferenceSession("../models/fcn-resnet50.onnx")
+    sess = altius_py.InferenceSession("../../models/fcn-resnet50.onnx")
 
     inputs = {"input.1": input}
 

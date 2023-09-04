@@ -16,7 +16,7 @@ import altius_py
 
 
 def main():
-    model_path = "../models/resnet50.onnx"
+    model_path = "../../models/resnet50.onnx"
 
     if not os.path.exists(model_path):
         with torch.no_grad():
@@ -28,8 +28,8 @@ def main():
                 verbose=True,
             )
 
-    labels = open("../models/imagenet_classes.txt").readlines()
-    image = Image.open("../models/cat.png")
+    labels = open("../../models/imagenet_classes.txt").readlines()
+    image = Image.open("../../models/cat.png")
 
     preprocess = transforms.Compose(
         [

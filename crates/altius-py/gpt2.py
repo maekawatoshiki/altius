@@ -18,9 +18,9 @@ logging.basicConfig(level=logging.INFO)
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 sess = altius_py.InferenceSession(
-    "../models/gpt2.onnx", intra_op_num_threads=16, enable_profile=True
+    "../../models/gpt2.onnx", intra_op_num_threads=16, enable_profile=True
 )
-# sess = ort.InferenceSession("../models/gpt2.onnx", providers=["CPUExecutionProvider"])
+# sess = ort.InferenceSession("../../models/gpt2.onnx", providers=["CPUExecutionProvider"])
 
 torch.manual_seed(42)
 

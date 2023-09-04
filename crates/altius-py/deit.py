@@ -13,8 +13,8 @@ from torchvision import transforms
 def main():
     logging.basicConfig(level=logging.INFO)
 
-    image = Image.open("../models/cat.png")
-    labels = open("../models/imagenet_classes.txt").readlines()
+    image = Image.open("../../models/cat.png")
+    labels = open("../../models/imagenet_classes.txt").readlines()
 
     preprocess = transforms.Compose(
         [
@@ -26,7 +26,7 @@ def main():
     input = preprocess(image)
     input = input.unsqueeze(0).numpy()
 
-    onnx_path = "../models/deit.onnx"
+    onnx_path = "../../models/deit.onnx"
 
     if not os.path.exists(onnx_path):
         import onnxsim

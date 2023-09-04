@@ -263,7 +263,7 @@ def get_font() -> ImageFont:
 def main():
     logging.basicConfig(level=logging.INFO)
 
-    image = Image.open("../models/dog.jpg")
+    image = Image.open("../../models/dog.jpg")
 
     preprocess = transforms.Compose(
         [
@@ -276,7 +276,7 @@ def main():
     input = input.unsqueeze(0).numpy()
     print(input.shape)
 
-    path = "../models/yolov5s.onnx"
+    path = "../../models/yolov5s.onnx"
     # ort_sess = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
     sess = altius_py.InferenceSession(path, intra_op_num_threads=8, enable_profile=True)
 

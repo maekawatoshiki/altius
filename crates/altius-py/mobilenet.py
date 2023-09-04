@@ -12,8 +12,8 @@ import altius_py
 
 
 def main():
-    labels = open("../models/imagenet_classes.txt").readlines()
-    image = Image.open("../models/cat.png")
+    labels = open("../../models/imagenet_classes.txt").readlines()
+    image = Image.open("../../models/cat.png")
 
     preprocess = transforms.Compose(
         [
@@ -26,7 +26,7 @@ def main():
     input = preprocess(image)
     input = input.unsqueeze(0).numpy()
 
-    sess = altius_py.InferenceSession("../models/mobilenetv3.onnx")
+    sess = altius_py.InferenceSession("../../models/mobilenetv3.onnx")
 
     inputs = {"input": input}
     output = sess.run(None, inputs)[0][0]

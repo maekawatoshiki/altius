@@ -13,7 +13,7 @@ import torch
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    image = Image.open("../models/cat.png").convert("RGB")
+    image = Image.open("../../models/cat.png").convert("RGB")
 
     preprocess = transforms.Compose(
         [
@@ -27,7 +27,7 @@ def main():
     input = input.unsqueeze(0).numpy()
     print(input.shape)
 
-    path = "../models/realesrgan_256x256.onnx"
+    path = "../../models/realesrgan_256x256.onnx"
     sess = altius_py.InferenceSession(
         path, intra_op_num_threads=32, enable_profile=True
     )

@@ -21,13 +21,17 @@
 
 # Requirements
 
+- cargo
 - poetry
+    - `python3.10` is recommended.
 
 # Run
 
 ```sh
-# Download large models.
+# Download models.
 (cd models && ./download.sh)
+# Download minimum models.
+# (cd models && ./download.sh CI)
 
 # Run examples.
 # {mnist, mobilenet, deit, vit} are available.
@@ -58,7 +62,7 @@ yarn serve
 # Run from Python
 
 ```sh
-cd altius-py
+cd ./crates/altius-py
 poetry install
 poetry run maturin develop -r
 poetry run python mobilenet.py

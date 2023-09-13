@@ -358,9 +358,7 @@ impl Tensor {
             return false;
         }
 
-        x.into_iter()
-            .zip(other.into_iter())
-            .all(|(&x, &y)| T::close(x, y))
+        x.iter().zip(other.iter()).all(|(&x, &y)| T::close(x, y))
     }
 
     pub fn verify(&self) -> bool {

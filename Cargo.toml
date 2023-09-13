@@ -13,6 +13,10 @@ resolver = "2"
 thiserror = "^1.0.31"
 log = "^0.4.17"
 rustc-hash = "^1.1.0"
+cranelift = "^0.99.0"
+cranelift-module = "^0.99.0"
+cranelift-object = "^0.99.0"
+cranelift-codegen = "^0.99.0"
 
 [profile.release]
 opt-level = 3

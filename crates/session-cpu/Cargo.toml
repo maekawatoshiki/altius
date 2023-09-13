@@ -8,10 +8,10 @@ log = { workspace = true }
 rustc-hash = { workspace = true }
 altius-core = { path = "../core" }
 altius-session = { path = "../session" }
-cranelift = "^0.97.0"
-cranelift-module = "^0.97.0"
-cranelift-object = "^0.97.0"
-cranelift-codegen = "^0.97.0"
+cranelift = { workspace = true }
+cranelift-module = { workspace = true }
+cranelift-object = { workspace = true }
+cranelift-codegen = { workspace = true }
 libloading = "0.7.4"
 indent = "0.1.1"
 sha1 = "0.10.5"

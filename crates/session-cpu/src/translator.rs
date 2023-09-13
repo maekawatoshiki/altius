@@ -80,7 +80,6 @@ impl<'a> Translator<'a> {
             |_| Ok::<_, SessionError>(tempfile::TempDir::new()?.into_path()),
             |dir| Ok(PathBuf::from(dir)),
         )?;
-        #[allow(unused_mut)]
         let mut prev_code_hash = None;
         if target_dir.as_path().exists() {
             let files = glob::glob(target_dir.join("*.c").as_path().to_str().unwrap())
@@ -969,7 +968,7 @@ for (int i = 0; i < {size}; i++) {{
                         _ => todo!("{:?} is not yet supported", op),
                     };
                     assert_eq!(op_outs.len(), 1);
-                    return (expr, Some(op_outs[0]));
+                    (expr, Some(op_outs[0]))
                 },
             );
 

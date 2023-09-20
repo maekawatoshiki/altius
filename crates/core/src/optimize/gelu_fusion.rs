@@ -97,7 +97,12 @@ pub fn fuse_gelu(model: &mut Model) {
         let gelu = Node::new(Op::Gelu).with_in(start).with_out(gelu_out);
         let _gelu_id = model.graph.add_node(gelu);
 
-        for user_id in &value_users[&end] {
+        let Some(users) = value_users.get(&end) else {
+            let idx = model.graph.outputs.iter().position(|&i| i == end).unwrap();
+            model.graph.outputs[idx] = gelu_out;
+            continue;
+        };
+        for user_id in users {
             let user = &mut model.graph.nodes[*user_id];
             let idx = user.inputs.iter().position(|&i| i == end).unwrap();
             user.inputs[idx] = gelu_out

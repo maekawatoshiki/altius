@@ -4,8 +4,12 @@ import onnx
 import tempfile
 import pytest
 import os
+
 import numpy as np
+
+import onnxsim
 from onnx import helper, ValueInfoProto, TensorProto
+from onnxscript import FLOAT, script, opset12 as op
 
 
 def test_relu_1():
@@ -114,6 +118,39 @@ def test_erf_2():
         op_elemwise(
             os.path.join(tmpdir, "model.onnx"), "Erf", [3, 28, 28], atol=1e-1, rtol=1e-5
         )
+
+
+@script()
+def gelu(x: FLOAT[1, 2, 3]) -> FLOAT[1, 2, 3]:
+    half = op.Constant(
+        value=onnx.helper.make_tensor("value", TensorProto.FLOAT, [1], [0.5])
+    )
+    one = op.Constant(
+        value=onnx.helper.make_tensor("value", TensorProto.FLOAT, [1], [1.0])
+    )
+    sqrt2 = op.Constant(
+        value=onnx.helper.make_tensor("value", TensorProto.FLOAT, [1], [np.sqrt(2.0)])
+    )
+    return op.Mul(op.Mul(x, op.Add(op.Erf(op.Div(x, sqrt2)), one)), half)
+
+
+def test_gelu_1():
+    model = gelu.to_model_proto()
+    model, ok = onnxsim.simplify(model)
+    assert ok
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filepath = os.path.join(tmpdir, "model.onnx")
+        onnx.save(model, filepath)
+        ort_sess = ort.InferenceSession(filepath, providers=["CPUExecutionProvider"])
+        altius_sess = altius_py.InferenceSession(filepath)
+
+        x = np.random.random_sample([1, 2, 3]).astype(np.float32)
+        expected = ort_sess.run(None, {"x": x})
+        actual = altius_sess.run(None, {"x": x})
+
+        for expected, actual in zip(expected, actual):
+            assert np.allclose(expected, actual, atol=1e-1, rtol=1e-5)
 
 
 def op_elemwise(filepath, op_type, shape, **kwargs):

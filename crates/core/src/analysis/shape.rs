@@ -430,9 +430,12 @@ impl Model {
             }
             Op::Split(split) => {
                 if opset_version >= 13 {
-                    let axis = split.axis;
-                    assert!(axis >= 0, "Negative index not supported");
                     let input = inputs[0].dims();
+                    let axis = if split.axis < 0 {
+                        input.len() as i64 + split.axis
+                    } else {
+                        split.axis
+                    };
                     let split = inputs[1].data::<i64>();
                     for s in split {
                         let mut dims = input.clone();

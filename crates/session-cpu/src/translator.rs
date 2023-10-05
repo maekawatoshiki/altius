@@ -2951,8 +2951,11 @@ for (int i = 0; i < {size}; i++) {{
     ) -> Result<String, SessionError> {
         let opset_version = self.model.opset_version;
 
-        assert!(split.axis >= 0);
-        let axis = split.axis as usize;
+        let axis = if split.axis < 0 {
+            inputs[0].dims.len() as i64 + split.axis
+        } else {
+            split.axis
+        } as usize;
         assert_eq!(axis, inputs[0].dims.len() - 1);
         assert!(inputs[0].elem_ty.is_f32());
         let axis_len = *inputs[0].dims.as_slice().last().unwrap();

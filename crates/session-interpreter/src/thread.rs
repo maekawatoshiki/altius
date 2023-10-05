@@ -70,11 +70,21 @@ impl ThreadCtx {
         #[cfg(target_os = "linux")]
         let apicid_to_processor = if let Ok(cpuinfo) = procfs::CpuInfo::new() {
             let mut apicid_to_processor = vec![0; cpuinfo.cpus.len()];
-            for (i, cpu) in cpuinfo.cpus.iter().enumerate() {
-                apicid_to_processor[cpu["apicid"].parse().unwrap_or(i)] =
-                    cpu["processor"].parse().unwrap_or(i);
+            let is_bijective = cpuinfo
+                .cpus
+                .iter()
+                .enumerate()
+                .all(|(i, c)| c["apicid"].parse::<usize>().unwrap_or(i) < cpuinfo.cpus.len());
+            if is_bijective {
+                for (i, cpu) in cpuinfo.cpus.iter().enumerate() {
+                    *apicid_to_processor
+                        .get_mut(cpu["apicid"].parse().unwrap_or(i))
+                        .unwrap() = cpu["processor"].parse().unwrap_or(i);
+                }
+                apicid_to_processor
+            } else {
+                (0..n).collect::<Vec<_>>()
             }
-            apicid_to_processor
         } else {
             (0..n).collect::<Vec<_>>()
         };

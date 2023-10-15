@@ -616,6 +616,7 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
             Op::Unsqueeze(_) => String::new(), // nop
             Op::Squeeze(_) => String::new(),   // nop
             Op::Split(ref s) => self.translate_split(s, &args, &inputs, outputs)?,
+            Op::Slice => self.translate_slice(&args, &inputs, outputs)?,
             Op::Cast(ref c) => self.translate_cast(c, &args, &inputs, outputs)?,
             Op::Resize(ref r) => self.translate_resize(r, &args, &inputs, outputs)?,
             Op::FusedElemwise(ref f) => {
@@ -3011,6 +3012,94 @@ for (int i = 0; i < {size} / {axis_len}; i++) {{
                     .join(", "),
             )
         };
+
+        Ok(kernel)
+    }
+
+    fn translate_slice(
+        &mut self,
+        args: &[String],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
+    ) -> Result<String, SessionError> {
+        assert_eq!(inputs.len(), 4); // data, starts, ends, axes
+                                     // TODO: Support steps
+
+        let shape_data = inputs[0];
+        let shape_starts = inputs[1];
+        let shape_ends = inputs[2];
+        let shape_axes = inputs[3];
+        let shape_output = &outputs[0];
+
+        let data = &args[0];
+        let starts = &args[1];
+        let ends = &args[2];
+        let axes = &args[3];
+        let output = &args[4];
+
+        // Very limited support for now
+        // TODO: Add support for wider variety of shapes
+        assert_eq!(shape_data.dims.len(), 3);
+        assert_eq!(shape_output.dims.len(), 3);
+        assert_eq!(shape_starts.dims.len(), 1);
+        assert_eq!(shape_ends.dims.len(), 1);
+        assert_eq!(shape_axes.dims.len(), 1);
+        assert_eq!(shape_starts.dims[0], 1);
+        assert_eq!(shape_ends.dims[0], 1);
+        assert_eq!(shape_axes.dims[0], 1);
+
+        let dims = shape_data
+            .dims
+            .as_slice()
+            .iter()
+            .map(|&x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let kernel = format!(
+            r#"
+const int num_dims = 3;
+const int num_axes = 1;
+
+int64_t dims[num_dims] = {{ {dims} }};
+int64_t steps[num_dims] = {{ 1, 1, 1 }};
+int64_t starts[num_axes] = {{ {starts}[0] }};
+int64_t ends[num_axes] = {{ {ends}[0] }};
+int64_t axes[num_axes] = {{ {axes}[0] }};
+
+int64_t effective_starts[num_dims];
+int64_t effective_ends[num_dims];
+int64_t effective_steps[num_dims];
+
+for (int i = 0; i < num_dims; i++) {{
+    effective_starts[i] = 0;
+    effective_ends[i] = dims[i];
+    effective_steps[i] = 1;
+}}
+
+for (int i = 0; i < num_axes; i++) {{
+    if (axes[i] < 0) axes[i] += num_dims;
+    if (starts[i] < 0) starts[i] += dims[axes[i]];
+    if (ends[i] < 0) ends[i] += dims[axes[i]];
+    effective_starts[axes[i]] = starts[i];
+    effective_ends[axes[i]] = ends[i];
+    effective_steps[axes[i]] = steps[i];
+}}
+
+assert(effective_steps[0] == 1);
+assert(effective_steps[1] == 1);
+assert(effective_steps[2] == 1);
+
+int64_t idx = 0;
+for (int i = effective_starts[0]; i < effective_ends[0]; i += /*effective_steps[0]=*/ 1) {{
+    for (int j = effective_starts[1]; j < effective_ends[1]; j += /*effective_steps[1]=*/ 1) {{
+        #pragma clang loop vectorize(enable)
+        for (int k = effective_starts[2]; k < effective_ends[2]; k += /*effective_steps[2]=*/ 1)
+            {output}[idx++] = {data}[i * dims[1] * dims[2] + j * dims[2] + k];
+    }}
+}}
+"#
+        );
 
         Ok(kernel)
     }

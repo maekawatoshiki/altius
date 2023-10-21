@@ -52,12 +52,14 @@ jobs:
       run: |
         (cd crates/altius-py && poetry run python deit.py)
         (cd crates/altius-py && poetry run python resnet50.py)
+        (cd crates/altius-py && poetry run python export_vit.py)
         cargo run --release --example mnist
         cargo run --release --example mobilenet
         cargo run --release --example deit
         cargo run --release --example mnist_cpu
         cargo run --release --example mobilenet_cpu
         cargo run --release --example deit_cpu
+        cargo run --release --example vit_cpu
         cargo run --release --example vit
         cargo run --release --example infer -- ./models/mnist-8.onnx
       env:

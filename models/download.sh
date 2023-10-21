@@ -22,12 +22,10 @@ download() {
 }
 
 if [ "${1:-}" = "CI" ]; then
-  download 1K6m7WxoE3noMTbNPyhyxLLNlXsdN1Sq6 ./vit_b_16.onnx
   download 1BiXmAGt_SZdZ1OuSv3ntT6Ad5h_q7oJ4 ./mnist-8.onnx
   download 1cZtpzvERn-QXDjfbPYY_cu3RlxxQJOVP ./mobilenetv3.onnx
   download 1PkSkHolMuM8_Eefj4Nu0LDSF_xqezgsT ./cat.png
 else
-  download 1K6m7WxoE3noMTbNPyhyxLLNlXsdN1Sq6 ./vit_b_16.onnx
   download 1E2RxWfxufLNB_cXm30RdjXt4YVbFzQrs ./bert.onnx
   download 1YP8wJyOhR0vSaeasn-z1WbkXBX8TzUER ./realesrgan_256x256.onnx
   download 1GgqkMVXL0T2ssZ-JSrMhCCJvAmpIgk8Q ./gpt2.onnx

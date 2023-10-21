@@ -38,13 +38,13 @@ fn main() {
     fuse_elemwise_ops(&mut model).unwrap();
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
-    let resized = image::imageops::resize(&image, 384, 384, image::imageops::FilterType::Triangle);
-    let image = ndarray::Array4::from_shape_fn((1, 3, 384, 384), |(_, c, y, x)| {
+    let resized = image::imageops::resize(&image, 224, 224, image::imageops::FilterType::Triangle);
+    let image = ndarray::Array4::from_shape_fn((1, 3, 224, 224), |(_, c, y, x)| {
         let mean = [0.5, 0.5, 0.5][c];
         let std = [0.5, 0.5, 0.5][c];
         (resized[(x as _, y as _)][c] as f32 / 255.0 - mean) / std
     });
-    let input = Tensor::new(vec![1, 3, 384, 384].into(), image.into_raw_vec());
+    let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
 
     let i = CPUSessionBuilder::new(model)
         .with_profiling_enabled(opt.profile)

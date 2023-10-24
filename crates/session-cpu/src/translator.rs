@@ -3056,29 +3056,29 @@ for (int i = 0; i < {size} / {axis_len}; i++) {{
             .collect::<Vec<_>>()
             .join(", ");
 
+        let num_dims = 3;
+        let num_axes = 1;
         let kernel = format!(
             r#"
-const int num_dims = 3;
-const int num_axes = 1;
 
-int64_t dims[num_dims] = {{ {dims} }};
-int64_t steps[num_dims] = {{ 1, 1, 1 }};
-int64_t starts[num_axes] = {{ {starts}[0] }};
-int64_t ends[num_axes] = {{ {ends}[0] }};
-int64_t axes[num_axes] = {{ {axes}[0] }};
+int64_t dims  [{num_dims}] = {{ {dims} }};
+int64_t steps [{num_dims}] = {{ 1, 1, 1 }};
+int64_t starts[{num_axes}] = {{ {starts}[0] }};
+int64_t ends  [{num_axes}] = {{ {ends}[0] }};
+int64_t axes  [{num_axes}] = {{ {axes}[0] }};
 
-int64_t effective_starts[num_dims];
-int64_t effective_ends[num_dims];
-int64_t effective_steps[num_dims];
+int64_t effective_starts[{num_dims}];
+int64_t effective_ends[{num_dims}];
+int64_t effective_steps[{num_dims}];
 
-for (int i = 0; i < num_dims; i++) {{
+for (int i = 0; i < {num_dims}; i++) {{
     effective_starts[i] = 0;
     effective_ends[i] = dims[i];
     effective_steps[i] = 1;
 }}
 
-for (int i = 0; i < num_axes; i++) {{
-    if (axes[i] < 0) axes[i] += num_dims;
+for (int i = 0; i < {num_axes}; i++) {{
+    if (axes[i] < 0) axes[i] += {num_dims};
     if (starts[i] < 0) starts[i] += dims[axes[i]];
     if (ends[i] < 0) ends[i] += dims[axes[i]];
     effective_starts[axes[i]] = starts[i];

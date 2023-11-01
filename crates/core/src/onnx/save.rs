@@ -36,13 +36,34 @@ pub enum ModelSaveError {
 
     #[error("Graph output shape is not provided")]
     NoGraphOutputShape,
+
+    #[error("Unknown opset version: {0}")]
+    UnknownOpsetVersion(i64),
 }
 
 pub fn save_onnx(model: &Model, path: impl AsRef<Path>) -> Result<(), ModelSaveError> {
+    fn opset_to_ir_version(opset: i64) -> Result<i64, ModelSaveError> {
+        match opset {
+            1..=8 => Ok(3),
+            9 => Ok(4),
+            10 => Ok(5),
+            11 => Ok(6),
+            12..=14 => Ok(7),
+            15..=18 => Ok(8),
+            19..=20 => Ok(9),
+            _ => Err(ModelSaveError::UnknownOpsetVersion(opset)),
+        }
+    }
+
     let mut model_proto = ModelProto::default();
     let mut buf = Vec::new();
 
     model_proto.graph = encode_graph(model)?.into();
+    model_proto.opset_import.push(OperatorSetIdProto {
+        domain: Some("ai.onnx".to_string()),
+        version: Some(model.opset_version),
+    });
+    model_proto.ir_version = Some(opset_to_ir_version(model.opset_version)?);
     model_proto.encode(&mut buf).unwrap();
 
     fs::write(path, buf).unwrap();

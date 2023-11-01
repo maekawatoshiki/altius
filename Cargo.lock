@@ -95,6 +95,7 @@ dependencies = [
  "image",
  "libloading",
  "log",
+ "ndarray",
  "ort",
  "rustc-hash",
  "structopt",

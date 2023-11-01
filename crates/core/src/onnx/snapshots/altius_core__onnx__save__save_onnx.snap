@@ -1,11 +1,22 @@
 ---
-source: core/src/onnx/save.rs
-assertion_line: 172
+source: crates/core/src/onnx/save.rs
+assertion_line: 165
 expression: "load_onnx_model_proto(\"/tmp/test.onnx\").unwrap()"
 ---
 ModelProto {
-    ir_version: None,
-    opset_import: [],
+    ir_version: Some(
+        4,
+    ),
+    opset_import: [
+        OperatorSetIdProto {
+            domain: Some(
+                "ai.onnx",
+            ),
+            version: Some(
+                9,
+            ),
+        },
+    ],
     producer_name: None,
     producer_version: None,
     domain: None,

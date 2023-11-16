@@ -41,6 +41,16 @@ impl CPUSessionBuilder {
             .with_intra_op_num_threads(self.intra_op_num_threads)
             .compile()?;
 
+        #[cfg(target_os = "linux")]
+        let lib: libloading::Library = unsafe {
+            // Load library with `RTLD_NOW | RTLD_NODELETE` to fix a SIGSEGV
+            libloading::os::unix::Library::open(
+                Some(product.target_dir.join("model.so")),
+                0x2 | 0x1000,
+            )?
+            .into()
+        };
+        #[cfg(not(target_os = "linux"))]
         let lib = unsafe { libloading::Library::new(product.target_dir.join("model.so")) }?;
         {
             let initializer: libloading::Symbol<unsafe extern "C" fn()> =

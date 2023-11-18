@@ -2,17 +2,24 @@ use altius_core::{
     graph::Graph,
     model::Model,
     node::Node,
-    onnx::save::save_onnx,
+    onnx::{load_onnx, save::save_onnx},
     op::Op,
-    tensor::{TensorElemType, TypedFixedShape},
+    tensor::{Tensor, TensorElemType, TypedFixedShape},
 };
+use altius_session_cpu::CPUSessionBuilder;
 use ndarray::CowArray;
 use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
 
 #[test]
-fn ort_add() {
+fn cpu_add() {
+    env_logger::init();
+
     let path = tempfile::NamedTempFile::new().unwrap();
-    export_onnx(path.path().to_str().unwrap());
+    let path = path.path();
+    export_onnx(path.to_str().unwrap());
+
+    let x_ = vec![1.0f32, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0];
+    let y_ = vec![2.0f32, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0];
 
     let env = Environment::builder()
         .with_execution_providers(&[ExecutionProvider::CPU(Default::default())])
@@ -23,12 +30,12 @@ fn ort_add() {
         .unwrap()
         .with_model_from_file(path)
         .unwrap();
-    let x = CowArray::from(&[1.0f32, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0])
+    let x = CowArray::from(&x_)
         .into_shape((4, 2))
         .unwrap()
         .into_dimensionality()
         .unwrap();
-    let y = CowArray::from(&[2.0f32, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0])
+    let y = CowArray::from(&y_)
         .into_shape((4, 2))
         .unwrap()
         .into_dimensionality()
@@ -37,10 +44,25 @@ fn ort_add() {
     let y = Value::from_array(sess.allocator(), &y).unwrap();
     let z = &sess.run(vec![x, y]).unwrap()[0];
     let z = z.try_extract::<f32>().unwrap();
-    let z = z.view();
+    let ort_z = z.view();
+    assert!(ort_z.shape() == &[4, 2]);
 
-    assert!(z.shape() == &[4, 2]);
-    assert!(z.as_slice() == Some(&[3.0f32, 7.0, 11.0, 15.0, 19.0, 23.0, 27.0, 31.0]));
+    let sess = CPUSessionBuilder::new(load_onnx(path).unwrap())
+        .build()
+        .unwrap();
+    let x = Tensor::new(vec![4, 2].into(), x_);
+    let y = Tensor::new(vec![4, 2].into(), y_);
+    let altius_z = &sess.run(vec![x, y]).unwrap()[0];
+    assert!(altius_z.dims().as_slice() == &[4, 2]);
+
+    ort_z
+        .as_slice()
+        .unwrap()
+        .iter()
+        .zip(altius_z.data::<f32>())
+        .for_each(|(ort, altius)| {
+            assert!((ort - altius).abs() < 1e-6);
+        });
 }
 
 #[cfg(test)]

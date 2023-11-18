@@ -70,8 +70,10 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
     let mut opset_version = None;
     for opset_import in &model_proto.opset_import {
         match opset_import.domain() {
-            "" if opset_version.is_none() => opset_version = Some(opset_import.version()),
-            "" => return Err(ModelLoadError::DuplicateOpset),
+            "" | "ai.onnx" if opset_version.is_none() => {
+                opset_version = Some(opset_import.version())
+            }
+            "" | "ai.onnx" => return Err(ModelLoadError::DuplicateOpset),
             domain => {
                 return Err(ModelLoadError::Todo(
                     format!("Custom domain ('{domain}') not supported yet").into(),

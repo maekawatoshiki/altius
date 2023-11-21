@@ -11,7 +11,7 @@ use ndarray::CowArray;
 use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
 
 #[test]
-fn cpu_add() {
+fn cpu_ops_bin() {
     // env_logger::init();
 
     for op in [Op::Add, Op::Sub, Op::Mul, Op::Div] {

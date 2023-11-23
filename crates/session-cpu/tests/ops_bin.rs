@@ -19,8 +19,8 @@ fn cpu_ops_bin() {
         let path = path.path();
         export_onnx(path.to_str().unwrap(), op);
 
-        let x_ = vec![1.0f32, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0];
-        let y_ = vec![2.0f32, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0];
+        let x_ = Tensor::rand_of_type(TensorElemType::F32, vec![4, 2].into());
+        let y_ = Tensor::rand_of_type(TensorElemType::F32, vec![4, 2].into());
 
         let env = Environment::builder()
             .with_execution_providers(&[ExecutionProvider::CPU(Default::default())])
@@ -31,12 +31,12 @@ fn cpu_ops_bin() {
             .unwrap()
             .with_model_from_file(path)
             .unwrap();
-        let x = CowArray::from(&x_)
+        let x = CowArray::from(x_.data::<f32>())
             .into_shape((4, 2))
             .unwrap()
             .into_dimensionality()
             .unwrap();
-        let y = CowArray::from(&y_)
+        let y = CowArray::from(y_.data::<f32>())
             .into_shape((4, 2))
             .unwrap()
             .into_dimensionality()
@@ -51,9 +51,7 @@ fn cpu_ops_bin() {
         let sess = CPUSessionBuilder::new(load_onnx(path).unwrap())
             .build()
             .unwrap();
-        let x = Tensor::new(vec![4, 2].into(), x_);
-        let y = Tensor::new(vec![4, 2].into(), y_);
-        let altius_z = &sess.run(vec![x, y]).unwrap()[0];
+        let altius_z = &sess.run(vec![x_, y_]).unwrap()[0];
         assert!(altius_z.dims().as_slice() == &[4, 2]);
 
         ort_z

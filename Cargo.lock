@@ -126,6 +126,7 @@ dependencies = [
  "ndarray",
  "num_cpus",
  "ort",
+ "rayon",
  "rustc-hash",
  "sha1",
  "structopt",

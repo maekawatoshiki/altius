@@ -13,8 +13,9 @@ use altius_core::{
     model::Model,
     node::{Node, NodeId},
     op::{
-        Cast, Concat, Conv2d, Flatten, FusedActivation, FusedElemwise, Gather, Gemm, HardSigmoid,
-        LayerNormalization, MaxPool, Op, ReduceMax, ReduceMean, Resize, Softmax, Split, Transpose,
+        BatchNormalization, Cast, Concat, Conv2d, Flatten, FusedActivation, FusedElemwise, Gather,
+        Gemm, HardSigmoid, LayerNormalization, MaxPool, Op, ReduceMax, ReduceMean, Resize, Softmax,
+        Split, Transpose,
     },
     tensor::{TensorElemType, TypedFixedShape},
     value::ValueId,
@@ -611,6 +612,9 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
             Op::ReduceMean(ref r) => self.translate_reduce_mean(r, &args, &inputs, outputs)?,
             Op::ReduceMax(ref r) => self.translate_reduce_max(r, &args, &inputs, outputs)?,
             Op::Softmax(ref s) => self.translate_softmax(s, &args, &inputs, outputs)?,
+            Op::BatchNormalization(ref b) => {
+                self.translate_batch_norm(b, &args, &inputs, outputs)?
+            }
             Op::LayerNormalization(l) => self.translate_layer_norm(l, &args, &inputs, outputs)?,
             Op::Gelu => self.translate_gelu(&args, &inputs, outputs)?,
             Op::Unsqueeze(_) => String::new(), // nop
@@ -2815,6 +2819,70 @@ for (int i = 0; i < {batch}; i++) {{
 }}",
             th = self.intra_op_num_threads,
             batch = output.dims.total_elems() / axis_len,
+        );
+
+        Ok(kernel)
+    }
+
+    fn translate_batch_norm(
+        &mut self,
+        bn: &BatchNormalization,
+        args: &[String],
+        inputs: &[&TypedFixedShape],
+        _outputs: &[TypedFixedShape],
+    ) -> Result<String, SessionError> {
+        let data = inputs[0];
+        let scale = inputs[1];
+        let bias = inputs[2];
+        let input_mean = inputs[3];
+        let input_var = inputs[4];
+
+        let data_name = &args[0];
+        let scale_name = &args[1];
+        let bias_name = &args[2];
+        let input_mean_name = &args[3];
+        let input_var_name = &args[4];
+        let output_name = &args[inputs.len()..][0];
+
+        assert!(!bn.training_mode, "Training mode is not supported.");
+        assert!(data.elem_ty.is_f32(), "Input data type must be f32.");
+        assert_eq!(data.dims.len(), 4, "Input data rank must be 4.");
+        assert_eq!(scale.dims.len(), 1, "Scale rank must be 1.");
+        assert_eq!(bias.dims.len(), 1, "Bias rank must be 1.");
+        assert_eq!(input_mean.dims.len(), 1, "Input mean rank must be 1.");
+        assert_eq!(input_var.dims.len(), 1, "Input var rank must be 1.");
+
+        let num_batch = data.dims[0];
+        let num_channel = data.dims[1];
+        let num_dim0 = data.dims[2];
+        let num_dim1 = data.dims[3];
+        let data_strides = data.dims.strides();
+
+        let kernel = format!(
+            "#pragma omp parallel for num_threads({th})
+for (int i = 0; i < {num_batch}; i++) {{
+    const float *_data = {data_name} + i * {data_strides_0};
+    float *output = {output_name} + i * {data_strides_0};
+    for (int j = 0; j < {num_channel}; j++) {{
+        const float _mean = {input_mean_name}[j];
+        const float _var = {input_var_name}[j];
+        const float _inv_var = 1.0 / sqrtf(_var + {epsilon});
+        const float _scale = {scale_name}[j];
+        const float _bias = {bias_name}[j];
+        for (int k = 0; k < {num_dim0}; k++) {{
+            for (int l = 0; l < {num_dim1}; l++) {{
+                const float x = _data[j * {data_strides_1} + k * {data_strides_2} + l];
+                output[j * {data_strides_1} + k * {data_strides_2} + l] =
+                    (x - _mean) * _inv_var * _scale + _bias;
+            }}
+        }}
+    }}
+}}",
+            th = self.intra_op_num_threads,
+            epsilon = bn.epsilon,
+            data_strides_0 = data_strides[0],
+            data_strides_1 = data_strides[1],
+            data_strides_2 = data_strides[2],
         );
 
         Ok(kernel)

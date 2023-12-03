@@ -8,9 +8,51 @@ import numpy as np
 from onnx import helper, ValueInfoProto, TensorProto
 
 
+def test_batch_norm_1():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        op_batch_norm(os.path.join(tmpdir, "model.onnx"), [1, 20, 10, 10])
+
+
 def test_layer_norm_1():
     with tempfile.TemporaryDirectory() as tmpdir:
         op_layer_norm(os.path.join(tmpdir, "model.onnx"), [1, 20, 10])
+
+
+def op_batch_norm(filepath, shape, **kwargs):
+    assert len(shape) == 4
+    inputs = [
+        helper.make_tensor_value_info("x", TensorProto.FLOAT, shape),
+        helper.make_tensor_value_info("scale", TensorProto.FLOAT, [shape[1]]),
+        helper.make_tensor_value_info("bias", TensorProto.FLOAT, [shape[1]]),
+        helper.make_tensor_value_info("mean", TensorProto.FLOAT, [shape[1]]),
+        helper.make_tensor_value_info("var", TensorProto.FLOAT, [shape[1]]),
+    ]
+    outputs = [helper.make_tensor_value_info("z", TensorProto.FLOAT, shape)]
+    nodes = [
+        helper.make_node(
+            "BatchNormalization", ["x", "scale", "bias", "mean", "var"], ["z"], **kwargs
+        )
+    ]
+    graph = helper.make_graph(nodes, "graph", inputs, outputs)
+    model = helper.make_model(graph)
+
+    onnx.save(model, filepath)
+    ort_sess = ort.InferenceSession(filepath, providers=["CPUExecutionProvider"])
+
+    for backend in ["interpreter", "cpu"]:
+        altius_sess = altius_py.InferenceSession(filepath, backend=backend)
+
+        x = np.random.random_sample(shape).astype(np.float32)
+        scale = np.random.random_sample(shape[1]).astype(np.float32)
+        bias = np.random.random_sample(shape[1]).astype(np.float32)
+        mean = np.random.random_sample(shape[1]).astype(np.float32)
+        var = np.random.random_sample(shape[1]).astype(np.float32)
+        inputs = {"x": x, "scale": scale, "bias": bias, "mean": mean, "var": var}
+        expected = ort_sess.run(None, inputs)
+        actual = altius_sess.run(None, inputs)
+
+        for expected, actual in zip(expected, actual):
+            assert np.allclose(expected, actual, rtol=1e-4, atol=1e-5)
 
 
 def op_layer_norm(filepath, shape, **kwargs):

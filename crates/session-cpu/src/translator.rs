@@ -2694,26 +2694,25 @@ for (int i = 0; i < {outer}; i++) {{
                 }
             })
             .collect::<Vec<_>>();
-        assert_eq!(axes.len(), 1);
-
-        let axis = axes[0];
-        assert_eq!(input.dims.len(), 3);
-        assert_eq!(axis, 2);
+        assert!(
+            axes.iter()
+                .all(|&axis| axis >= input.dims.len() - axes.len()),
+            "Axes must specify innermost dimensions"
+        );
         assert!(rmean.keep_dims);
 
-        let axis_len = input.dims[2];
-
         let kernel = format!(
-            "for (int i = 0; i < {batch}; i++) {{ 
+            "for (int i = 0; i < {batch}; i++) {{
     const float *input_ptr = {input_name} + i * {axis_len};
     float sum = 0.f;
-#pragma clang loop vectorize(enable)
+    #pragma clang loop vectorize(enable)
     for (int j = 0; j < {axis_len}; j++) {{
         sum += input_ptr[j];
     }}
     {output_name}[i] = sum * (1.f / {axis_len});
 }}",
-            batch = output.dims.total_elems()
+            batch = output.dims.total_elems(),
+            axis_len = input.dims[axes[0]..].iter().product::<usize>(),
         );
 
         Ok(kernel)

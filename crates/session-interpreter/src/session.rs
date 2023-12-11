@@ -28,7 +28,8 @@ use thread_local::ThreadLocal;
 
 use std::{
     cell::RefCell,
-    simd::{Simd, SimdFloat, StdFloat},
+    simd::num::SimdFloat,
+    simd::{Simd, StdFloat},
     time::{Duration, Instant},
 };
 

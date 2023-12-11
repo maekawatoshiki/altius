@@ -1,6 +1,10 @@
 use std::{
     mem::transmute,
-    simd::{Simd, SimdFloat, SimdOrd, SimdUint, StdFloat},
+    simd::{
+        num::SimdUint,
+        prelude::{Simd, SimdFloat, SimdOrd},
+        StdFloat,
+    },
 };
 
 // NOTE: No longer used in softmax kernel, but will be used for exp kernel in the future.

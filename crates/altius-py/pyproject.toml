@@ -10,7 +10,7 @@ python = ">=3.9,<3.11"
 matplotlib = "^3.5.2"
 pillow = "^9.2.0"
 maturin = "^1.1.0"
-onnx = "^1.14.0"
+onnx = "1.14.0"
 transformers = {extras = ["onnx"], version = "^4.30.2"}
 onnxsim = "= 0.4.17"
 numpy = "^1.25.1"

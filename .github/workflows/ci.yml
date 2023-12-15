@@ -14,10 +14,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  CI:
-
+  Linux:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
@@ -74,3 +72,65 @@ jobs:
       env:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
+
+  macOS:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Download large files
+      working-directory: ./models
+      run: ./download.sh CI
+    - name: Install dependencies
+      run: |
+        brew install llvm libomp
+    - name: Install poetry
+      run: |
+        brew install poetry python@3.10
+        (cd crates/altius-py && poetry env use python3.10 && poetry install)
+    - name: Test
+      run: |
+        export PATH="/usr/local/opt/llvm/bin:$PATH"
+        export LDFLAGS="-L/usr/local/opt/llvm/lib"
+        export CPPFLAGS="-I/usr/local/opt/llvm/include"
+        cargo test --release
+        ALTIUS_ENABLE_CLIF=1 cargo test --release
+
+    # TODO: Due to a OpenMP-related problem, we temporarily disable this action:
+    # - name: Run examples
+    #   run: |
+    #     export PATH="/usr/local/opt/llvm/bin:$PATH"
+    #     export LDFLAGS="-L/usr/local/opt/llvm/lib"
+    #     export CPPFLAGS="-I/usr/local/opt/llvm/include"
+    #     (cd crates/altius-py && poetry run python deit.py)
+    #     (cd crates/altius-py && poetry run python resnet50.py)
+    #     (cd crates/altius-py && poetry run python export_vit.py)
+    #     cargo run --release --example mnist
+    #     cargo run --release --example mobilenet
+    #     cargo run --release --example deit
+    #     cargo run --release --example mnist_cpu
+    #     cargo run --release --example mobilenet_cpu
+    #     cargo run --release --example deit_cpu
+    #     cargo run --release --example vit_cpu
+    #     cargo run --release --example vit
+    #     cargo run --release --example infer -- ./models/mnist-8.onnx
+
+    # We do not submit code coverage measured on macOS.
+    # - name: Submit coverage
+    #   run: |
+    #     mkdir -p /tmp/cov/
+    #     cp -rf ./target/release/* /tmp/cov/
+    #     grcov . --binary-path /tmp/cov/ -s . -t cobertura --branch --ignore-not-existing --ignore "*cargo*" -o coverage.xml
+    #     bash <(curl -s https://codecov.io/bash)
+    #   env:
+    #     RUSTFLAGS: -Cinstrument-coverage
+    #     LLVM_PROFILE_FILE: coverage-%p-%m.profraw

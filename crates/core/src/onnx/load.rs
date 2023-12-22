@@ -86,9 +86,12 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
     // Load initializers.
     for init in graph.initializer.iter() {
         let tensor = get_tensor(init)?;
-        let val = *name_to_val
-            .entry(init.name())
-            .or_insert_with(|| model.graph.values.new_val_named(init.name()));
+        let val = *name_to_val.entry(init.name()).or_insert_with(|| {
+            model.graph.values.new_val_named_and_shaped(
+                init.name(),
+                TypedShape::new(tensor.dims().clone().into(), tensor.elem_ty()),
+            )
+        });
         model.graph.inits.insert(val, tensor);
     }
 

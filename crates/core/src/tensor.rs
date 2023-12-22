@@ -444,6 +444,12 @@ impl From<TypedFixedShape> for TypedShape {
     }
 }
 
+impl From<FixedDimensions> for Dimensions {
+    fn from(dims: FixedDimensions) -> Self {
+        Dimensions::new(dims.0.into_iter().map(Dimension::Fixed).collect())
+    }
+}
+
 impl TensorElemType {
     pub fn size(&self) -> usize {
         match self {

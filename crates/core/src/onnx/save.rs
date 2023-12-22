@@ -6,6 +6,7 @@ use thiserror::Error;
 use crate::{
     dim::Dimension as Dim,
     model::Model,
+    op::Op,
     tensor::{TensorElemType, TypedShape},
 };
 
@@ -14,6 +15,8 @@ include!(concat!(env!("OUT_DIR"), "/onnx.rs"));
 use tensor_proto::DataType;
 use tensor_shape_proto::{dimension::Value as DimValue, Dimension};
 use type_proto::Value::TensorType;
+
+use self::attribute_proto::AttributeType;
 
 #[derive(Error, Debug)]
 pub enum ModelSaveError {
@@ -141,12 +144,43 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
         }
     }
 
+    // TODO: We need to cover all ops.
+    fn attrs(op: &Op) -> Vec<AttributeProto> {
+        let mut attrs = vec![];
+        match op {
+            Op::Conv2d(c) => {
+                attrs.push(AttributeProto {
+                    name: "auto_pad".to_string().into(),
+                    s: "SAME_UPPER".to_string().into_bytes().into(),
+                    r#type: Some(AttributeType::String as i32),
+                    ..Default::default()
+                });
+                attrs.push(AttributeProto {
+                    name: "kernel_shape".to_string().into(),
+                    ints: c.kernel_shape.iter().map(|x| *x as i64).collect::<Vec<_>>(),
+                    r#type: Some(AttributeType::Ints as i32),
+                    ..Default::default()
+                });
+            }
+            _ => {}
+        };
+        attrs
+    }
+
+    fn op_type(name: &'static str) -> &'static str {
+        match name {
+            "Conv2d" => "Conv",
+            name => name,
+        }
+    }
+
     // Encode nodes.
     for &node_id in &model.topo_sort_nodes() {
         let node = &model.graph.nodes[node_id];
         let mut node_proto = NodeProto {
             name: node.name.clone(),
-            op_type: node.op.name().to_string().into(),
+            op_type: op_type(node.op.name()).to_string().into(),
+            attribute: attrs(&node.op),
             ..Default::default()
         };
 

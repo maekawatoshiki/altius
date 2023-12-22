@@ -74,6 +74,34 @@ pub fn save_onnx(model: &Model, path: impl AsRef<Path>) -> Result<(), ModelSaveE
 fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
     let mut graph_proto = GraphProto::default();
 
+    // Encode graph initializers.
+    for (&id, tensor) in &model.graph.inits {
+        let val = &model.graph.values.inner()[id];
+        let Some(TypedShape { dims, elem_ty }) = &val.shape else {
+            return Err(ModelSaveError::NoGraphInputShape);
+        };
+        let elem_ty: DataType = (*elem_ty).into();
+        let name = val
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("initializer.{}", id.index()));
+        assert_eq!(elem_ty, DataType::Float, "Only float is supported for now");
+
+        graph_proto.initializer.push(TensorProto {
+            name: Some(name),
+            data_type: Some(elem_ty as i32),
+            dims: dims[0..]
+                .iter()
+                .map(|d| match d {
+                    Dim::Fixed(d) => *d as i64,
+                    Dim::Dynamic(_d) => todo!(),
+                })
+                .collect::<Vec<_>>(),
+            float_data: tensor.data::<f32>().iter().copied().collect::<Vec<_>>(),
+            ..Default::default()
+        });
+    }
+
     // Encode graph inputs and outputs.
     for (vals, proto) in [
         (&model.graph.inputs, &mut graph_proto.input),

@@ -72,6 +72,13 @@ struct CraneliftCtx {
     num_vars: usize,
 }
 
+/// Manages memory regions for temporary tensors.
+#[derive(Default)]
+struct Regions {
+    val_to_region: HashMap<ValueId, Range<usize>>,
+    max_allocated: usize,
+}
+
 impl<'a> Translator<'a> {
     pub fn new(
         model: &'a Model,
@@ -286,47 +293,8 @@ impl<'a> Translator<'a> {
         let mut created_calls = vec![];
         let mut created_tmp_values = vec![];
         let mut created_extern_values = vec![];
+        let mut regions = Regions::default();
 
-        let mut total_bytes_allocated = 0;
-        for plan in &execution_plans {
-            let node = &self.model.graph.nodes[plan.node_id];
-            for output in node.outputs.iter().filter(|id| {
-                !self.model.graph.inputs.contains(id) && !self.model.graph.outputs.contains(id)
-            }) {
-                let shape = &self.value_shapes[output];
-                total_bytes_allocated += shape.dims.total_elems() * shape.elem_ty.size();
-            }
-        }
-
-        // Allocated regions for each value.
-        let mut val_to_region: HashMap<ValueId, Range<usize>> = HashMap::default();
-        fn first_free_region(
-            val_to_region: &HashMap<ValueId, Range<usize>>,
-            size: usize,
-        ) -> Range<usize> {
-            let mut regions = val_to_region.values().collect::<Vec<_>>();
-            regions.sort_by_key(|r| r.start);
-            log::debug!("regions: {:?}", regions);
-            if regions.len() == 1 {
-                if regions[0].start >= size {
-                    return 0..size;
-                }
-                return regions[0].end..regions[0].end + size;
-            }
-            let mut start = 0;
-            for r in regions.windows(2) {
-                assert!(r.len() == 2);
-                let r1 = r[0];
-                let r2 = r[1];
-                if r2.start - r1.end >= size {
-                    return r1.end..r1.end + size;
-                }
-                start = r2.end;
-            }
-            start..start + size
-        }
-
-        // let mut offset = 0;
         for plan in execution_plans {
             let node = &self.model.graph.nodes[plan.node_id];
             // Allocate temporary tensors.
@@ -342,14 +310,11 @@ impl<'a> Translator<'a> {
                 let ty = get_c_type(shape.elem_ty);
                 let name = self.value_name(*output);
                 let size = shape.dims.total_elems() * shape.elem_ty.size();
-                let offset = first_free_region(&val_to_region, size).start;
-                val_to_region.insert(*output, offset..offset + size);
-                assert!(offset + size <= total_bytes_allocated);
+                let region = regions.alloc(*output, size);
+                let offset = region.start;
                 created_calls.push(format!(
-                    // "{name} = ({ty} *)malloc(sizeof({ty}) * ({size}));",
                     "{name} = ({ty} *)((char *)global_memory + {offset});",
                 ));
-                // offset += shape.dims.total_elems() * shape.elem_ty.size();
             }
 
             self.translate_node(plan.node_id, &mut created_calls)?;
@@ -359,8 +324,7 @@ impl<'a> Translator<'a> {
                 if self.reshaped_values.contains(free) || self.propagated_inits.contains(free) {
                     continue;
                 }
-                val_to_region.remove(free);
-                // created_calls.push(format!("free({});", self.value_name(*free)));
+                regions.free(*free);
             }
         }
 
@@ -402,8 +366,6 @@ void *mi_malloc(size_t size);
 void mi_free(void *ptr);
 void *mi_malloc_aligned(size_t size, size_t alignment);
 
-char *global_memory;
-
 static struct timespec now() {{
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -411,6 +373,7 @@ static struct timespec now() {{
 }}\n\n",
             );
             writer.write_all(headers.as_bytes())?;
+            writer.write_all(b"static char *global_memory;\n\n")?;
             if self.enable_profiling {
                 writer.write_all(
                     format!(
@@ -476,10 +439,11 @@ static struct timespec now() {{
                 format!(
                     r#"void initialize() {{
     {init_blis}
-    global_memory = (char *)mi_malloc_aligned({total_bytes_allocated}, 32);
+    global_memory = (char *)mi_malloc_aligned({max_allocated}, 32);
 }}
 
-"#
+"#,
+                    max_allocated = regions.max_allocated
                 )
                 .as_bytes(),
             )?;
@@ -3352,6 +3316,49 @@ impl CraneliftCtx {
         builder.declare_var(var, ty);
         builder.def_var(var, init);
         var
+    }
+}
+
+impl Regions {
+    fn alloc(&mut self, id: ValueId, size: usize) -> Range<usize> {
+        let region = self.find_first_free_region(size);
+        self.val_to_region.insert(id, region.clone());
+        self.max_allocated = self.max_allocated.max(
+            self.val_to_region
+                .values()
+                .max_by_key(|r| r.end)
+                .unwrap()
+                .end,
+        );
+        region
+    }
+
+    fn free(&mut self, id: ValueId) {
+        self.val_to_region.remove(&id);
+    }
+
+    fn find_first_free_region(&self, size: usize) -> Range<usize> {
+        let mut regions = self.val_to_region.values().collect::<Vec<_>>();
+        regions.sort_by_key(|r| r.start);
+        log::debug!(
+            "regions: {regions:?} (count: {count})",
+            count = regions.len()
+        );
+        match regions.len() {
+            0 => 0..size,
+            1 if regions[0].start >= size => 0..size,
+            1 => regions[0].end..regions[0].end + size,
+            _ => {
+                for r in regions.windows(2) {
+                    let [cur, next] = [r[0], r[1]];
+                    if next.start - cur.end >= size {
+                        return cur.end..cur.end + size;
+                    }
+                }
+                let last = regions.last().unwrap();
+                last.end..last.end + size
+            }
+        }
     }
 }
 

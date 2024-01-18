@@ -2,6 +2,7 @@ use std::{
     fs::{create_dir_all, remove_file, File},
     io::{BufWriter, Write},
     mem::{size_of, ManuallyDrop},
+    ops::Range,
     path::PathBuf,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -286,6 +287,46 @@ impl<'a> Translator<'a> {
         let mut created_tmp_values = vec![];
         let mut created_extern_values = vec![];
 
+        let mut total_bytes_allocated = 0;
+        for plan in &execution_plans {
+            let node = &self.model.graph.nodes[plan.node_id];
+            for output in node.outputs.iter().filter(|id| {
+                !self.model.graph.inputs.contains(id) && !self.model.graph.outputs.contains(id)
+            }) {
+                let shape = &self.value_shapes[output];
+                total_bytes_allocated += shape.dims.total_elems() * shape.elem_ty.size();
+            }
+        }
+
+        // Allocated regions for each value.
+        let mut val_to_region: HashMap<ValueId, Range<usize>> = HashMap::default();
+        fn first_free_region(
+            val_to_region: &HashMap<ValueId, Range<usize>>,
+            size: usize,
+        ) -> Range<usize> {
+            let mut regions = val_to_region.values().collect::<Vec<_>>();
+            regions.sort_by_key(|r| r.start);
+            log::debug!("regions: {:?}", regions);
+            if regions.len() == 1 {
+                if regions[0].start >= size {
+                    return 0..size;
+                }
+                return regions[0].end..regions[0].end + size;
+            }
+            let mut start = 0;
+            for r in regions.windows(2) {
+                assert!(r.len() == 2);
+                let r1 = r[0];
+                let r2 = r[1];
+                if r2.start - r1.end >= size {
+                    return r1.end..r1.end + size;
+                }
+                start = r2.end;
+            }
+            start..start + size
+        }
+
+        // let mut offset = 0;
         for plan in execution_plans {
             let node = &self.model.graph.nodes[plan.node_id];
             // Allocate temporary tensors.
@@ -299,11 +340,16 @@ impl<'a> Translator<'a> {
                 }
                 let shape = &self.value_shapes[output];
                 let ty = get_c_type(shape.elem_ty);
+                let name = self.value_name(*output);
+                let size = shape.dims.total_elems() * shape.elem_ty.size();
+                let offset = first_free_region(&val_to_region, size).start;
+                val_to_region.insert(*output, offset..offset + size);
+                assert!(offset + size <= total_bytes_allocated);
                 created_calls.push(format!(
-                    "{name} = ({ty} *)malloc(sizeof({ty}) * ({size}));",
-                    name = self.value_name(*output),
-                    size = self.value_shapes[output].dims.total_elems(),
+                    // "{name} = ({ty} *)malloc(sizeof({ty}) * ({size}));",
+                    "{name} = ({ty} *)((char *)global_memory + {offset});",
                 ));
+                // offset += shape.dims.total_elems() * shape.elem_ty.size();
             }
 
             self.translate_node(plan.node_id, &mut created_calls)?;
@@ -313,7 +359,8 @@ impl<'a> Translator<'a> {
                 if self.reshaped_values.contains(free) || self.propagated_inits.contains(free) {
                     continue;
                 }
-                created_calls.push(format!("free({});", self.value_name(*free)));
+                val_to_region.remove(free);
+                // created_calls.push(format!("free({});", self.value_name(*free)));
             }
         }
 
@@ -353,6 +400,9 @@ impl<'a> Translator<'a> {
 
 void *mi_malloc(size_t size);
 void mi_free(void *ptr);
+void *mi_malloc_aligned(size_t size, size_t alignment);
+
+char *global_memory;
 
 static struct timespec now() {{
     struct timespec ts;
@@ -422,12 +472,21 @@ static struct timespec now() {{
             let init_blis = "// blis not used on macOS";
             #[cfg(not(target_os = "macos"))]
             let init_blis = format!("bli_thread_set_num_threads({});", self.intra_op_num_threads);
-            writer
-                .write_all(format!("void initialize() {{\n    {init_blis}\n}}\n\n").as_bytes())?;
+            writer.write_all(
+                format!(
+                    r#"void initialize() {{
+    {init_blis}
+    global_memory = (char *)mi_malloc_aligned({total_bytes_allocated}, 32);
+}}
+
+"#
+                )
+                .as_bytes(),
+            )?;
 
             writer.write_all(
                 format!(
-                    "void model_entry({}) {{\n",
+                    "void model_entry({}) {{\n\n",
                     self.model
                         .graph
                         .inputs
@@ -793,7 +852,7 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
     const int output_hw = {output_h} * {output_w};
     float *_input_ptr = (float *){input_name};
     float *_col_ptr = (float *)col;
-   
+
     #pragma omp parallel for num_threads({num_threads})
     for (int outer = 0; outer < {batch_size} * {input_c}; outer++) {{
         float *input_ptr = _input_ptr + outer * {input_hw};

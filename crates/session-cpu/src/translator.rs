@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     fs::{create_dir_all, remove_file, File},
     io::{BufWriter, Write},
     mem::{size_of, ManuallyDrop},
@@ -75,7 +76,8 @@ struct CraneliftCtx {
 /// Manages memory regions for temporary tensors.
 #[derive(Default)]
 struct Regions {
-    val_to_region: HashMap<ValueId, Range<usize>>,
+    start_to_region: BTreeMap<usize, Range<usize>>,
+    val_to_start: HashMap<ValueId, usize>,
     max_allocated: usize,
 }
 
@@ -3322,41 +3324,44 @@ impl CraneliftCtx {
 impl Regions {
     fn alloc(&mut self, id: ValueId, size: usize) -> Range<usize> {
         let region = self.find_first_free_region(size);
-        self.val_to_region.insert(id, region.clone());
-        self.max_allocated = self.max_allocated.max(
-            self.val_to_region
-                .values()
-                .max_by_key(|r| r.end)
-                .unwrap()
-                .end,
-        );
+        self.val_to_start.insert(id, region.start);
+        self.start_to_region.insert(region.start, region.clone());
+        self.max_allocated = self
+            .max_allocated
+            .max(self.start_to_region.last_key_value().unwrap().1.end);
         region
     }
 
     fn free(&mut self, id: ValueId) {
-        self.val_to_region.remove(&id);
+        if let Some(start) = self.val_to_start.remove(&id) {
+            self.start_to_region.remove(&start).unwrap();
+        }
     }
 
     fn find_first_free_region(&self, size: usize) -> Range<usize> {
-        let mut regions = self.val_to_region.values().collect::<Vec<_>>();
-        regions.sort_by_key(|r| r.start);
+        // Sorted by start offset
+        let regions = self.start_to_region.values().collect::<Vec<_>>();
         log::debug!(
             "regions: {regions:?} (count: {count})",
             count = regions.len()
         );
-        match regions.len() {
-            0 => 0..size,
-            1 if regions[0].start >= size => 0..size,
-            1 => regions[0].end..regions[0].end + size,
+        fn roundup(x: usize) -> usize {
+            let mask = 32 - 1;
+            (x + mask) & !mask
+        }
+        match self.start_to_region.len() {
+            0 => 0..roundup(size),
+            1 if regions[0].start >= size => 0..roundup(size),
+            1 => roundup(regions[0].end)..roundup(regions[0].end + size),
             _ => {
                 for r in regions.windows(2) {
                     let [cur, next] = [r[0], r[1]];
                     if next.start - cur.end >= size {
-                        return cur.end..cur.end + size;
+                        return roundup(cur.end)..roundup(cur.end + size);
                     }
                 }
                 let last = regions.last().unwrap();
-                last.end..last.end + size
+                roundup(last.end)..roundup(last.end + size)
             }
         }
     }

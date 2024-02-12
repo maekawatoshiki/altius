@@ -10,6 +10,7 @@ prost = "^0.10"
 thiserror = { workspace = true }
 log = { workspace = true }
 rand = "^0.8.5"
+ndarray = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 mimalloc = { version = "0.1.29", default-features = false, features = ["local_dynamic_tls"] }

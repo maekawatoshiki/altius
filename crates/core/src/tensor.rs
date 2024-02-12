@@ -4,6 +4,7 @@ use crate::{
     dim::{Dimension, Dimensions},
     fixed_dim::{FixedDimension, FixedDimensions},
 };
+use ndarray::{CowArray, IxDyn};
 use rand::{
     distributions::Standard, prelude::Distribution, rngs::StdRng, thread_rng, Rng, SeedableRng,
 };
@@ -588,6 +589,14 @@ impl fmt::Display for Tensor {
             TensorElemType::Bool => dump(f, self.data::<bool>())?,
         }
         write!(f, ")")
+    }
+}
+
+impl<T: TensorElemTypeExt> From<&CowArray<'_, T, IxDyn>> for Tensor {
+    fn from(arr: &CowArray<T, IxDyn>) -> Self {
+        let dims = arr.shape().to_vec().into();
+        let data = arr.iter().cloned().collect();
+        Self::new(dims, data)
     }
 }
 

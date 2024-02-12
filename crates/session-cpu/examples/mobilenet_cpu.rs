@@ -35,6 +35,8 @@ fn main() {
     let opt = Opt::from_args();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
 
+    let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
+    let classes = classes.split('\n').collect::<Vec<_>>();
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
     let resized = image::imageops::resize(&image, 224, 224, image::imageops::FilterType::Triangle);
     let image = ndarray::Array4::from_shape_fn((1, 3, 224, 224), |(_, c, y, x)| {
@@ -42,7 +44,11 @@ fn main() {
         let std = [0.229, 0.224, 0.225][c];
         (resized[(x as _, y as _)][c] as f32 / 255.0 - mean) / std
     });
-    let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
+    let input = CowArray::from(image.as_slice().unwrap())
+        .into_shape((1, 3, 224, 224))
+        .unwrap()
+        .into_dimensionality()
+        .unwrap();
 
     if opt.ort {
         let env = Environment::builder()
@@ -58,24 +64,17 @@ fn main() {
             .unwrap()
             .with_model_from_file(root.join("mobilenetv3.onnx"))
             .unwrap();
-        let x = CowArray::from(input.data::<f32>())
-            .into_shape((1, 3, 224, 224))
-            .unwrap()
-            .into_dimensionality()
-            .unwrap();
-        let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
         for _ in 0..opt.iters {
-            let x = Value::from_array(sess.allocator(), &x).unwrap();
-            // use std::time::Instant;
-            // let start = Instant::now();
+            let x = Value::from_array(sess.allocator(), &input).unwrap();
+            use std::time::Instant;
+            let start = Instant::now();
             let out = &sess.run(vec![x]).unwrap()[0];
-            // log::info!("ort: {:?}", start.elapsed());
+            log::info!("ort: {:?}", start.elapsed());
             let out = out.try_extract::<f32>().unwrap();
             let out = out.view();
             let out = out.as_slice().unwrap();
             let mut out = out.iter().enumerate().collect::<Vec<_>>();
             out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
-            let classes = classes.split('\n').collect::<Vec<_>>();
 
             println!("prediction: {}", classes[out[0].0]);
             println!("top5: {:?}", &out[..5]);
@@ -87,12 +86,12 @@ fn main() {
             .with_intra_op_num_threads(opt.threads)
             .build()
             .unwrap();
-        let classes = fs::read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
         for _ in 0..opt.iters {
-            let out = session.run(vec![input.clone()]).expect("Inference failed");
+            let out = session
+                .run(vec![Tensor::from(&input)])
+                .expect("Inference failed");
             let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
             out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
-            let classes = classes.split('\n').collect::<Vec<_>>();
 
             println!("prediction: {}", classes[out[0].0]);
             println!("top5: {:?}", &out[..5]);

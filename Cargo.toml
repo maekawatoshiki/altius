@@ -17,6 +17,7 @@ cranelift = "^0.99.0"
 cranelift-module = "^0.99.0"
 cranelift-object = "^0.99.0"
 cranelift-codegen = "^0.99.0"
+ndarray = "^0.15.6"
 
 [profile.release]
 opt-level = 3

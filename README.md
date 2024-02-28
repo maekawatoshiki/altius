@@ -22,8 +22,7 @@
 # Requirements
 
 - cargo
-- poetry
-    - `python3.10` is recommended.
+- rye
 
 # Run
 
@@ -63,7 +62,7 @@ yarn serve
 
 ```sh
 cd ./crates/altius-py
-poetry install
-poetry run maturin develop -r
-poetry run python mobilenet.py
+rye sync
+rye run maturin develop -r
+rye run python mobilenet.py
 ```

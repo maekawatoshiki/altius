@@ -1,28 +1,40 @@
-[tool.poetry]
+[project]
 name = "altius-py"
 version = "0.1.0"
-description = ""
-authors = ["uint256_t <maekawatoshiki@github.com>"]
-packages = [{include = "altius_py"}]
+authors = [
+    { name = "maekawatoshiki" }
+]
+dependencies = [
+    "pillow>=9.2.0",
+    "matplotlib>=3.5.3",
+    "maturin>=1.1.0",
+    "onnx>=1.14.0",
+    "transformers>=4.30.2",
+    "onnxsim==0.4.17",
+    "numpy>=1.25.2",
+    "onnxruntime>=1.15.1",
+    "pytest>=7.4.4",
+    "pytest-xdist>=3.3.1",
+    "torch==1.12.0",
+    "torchvision>=0.13.0",
+    "onnxscript>=0.1.0.dev20240227",
+    "pip>=24.0",
+]
+requires-python = ">=3.9,<3.11"
 
-[tool.poetry.dependencies]
-python = ">=3.9,<3.11"
-matplotlib = "^3.5.2"
-pillow = "^9.2.0"
-maturin = "^1.1.0"
-onnx = "1.14.0"
-transformers = {extras = ["onnx"], version = "^4.30.2"}
-onnxsim = "= 0.4.17"
-numpy = "^1.25.1"
-onnxruntime = "^1.15.1"
-pytest = "^7.4.0"
-pytest-xdist = "^3.3.1"
-patchelf = {version = "^0.17.2.1", platform = "linux"}
-torch = "1.12.0"
-torchvision = "0.13.0"
-onnxscript = "^0.1.0.dev20230920"
+[project.optional-dependencies]
+linux = [
+    "patchelf>=0.17.2.1",
+]
 
 [build-system]
-requires = ["maturin>=1.0"]
-build-backend = "maturin"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = []
+
+[tool.hatch.metadata]
+allow-direct-references = true
 

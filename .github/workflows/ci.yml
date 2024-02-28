@@ -37,8 +37,10 @@ jobs:
       run: cargo install grcov
     - name: Install dependencies
       run: sudo apt install libomp-dev
-    - name: Install poetry
-      run: curl -sSL https://install.python-poetry.org | python3 -
+    - name: Install rye
+      uses: eifinger/setup-rye@v1
+    - name: Free up disk
+      run: sudo rm -rf /usr/local/lib/android || true
     - name: Test
       run: |
         cargo test --release
@@ -48,9 +50,9 @@ jobs:
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
     - name: Run examples
       run: |
-        (cd crates/altius-py && poetry run python deit.py)
-        (cd crates/altius-py && poetry run python resnet50.py)
-        (cd crates/altius-py && poetry run python export_vit.py)
+        (cd crates/altius-py && rye run python deit.py)
+        (cd crates/altius-py && rye run python resnet50.py)
+        (cd crates/altius-py && rye run python export_vit.py)
         cargo run --release --example mnist
         cargo run --release --example mobilenet
         cargo run --release --example deit
@@ -93,10 +95,10 @@ jobs:
     - name: Install dependencies
       run: |
         brew install llvm libomp
-    - name: Install poetry
-      run: |
-        brew install poetry python@3.10
-        (cd crates/altius-py && poetry env use python3.10 && poetry install)
+    - name: Install rye
+      uses: eifinger/setup-rye@v1
+    - name: Free up disk
+      run: sudo rm -rf /usr/local/lib/android || true
     - name: Test
       run: |
         export PATH="/usr/local/opt/llvm/bin:$PATH"

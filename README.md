@@ -62,7 +62,7 @@ yarn serve
 
 ```sh
 cd ./crates/altius-py
-rye sync
+rye sync --features linux # no --features needed on macOS
 rye run maturin develop -r
 rye run python mobilenet.py
 ```

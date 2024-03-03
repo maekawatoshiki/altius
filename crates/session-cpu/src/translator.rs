@@ -174,10 +174,9 @@ impl<'a> Translator<'a> {
         let mut cmd = std::process::Command::new("clang");
 
         #[cfg(debug_assertions)]
-        let mimalloc_path = "target/debug/build/libmimalloc-sys-*/out/c_src/mimalloc/src/static.o";
+        let mimalloc_path = "target/debug/build/libmimalloc-sys-*/out/*-static.o";
         #[cfg(not(debug_assertions))]
-        let mimalloc_path =
-            "target/release/build/libmimalloc-sys-*/out/c_src/mimalloc/src/static.o";
+        let mimalloc_path = "target/release/build/libmimalloc-sys-*/out/*-static.o";
         #[cfg(target_os = "linux")]
         #[cfg(debug_assertions)]
         let blis_path = "target/debug/build/blis-src-*/out";

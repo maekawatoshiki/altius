@@ -2,8 +2,10 @@
 
 if [ ! -d ".venv" ]; then
   if [ "$(uname)" = "Darwin" ]; then
+    echo "Building on macOS"
     rye sync
   else
+    echo "Building on Linux"
     rye sync --features linux
   fi
 fi

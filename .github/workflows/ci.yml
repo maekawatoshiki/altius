@@ -38,7 +38,7 @@ jobs:
     - name: Install dependencies
       run: sudo apt install libomp-dev
     - name: Install rye
-      uses: eifinger/setup-rye@v1
+      uses: eifinger/setup-rye@v2
     - name: Free up disk
       run: sudo rm -rf /usr/local/lib/android || true
     - name: Test
@@ -96,7 +96,7 @@ jobs:
       run: |
         brew install llvm libomp
     - name: Install rye
-      uses: eifinger/setup-rye@v1
+      uses: eifinger/setup-rye@v2
     - name: Free up disk
       run: sudo rm -rf /usr/local/lib/android || true
     - name: Test

@@ -79,8 +79,6 @@ packaging==23.2
     # via onnxruntime
     # via pytest
     # via transformers
-patchelf==0.17.2.1
-    # via altius-py
 pillow==10.2.0
     # via altius-py
     # via matplotlib

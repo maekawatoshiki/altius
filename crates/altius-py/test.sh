@@ -1,7 +1,7 @@
 #!/bin/bash -eux
 
 if [ ! -d ".venv" ]; then
-  if [ "$(uname)" == "Darwin" ]; then
+  if [ "$(uname)" = "Darwin" ]; then
     rye sync
   else
     rye sync --features linux

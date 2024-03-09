@@ -18,9 +18,9 @@ logging.basicConfig(level=logging.INFO)
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 sess = altius_py.InferenceSession(
-    "../../models/gpt2.onnx", intra_op_num_threads=16, enable_profile=True
+    "./gpt2-onnx/model.onnx", intra_op_num_threads=16, enable_profile=True, backend="cpu"
 )
-# sess = ort.InferenceSession("../../models/gpt2.onnx", providers=["CPUExecutionProvider"])
+# sess = ort.InferenceSession("./gpt2-onnx/model.onnx", providers=["CPUExecutionProvider"])
 
 torch.manual_seed(42)
 
@@ -37,6 +37,8 @@ for _ in range(1000):
         input = np.zeros((1, max_tokens), dtype=np.int64)
         input[0, : inputs[name].shape[1]] = inputs[name]
         inputs[name] = input
+
+    inputs["position_ids"] = np.arange(max_tokens).reshape((1, -1))
 
     outputs = sess.run(None, dict(inputs))
 

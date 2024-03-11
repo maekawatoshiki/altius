@@ -32,9 +32,9 @@ def main():
             output_names=["output"],
             opset_version=12,
         )
-        model, check = onnxsim.simplify(onnx.load("fastvit.onnx"))
+        _model, check = onnxsim.simplify(onnx.load("fastvit.onnx"))
         assert check, "Failed to simplify model"
-        onnx.save(model, "fastvit.onnx")
+        onnx.save(_model, "fastvit.onnx")
 
     data_config = timm.data.resolve_model_data_config(model)
     transforms = timm.data.create_transform(**data_config, is_training=False)

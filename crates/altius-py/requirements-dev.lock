@@ -32,6 +32,7 @@ fonttools==4.49.0
 fsspec==2024.2.0
     # via huggingface-hub
 huggingface-hub==0.21.1
+    # via timm
     # via tokenizers
     # via transformers
 humanfriendly==10.0
@@ -103,6 +104,7 @@ python-dateutil==2.8.2
     # via matplotlib
 pyyaml==6.0.1
     # via huggingface-hub
+    # via timm
     # via transformers
 regex==2023.12.25
     # via transformers
@@ -113,11 +115,13 @@ requests==2.31.0
 rich==13.7.0
     # via onnxsim
 safetensors==0.4.2
+    # via timm
     # via transformers
 six==1.16.0
     # via python-dateutil
 sympy==1.12
     # via onnxruntime
+timm==0.9.16
 tokenizers==0.15.2
     # via transformers
 tomli==2.0.1
@@ -125,9 +129,11 @@ tomli==2.0.1
     # via pytest
 torch==1.12.0
     # via altius-py
+    # via timm
     # via torchvision
 torchvision==0.13.0
     # via altius-py
+    # via timm
 tqdm==4.66.2
     # via huggingface-hub
     # via transformers

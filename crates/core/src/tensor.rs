@@ -605,7 +605,7 @@ macro_rules! dump_tensor {
         #[test]
         fn $name() {
             let t = Tensor::zeros::<$ty>(vec![2, 3, 4].into());
-            insta::assert_display_snapshot!(t);
+            insta::assert_snapshot!(t);
         }
     };
 }

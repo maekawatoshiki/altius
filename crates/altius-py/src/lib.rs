@@ -41,9 +41,7 @@ fn load(path: String) -> PyResult<PyModel> {
 }
 
 #[pyfunction(
-    enable_profiling = false,
-    intra_op_num_threads = 1,
-    backend = "\"interpreter\".to_string()"
+    text_signature = "(model, enable_profiling=False, intra_op_num_threads=1, backend=\"interpreter\")"
 )]
 fn session(
     py: Python,

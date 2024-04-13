@@ -23,18 +23,19 @@ def main():
     model = timm.create_model("fastvit_s12.apple_in1k", pretrained=True)
     model = model.eval()
 
-    if not os.path.exists("fastvit.onnx"):
+    path = "../../models/fastvit.onnx"
+    if not os.path.exists(path):
         torch.onnx.export(
             model,
             torch.randn(1, 3, 256, 256),
-            "fastvit.onnx",
+            path,
             input_names=["input"],
             output_names=["output"],
             opset_version=12,
         )
-        _model, check = onnxsim.simplify(onnx.load("fastvit.onnx"))
+        _model, check = onnxsim.simplify(onnx.load(path))
         assert check, "Failed to simplify model"
-        onnx.save(_model, "fastvit.onnx")
+        onnx.save(_model, path)
 
     data_config = timm.data.resolve_model_data_config(model)
     transforms = timm.data.create_transform(**data_config, is_training=False)
@@ -44,9 +45,7 @@ def main():
     os.environ["GOMP_CPU_AFFINITY"] = "0-7"
 
     # ort_sess = ort.InferenceSession("fastvit.onnx", providers=["CPUExecutionProvider"])
-    alt_sess = alt.InferenceSession(
-        "fastvit.onnx", backend="cpu", intra_op_num_threads=8
-    )
+    alt_sess = alt.InferenceSession(path, backend="cpu", intra_op_num_threads=8)
 
     with open("../../models/imagenet_classes.txt") as f:
         class_names = [line.strip() for line in f.readlines()]

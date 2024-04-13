@@ -8,17 +8,20 @@ dependencies = [
     "pillow>=9.2.0",
     "matplotlib>=3.5.3",
     "maturin>=1.1.0",
-    "onnx>=1.14.0",
+    "onnx==1.15.0",
     "transformers>=4.30.2",
     "onnxsim==0.4.17",
     "numpy>=1.25.2",
     "onnxruntime>=1.15.1",
     "pytest>=7.4.4",
     "pytest-xdist>=3.3.1",
-    "torch==1.12.0",
-    "torchvision>=0.13.0",
+    "torch>=2.2.2",
     "onnxscript>=0.1.0.dev20240227",
     "pip>=24.0",
+    "optimum>=1.18.1",
+    "torchvision>=0.17.2",
+    "tabulate>=0.9.0",
+    "timm>=0.9.16",
 ]
 requires-python = ">=3.9,<3.11"
 
@@ -30,12 +33,6 @@ linux = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.rye]
-managed = true
-dev-dependencies = [
-    "timm>=0.9.16",
-]
 
 [tool.hatch.metadata]
 allow-direct-references = true

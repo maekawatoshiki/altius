@@ -2499,17 +2499,14 @@ for (int i = 0; i < {outer}; i++) {{
 
         if indices.dims.is_scalar() {
             let axis = gather.axis as usize;
-            assert_eq!(axis, 1);
-            assert_eq!(data.dims.len(), 3);
-            assert_eq!(data.dims[0], 1);
+            data.dims[..axis].iter().for_each(|&d| assert_eq!(d, 1));
 
             let kernel = format!(
-                "memcpy({}, {} + {} * ({}[0]), sizeof(float) * {});",
-                output_name,
-                data_name,
-                data.dims.strides()[axis],
-                indices_name,
-                data.dims[2]
+                "memcpy({out}, {data} + {stride} * ({ind}[0]), sizeof(float) * {stride});",
+                out = output_name,
+                data = data_name,
+                stride = data.dims.strides()[axis],
+                ind = indices_name,
             );
             Ok(kernel)
         } else {

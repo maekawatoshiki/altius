@@ -1568,12 +1568,11 @@ fn compute_gather(gather: &Gather, inputs: &[&Tensor], outputs: &mut [Tensor]) {
 
     if indices.dims().is_scalar() {
         let axis = gather.axis as usize;
-        assert_eq!(axis, 1);
-        assert_eq!(data.dims().len(), 3);
-        assert_eq!(data.dims()[0], 1);
+        data.dims()[..axis].iter().for_each(|&d| assert_eq!(d, 1));
 
-        let gathered =
-            &data.slice_at::<f32>(&[0, indices.data::<i64>()[0] as usize])[..data.dims()[2]];
+        let mut from = vec![0; data.dims().len()];
+        from[axis] = indices.data::<i64>()[0] as usize;
+        let gathered = &data.slice_at::<f32>(&from)[..data.strides()[axis]];
         output.data_mut().copy_from_slice(gathered);
     } else {
         let axis = gather.axis as usize;

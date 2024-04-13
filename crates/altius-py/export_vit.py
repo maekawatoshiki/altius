@@ -9,7 +9,7 @@ model = torchvision.models.vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_SWAG_LIN
 model.eval()
 
 path = "../../models/vit_b_16.onnx"
-torch.onnx.export(model, torch.randn(1, 3, 224, 224), path, opset_version=12)
+torch.onnx.export(model, torch.randn(1, 3, 224, 224), path, opset_version=14)
 
 model, ok = onnxsim.simplify(path)
 assert ok

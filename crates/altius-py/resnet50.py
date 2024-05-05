@@ -1,8 +1,8 @@
 import time
 import os
 
-os.environ["GOMP_CPU_AFFINITY"] = "0-7"
-os.environ["OMP_WAIT_POLICY"] = "active"
+# os.environ["GOMP_CPU_AFFINITY"] = "0-7"
+# os.environ["OMP_WAIT_POLICY"] = "active"
 
 from PIL import Image
 import numpy as np
@@ -47,7 +47,7 @@ def main():
     else:
         sess = altius_py.InferenceSession(
             model_path,
-            intra_op_num_threads=4,
+            intra_op_num_threads=1,
             backend="cpu",
         )
 

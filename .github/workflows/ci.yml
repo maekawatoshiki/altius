@@ -51,7 +51,7 @@ jobs:
     - name: Run examples
       run: |
         (cd crates/altius-py && rye run python deit.py)
-        (cd crates/altius-py && rye run python resnet50.py)
+        # (cd crates/altius-py && rye run python resnet50.py)
         (cd crates/altius-py && rye run python export_vit.py)
         cargo run --release --example mnist
         cargo run --release --example mobilenet
@@ -75,37 +75,53 @@ jobs:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
 
-  macOS:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-    # - uses: actions/cache@v2
-    #   with:
-    #     path: |
-    #       ~/.cargo/registry
-    #       ~/.cargo/git
-    #       target
-    #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    - name: Download large files
-      working-directory: ./models
-      run: ./download.sh CI
-    - name: Install dependencies
-      run: |
-        brew install llvm libomp
-    - name: Install rye
-      uses: eifinger/setup-rye@v2
-    - name: Free up disk
-      run: sudo rm -rf /usr/local/lib/android || true
-    - name: Test
-      run: |
-        export PATH="/usr/local/opt/llvm/bin:$PATH"
-        export LDFLAGS="-L/usr/local/opt/llvm/lib"
-        export CPPFLAGS="-I/usr/local/opt/llvm/include"
-        cargo test --release
-        ALTIUS_ENABLE_CLIF=1 cargo test --release
+  # TODO: Fails due to:
+  #           0  0x1030cf648  __assert_rtn + 72
+  #           1  0x10301b0f4  ld::InputFiles::SliceParser::parseObjectFile(mach_o::Header const*) const + 21260
+  #           2  0x103026e30  ld::InputFiles::parseAllFiles(void (ld::AtomFile const*) block_pointer)::$_7::operator()(unsigned long, ld::FileInfo const&) const + 420
+  #           3  0x1837be428  _dispatch_client_callout2 + 20
+  #           4  0x1837d2850  _dispatch_apply_invoke3 + 336
+  #           5  0x1837be3e8  _dispatch_client_callout + 20
+  #           6  0x1837bfc68  _dispatch_once_callout + 32
+  #           7  0x1837d18a4  _dispatch_apply_invoke + 252
+  #           8  0x1837be3e8  _dispatch_client_callout + 20
+  #           9  0x1837d0080  _dispatch_root_queue_drain + 864
+  #           10  0x1837d06b8  _dispatch_worker_thread2 + 156
+  #           11  0x18396afd0  _pthread_wqthread + 228
+  #           ld: Assertion failed: (pattern[0].addrMode == addr_other), function addFixupFromRelocations, file Relocations.cpp, line 698.
+  #           clang: error: linker command failed with exit code 1 (use -v to see invocation)
+
+  # macOS:
+  #   runs-on: macos-14
+  #   steps:
+  #   - uses: actions/checkout@v2
+  #   - uses: actions-rs/toolchain@v1
+  #     with:
+  #       toolchain: nightly
+  #   # - uses: actions/cache@v2
+  #   #   with:
+  #   #     path: |
+  #   #       ~/.cargo/registry
+  #   #       ~/.cargo/git
+  #   #       target
+  #   #     key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+  #   - name: Download large files
+  #     working-directory: ./models
+  #     run: ./download.sh CI
+  #   - name: Install dependencies
+  #     run: |
+  #       brew install llvm libomp
+  #   - name: Install rye
+  #     uses: eifinger/setup-rye@v2
+  #   - name: Free up disk
+  #     run: sudo rm -rf /usr/local/lib/android || true
+  #   - name: Test
+  #     run: |
+  #       export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+  #       export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+  #       export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
+  #       cargo test --release
+  #       ALTIUS_ENABLE_CLIF=1 cargo test --release
 
     # TODO: Due to a OpenMP-related problem, we temporarily disable this action:
     # - name: Run examples

@@ -56,8 +56,6 @@ pub struct InterpreterSession {
     pub(super) values: ThreadLocal<RefCell<FxHashMap<ValueId, Tensor>>>,
     pub(super) dummy_value: Tensor,
     pub(super) tctx: ThreadCtx,
-    #[cfg(feature = "x64-fusion")]
-    asm_ops: Assmembler,
 }
 
 impl InterpreterSession {

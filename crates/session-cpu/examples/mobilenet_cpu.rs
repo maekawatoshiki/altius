@@ -1,3 +1,4 @@
+use altius_core::flops::compute_flops;
 use ndarray::CowArray;
 use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
 use structopt::StructOpt;
@@ -76,8 +77,8 @@ fn main() {
             let mut out = out.iter().enumerate().collect::<Vec<_>>();
             out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 
-            println!("prediction: {}", classes[out[0].0]);
-            println!("top5: {:?}", &out[..5]);
+            log::info!("prediction: {}", classes[out[0].0]);
+            log::info!("top5: {:?}", &out[..5]);
         }
     } else {
         let model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
@@ -93,8 +94,10 @@ fn main() {
             let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
             out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 
-            println!("prediction: {}", classes[out[0].0]);
-            println!("top5: {:?}", &out[..5]);
+            log::info!("prediction: {}", classes[out[0].0]);
+            log::info!("top5: {:?}", &out[..5]);
         }
+        let flops = compute_flops(session.model()).unwrap();
+        log::info!("Model FLOPs: {} ({}M)", flops, flops / 1_000_000);
     }
 }

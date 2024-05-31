@@ -19,6 +19,9 @@ cblas-sys = "0.1.4"
 cudnn = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+mimalloc = { version = "0.1.29", default-features = false, features = ["local_dynamic_tls"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 blis-src = { version = "*", features = [ "openmp" ], default-features = false }
 procfs = "0.14.2"

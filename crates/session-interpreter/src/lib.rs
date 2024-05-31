@@ -19,3 +19,10 @@ mod thread;
 
 pub use builder::InterpreterSessionBuilder;
 pub use session::InterpreterSession;
+
+#[cfg(not(target_arch = "wasm32"))]
+use mimalloc::MiMalloc;
+
+#[cfg(not(target_arch = "wasm32"))]
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;

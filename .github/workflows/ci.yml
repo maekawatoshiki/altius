@@ -36,7 +36,7 @@ jobs:
     - name: Install grcov
       run: cargo install grcov
     - name: Install dependencies
-      run: sudo apt install libomp-dev
+      run: sudo apt install libomp-dev xz-utils
     - name: Install rye
       uses: eifinger/setup-rye@v2
     - name: Free up disk

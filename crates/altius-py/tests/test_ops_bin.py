@@ -65,7 +65,6 @@ def test_sub_3():
         op_bin(os.path.join(tmpdir, "model.onnx"), "Sub", [128, 3, 224, 224])
 
 
-@pytest.mark.xfail
 def test_sub_4():
     with tempfile.TemporaryDirectory() as tmpdir:
         op_bin(os.path.join(tmpdir, "model.onnx"), "Sub", [1, 3, 28, 28], [3, 1, 1])

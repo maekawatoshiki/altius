@@ -10,11 +10,13 @@ if [ ! -d ".venv" ]; then
   fi
 fi
 
+export RUST_LOG=INFO
+
 if [ ${1:-nobuild} = "build" ]; then
   if [ -z "${GITHUB_ACTIONS}" ]; then
-    rye run maturin develop -r --target-dir ./target
+    rye run maturin develop -r --target-dir ./target > /dev/null
   else
-    rye run maturin develop -r
+    rye run maturin develop -r > /dev/null
   fi
 fi
 

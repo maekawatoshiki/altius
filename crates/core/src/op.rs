@@ -6,6 +6,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Op {
+    Identity,
     Conv2d(Conv2d),
     Add,
     Sub,
@@ -331,6 +332,7 @@ impl Op {
 
     pub fn name(&self) -> &'static str {
         match self {
+            Op::Identity => "Identity",
             Op::Conv2d(_) => "Conv2d",
             Op::Add => "Add",
             Op::Sub => "Sub",

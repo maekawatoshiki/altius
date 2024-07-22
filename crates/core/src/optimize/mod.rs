@@ -1,4 +1,5 @@
 pub mod conv_act_fusion;
+pub mod identity_elim;
 pub mod elemwise_fusion;
 pub mod fast_gelu_fusion;
 pub mod gelu_fusion;

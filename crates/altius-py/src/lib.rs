@@ -59,6 +59,7 @@ fn session(
             PyRuntimeError::new_err(format!("Failed to fuse element-wise operations: {e:?}"))
         })?
     }
+    optimize::identity_elim::eliminate_identity(&mut model);
 
     match backend.as_str() {
         "interpreter" => Ok(PyInterpreterSession(

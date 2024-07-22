@@ -11,7 +11,7 @@ import onnxsim
 from onnx import helper, ValueInfoProto, TensorProto
 from onnxscript import FLOAT, script, opset12 as op
 
-@pytest.mark.xfail
+
 def test_identity_1():
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Identity", [1, 2])

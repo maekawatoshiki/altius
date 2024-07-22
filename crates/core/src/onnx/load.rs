@@ -169,6 +169,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             .collect();
 
         let op = match node.op_type() {
+            "Identity" => Op::Identity,
             "Add" => Op::Add,
             "Sub" => Op::Sub,
             "Mul" => Op::Mul,

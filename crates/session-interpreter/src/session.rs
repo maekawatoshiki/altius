@@ -166,6 +166,7 @@ impl InterpreterSession {
 
         // Actual kernel runs here.
         match op {
+            Op::Identity => todo!(),
             Op::Conv2d(ref conv) => conv2d::compute(&mut Conv2dCtx {
                 #[cfg(feature = "cuda")]
                 cudnn: &self.cudnn_ctx,

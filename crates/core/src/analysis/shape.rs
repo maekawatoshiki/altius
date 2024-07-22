@@ -1,6 +1,5 @@
-use std::borrow::Cow;
-
 use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 use thiserror::Error;
 
 use crate::{
@@ -31,6 +30,10 @@ impl Model {
         let opset_version = self.opset_version;
 
         match op {
+            Op::Identity => {
+                let input = inputs[0];
+                shapes.push(TypedFixedShape::new(input.dims().clone(), input.elem_ty()));
+            }
             Op::Conv2d(conv) => {
                 let auto_pad = &conv.auto_pad;
                 let kernel = &conv.kernel_shape;

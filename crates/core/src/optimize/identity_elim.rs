@@ -27,11 +27,13 @@ pub fn eliminate_identity(model: &mut Model) {
                 }
             }
         } else {
-            for output in &mut model.graph.outputs {
-                if *output == id_out {
-                    *output = id_in;
-                }
-            } 
+            continue;
+            // NOTE: Prevent for graph input value and output value from being the same.
+            // for output in &mut model.graph.outputs {
+            //     if *output == id_out {
+            //         *output = id_in;
+            //     }
+            // } 
         };
 
         model.graph.nodes[node_id].deleted = true;

@@ -12,7 +12,7 @@ from onnx import helper, ValueInfoProto, TensorProto
 from onnxscript import FLOAT, script, opset12 as op
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_identity_1(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Identity", [1, 2], backend)

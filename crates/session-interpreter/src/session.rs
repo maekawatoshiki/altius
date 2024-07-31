@@ -166,7 +166,7 @@ impl InterpreterSession {
 
         // Actual kernel runs here.
         match op {
-            Op::Identity => todo!(),
+            Op::Identity => compute_identity(&inputs, &mut outputs),
             Op::Conv2d(ref conv) => conv2d::compute(&mut Conv2dCtx {
                 #[cfg(feature = "cuda")]
                 cudnn: &self.cudnn_ctx,
@@ -523,6 +523,15 @@ macro_rules! op_bin_elemwise {
             compute(&a_stride, &b_stride, &o_stride, &o_shape, &input_a, &input_b, output);
         }
     }};
+}
+
+// In most cases, Identity nodes are eliminated during optimization.
+// However, we sometimes need to memcpy the data due to some constraints.
+fn compute_identity(inputs: &[&Tensor], outputs: &mut [Tensor]) {
+    let input = inputs[0];
+    let output = &mut outputs[0];
+
+    output.copy_data_from(input);
 }
 
 op_bin_elemwise!(compute_add, +);

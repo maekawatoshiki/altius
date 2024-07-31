@@ -607,6 +607,7 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
         }
 
         let kernel = match op {
+            Op::Identity => self.translate_identity(&args, &inputs, outputs)?,
             Op::Conv2d(ref c) => self.translate_conv2d(c, &args, &inputs, outputs)?,
             Op::HardSigmoid(ref h) => self.translate_hard_sigmoid(h, &args, &inputs, outputs)?,
             Op::Add => self.translate_bin_op("+", &args, &inputs, outputs)?,
@@ -694,6 +695,26 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
         }
 
         Ok(())
+    }
+
+    fn translate_identity(
+        &mut self,
+        args: &[String],
+        inputs: &[&TypedFixedShape],
+        outputs: &[TypedFixedShape],
+    ) -> Result<String, SessionError> {
+        let input = &inputs[0];
+        let output = &outputs[0];
+
+        assert_eq!(args.len(), 2);
+        let ty = get_c_type(input.elem_ty);
+        let input_name = &args[0];
+        let output_name = &args[1];
+        let size = output.dims.total_elems();
+
+        Ok(format!(
+            "memcpy({output_name}, {input_name}, sizeof({ty}) * {size});",
+        ))
     }
 
     fn translate_conv2d(

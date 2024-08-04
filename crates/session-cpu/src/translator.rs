@@ -234,8 +234,8 @@ impl<'a> Translator<'a> {
                             ));
                         }
                         num_compilied_kernels.fetch_add(num_kernels, Ordering::SeqCst);
-                        log::debug!(
-                            "Compiled {}/{} kernels",
+                        eprint!(
+                            "[{:03}/{:03}] Compilation in progress\r",
                             num_compilied_kernels.load(Ordering::SeqCst),
                             num_kernels_to_compile
                         );
@@ -726,8 +726,6 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
     ) -> Result<String, SessionError> {
         let input_names = &args[..inputs.len()];
         let output_names = &args[inputs.len()..];
-        log::debug!("input names: {:?}", input_names);
-        log::debug!("output names: {:?}", output_names);
 
         let input = &inputs[Op::CONV2D_IN];
         let _weight = &inputs[Op::CONV2D_WEIGHT];
@@ -763,8 +761,6 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
         let pad_l = padding[1];
         let _pad_b = padding[2];
         let _pad_r = padding[3];
-
-        log::debug!("kernel: {:?}", kernel);
 
         let code_fill_bias = if let Some(bias) = input_names.get(Op::CONV2D_BIAS) {
             let output_name = &output_names[0];
@@ -3358,10 +3354,6 @@ impl Regions {
     fn find_first_free_region(&self, size: usize) -> Range<usize> {
         // Sorted by start offset
         let regions = self.start_to_region.values().collect::<Vec<_>>();
-        log::debug!(
-            "regions: {regions:?} (count: {count})",
-            count = regions.len()
-        );
         fn roundup(x: usize) -> usize {
             let mask = 32 - 1;
             (x + mask) & !mask

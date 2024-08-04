@@ -1,6 +1,5 @@
 use std::{cmp::Ordering, fs::read_to_string, path::Path, time::Instant};
 
-use altius_core::flops::compute_flops;
 use ndarray::CowArray;
 use ort::{Environment, GraphOptimizationLevel, SessionBuilder, Value};
 use structopt::StructOpt;
@@ -70,11 +69,9 @@ fn main() {
         let mut out = out[0].data::<f32>().iter().enumerate().collect::<Vec<_>>();
         out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
 
-        log::info!("inference result: {}", classes[out[0].0]);
-        log::info!("top5: {:?}", &out[..5]);
+        println!("inference result: {}", classes[out[0].0]);
+        println!("top5: {:?}", &out[..5]);
     }
-    let flops = compute_flops(i.model()).unwrap();
-    log::info!("Model FLOPs: {} ({}M)", flops, flops / 1_000_000);
 }
 
 fn run_on_ort(opt: &Opt) {

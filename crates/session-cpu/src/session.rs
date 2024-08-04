@@ -1,4 +1,5 @@
 use altius_core::{
+    flops::compute_flops,
     model::Model,
     tensor::{Tensor, TypedFixedShape},
     value::ValueId,
@@ -65,12 +66,18 @@ impl CPUSession {
                 })
                 .collect::<Vec<_>>();
             let sum_durations = durations.iter().map(|(_, d)| d).sum::<f32>();
-            durations.push(("All", entire_duration));
             durations.push(("All (Kernel)", sum_durations));
             durations.sort_by(|(_, b), (_, a)| a.partial_cmp(b).unwrap());
             let width = durations.iter().map(|(op, _)| op.len()).max().unwrap();
             for (op, duration) in durations {
-                log::info!("| {op:width$}: {duration:.5} [ms]");
+                log::info!("{op:width$}: {duration:.5} ms");
+            }
+            if let Ok(flops) = compute_flops(&self.model) {
+                log::info!(
+                    "[ {:.5} ms, {:.5} GFLOPS ]",
+                    entire_duration,
+                    flops as f32 / (entire_duration / 1000.0) / 1_000_000_000.0
+                );
             }
         }
 

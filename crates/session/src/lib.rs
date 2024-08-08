@@ -1,4 +1,3 @@
-#![feature(portable_simd)]
 #![allow(clippy::excessive_precision)]
 
 pub mod plan;

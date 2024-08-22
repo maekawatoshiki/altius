@@ -22,7 +22,7 @@
 # Requirements
 
 - cargo
-- rye
+- uv
 
 # Run
 
@@ -62,7 +62,7 @@ yarn serve
 
 ```sh
 cd ./crates/altius-py
-rye sync --features linux # no --features needed on macOS
-rye run maturin develop -r
-rye run python mobilenet.py
+uv sync
+uv run maturin develop -r
+uv run python mobilenet.py
 ```

@@ -37,8 +37,8 @@ jobs:
       run: cargo install grcov
     - name: Install dependencies
       run: sudo apt install libomp-dev xz-utils
-    - name: Install rye
-      uses: eifinger/setup-rye@v2
+    - name: Install uv
+      uses: yezz123/setup-uv@v4
     - name: Free up disk
       run: sudo rm -rf /usr/local/lib/android || true
     - name: Test
@@ -50,9 +50,9 @@ jobs:
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
     - name: Run examples
       run: |
-        (cd crates/altius-py && rye run python deit.py)
-        # (cd crates/altius-py && rye run python resnet50.py)
-        (cd crates/altius-py && rye run python export_vit.py)
+        (cd crates/altius-py && uv run python deit.py)
+        # (cd crates/altius-py && uv run python resnet50.py)
+        (cd crates/altius-py && uv run python export_vit.py)
         cargo run --release --example mnist
         cargo run --release --example mobilenet
         cargo run --release --example deit

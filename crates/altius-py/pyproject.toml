@@ -26,7 +26,7 @@ dependencies = [
     "einops>=0.8.0",
     "fpzip>=1.2.4",
     "zfpy>=1.0.0",
-    "onnxruntime-genai>=0.3.0",
+    "onnxruntime-genai>=0.3.0; sys_platform == 'linux'",
     "huggingface>=0.0.1",
     "netron>=7.8.3",
     "patchelf>=0.17.2.1; sys_platform == 'linux'",

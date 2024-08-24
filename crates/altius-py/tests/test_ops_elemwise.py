@@ -106,19 +106,19 @@ def test_sqrt_2(backend):
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Sqrt", [3, 1, 28, 28], backend)
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_softmax_1(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Softmax", [1, 2, 3], backend)
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_softmax_2(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Softmax", [3, 28, 28], backend)
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_softmax_3(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(

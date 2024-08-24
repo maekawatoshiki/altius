@@ -126,7 +126,7 @@ def test_softmax_3(backend):
         )
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_erf_1(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(
@@ -139,7 +139,7 @@ def test_erf_1(backend):
         )
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_erf_2(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(
@@ -166,7 +166,8 @@ def gelu(x: FLOAT[1, 2, 3]) -> FLOAT[1, 2, 3]:
     return op.Mul(op.Mul(x, op.Add(op.Erf(op.Div(x, sqrt2)), one)), half)
 
 
-def test_gelu_1():
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
+def test_gelu_1(backend):
     model = gelu.to_model_proto()
     model, ok = onnxsim.simplify(model)
     assert ok
@@ -175,7 +176,7 @@ def test_gelu_1():
         filepath = os.path.join(tmpdir, "model.onnx")
         onnx.save(model, filepath)
         ort_sess = ort.InferenceSession(filepath, providers=["CPUExecutionProvider"])
-        altius_sess = altius_py.InferenceSession(filepath)
+        altius_sess = altius_py.InferenceSession(filepath, backend=backend)
 
         x = np.random.random_sample([1, 2, 3]).astype(np.float32)
         expected = ort_sess.run(None, {"x": x})

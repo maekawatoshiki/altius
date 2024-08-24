@@ -3387,12 +3387,10 @@ const fn get_clif_type(t: TensorElemType) -> Type {
 
 fn value_name(model: &Model, id: ValueId) -> String {
     let value = &model.graph.values.inner()[id];
-    escape_name(
-        value
-            .name
-            .clone()
-            .unwrap_or_else(|| format!("Value_noname_{}", id.index())),
-    )
+    escape_name(value.name.clone().map_or_else(
+        || format!("Value_noname_{}", id.index()),
+        |name| format!("Value_{name}_{}", id.index()),
+    ))
 }
 
 fn escape_name(s: impl Into<String>) -> String {

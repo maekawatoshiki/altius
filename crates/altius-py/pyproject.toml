@@ -8,7 +8,7 @@ dependencies = [
     "pillow>=9.2.0",
     "matplotlib>=3.5.3",
     "maturin>=1.1.0",
-    "onnx==1.15.0",
+    "onnx>=1.15.0",
     "transformers==4.41.2",
     "onnxsim==0.4.17",
     "numpy>=1.25.2",
@@ -31,12 +31,8 @@ dependencies = [
     "netron>=7.8.3",
     "patchelf>=0.17.2.1; sys_platform == 'linux'",
 ]
-requires-python = ">=3.9,<3.11"
+requires-python = ">=3.12"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.metadata]
-allow-direct-references = true
-
+requires = ["maturin>=1.1.0"]
+build-backend = "maturin"

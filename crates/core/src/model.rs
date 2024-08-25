@@ -127,14 +127,15 @@ impl fmt::Debug for Model {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         #[derive(Default)]
         struct DebugNode<'a> {
-            name: &'static str,
+            op: &'static str,
+            name: &'a str,
             inputs: Vec<(TensorElemType, &'a FixedDimensions)>,
             outputs: Vec<(TensorElemType, &'a FixedDimensions)>,
         }
 
         impl fmt::Debug for DebugNode<'_> {
             fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-                write!(f, "{} in=(", self.name)?;
+                write!(f, "{}({}) in=(", self.op, self.name)?;
                 for (i, (dtype, dims)) in self.inputs.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
@@ -161,7 +162,8 @@ impl fmt::Debug for Model {
         for &node_id in &node_ids {
             let node = &self.graph.nodes[node_id];
             let mut debug_node = DebugNode::default();
-            debug_node.name = node.op.name();
+            debug_node.op = node.op.name();
+            debug_node.name = node.name.as_ref().map_or("", |s| s);
             for &input in &node.inputs {
                 let dtype = value_shapes[&input].elem_ty;
                 let dims = &value_shapes[&input].dims;

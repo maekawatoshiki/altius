@@ -671,10 +671,6 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
         self.created_kernel_protos.push(format!("{decl};"));
 
         if kernel == "/* Cranelift */" {
-            self.clif_ctx
-                .ctx
-                .optimize(self.clif_ctx.module.isa())
-                .unwrap();
             let id = self.clif_ctx.module.declare_function(
                 &node_name,
                 Linkage::Export,

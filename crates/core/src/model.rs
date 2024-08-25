@@ -1,6 +1,12 @@
-use std::mem;
+use std::{
+    fmt::{self, Formatter},
+    mem,
+};
 
-use crate::{graph::Graph, node::NodeId, value::ValueId};
+use crate::{
+    analysis::shape::infer_shapes, fixed_dim::FixedDimensions, graph::Graph, node::NodeId,
+    tensor::TensorElemType, value::ValueId,
+};
 use id_arena::Arena;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -114,6 +120,65 @@ impl Model {
             assert!(!old_node.deleted);
             self.graph.nodes.alloc(old_node);
         }
+    }
+}
+
+impl fmt::Debug for Model {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        #[derive(Default)]
+        struct DebugNode<'a> {
+            name: &'static str,
+            inputs: Vec<(TensorElemType, &'a FixedDimensions)>,
+            outputs: Vec<(TensorElemType, &'a FixedDimensions)>,
+        }
+
+        impl fmt::Debug for DebugNode<'_> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                write!(f, "{} in=(", self.name)?;
+                for (i, (dtype, dims)) in self.inputs.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{dims:?}:{dtype:?}")?;
+                }
+                write!(f, ") out=(")?;
+                for (i, (dtype, dims)) in self.outputs.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{dims:?}:{dtype:?}")?;
+                }
+                write!(f, ")")
+            }
+        }
+
+        let mut value_shapes = FxHashMap::default();
+        infer_shapes(self, &mut Default::default(), &mut value_shapes)
+            .expect("Failed to infer shapes");
+
+        let node_ids = self.topo_sort_nodes();
+        let mut debug_nodes = vec![];
+        for &node_id in &node_ids {
+            let node = &self.graph.nodes[node_id];
+            let mut debug_node = DebugNode::default();
+            debug_node.name = node.op.name();
+            for &input in &node.inputs {
+                let dtype = value_shapes[&input].elem_ty;
+                let dims = &value_shapes[&input].dims;
+                debug_node.inputs.push((dtype, dims));
+            }
+            for &output in &node.outputs {
+                let dtype = value_shapes[&output].elem_ty;
+                let dims = &value_shapes[&output].dims;
+                debug_node.outputs.push((dtype, dims));
+            }
+            debug_nodes.push(debug_node);
+        }
+
+        f.debug_struct("Model")
+            .field("graph", &debug_nodes)
+            .field("opset_version", &self.opset_version)
+            .finish()
     }
 }
 

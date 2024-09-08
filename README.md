@@ -61,7 +61,7 @@ yarn serve
 # Run from Python
 
 ```sh
-cd ./crates/altius-py
+cd ./crates/altius_py
 uv sync
 uv run maturin develop -r
 uv run python mobilenet.py

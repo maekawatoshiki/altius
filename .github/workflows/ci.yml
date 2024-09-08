@@ -50,9 +50,9 @@ jobs:
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
     - name: Run examples
       run: |
-        (cd crates/altius-py && uv run python deit.py)
-        # (cd crates/altius-py && uv run python resnet50.py)
-        (cd crates/altius-py && uv run python export_vit.py)
+        (cd crates/altius_py && uv run python deit.py)
+        # (cd crates/altius_py && uv run python resnet50.py)
+        (cd crates/altius_py && uv run python export_vit.py)
         cargo run --release --example mnist
         cargo run --release --example mobilenet
         cargo run --release --example deit
@@ -129,9 +129,9 @@ jobs:
     #     export PATH="/usr/local/opt/llvm/bin:$PATH"
     #     export LDFLAGS="-L/usr/local/opt/llvm/lib"
     #     export CPPFLAGS="-I/usr/local/opt/llvm/include"
-    #     (cd crates/altius-py && poetry run python deit.py)
-    #     (cd crates/altius-py && poetry run python resnet50.py)
-    #     (cd crates/altius-py && poetry run python export_vit.py)
+    #     (cd crates/altius_py && poetry run python deit.py)
+    #     (cd crates/altius_py && poetry run python resnet50.py)
+    #     (cd crates/altius_py && poetry run python export_vit.py)
     #     cargo run --release --example mnist
     #     cargo run --release --example mobilenet
     #     cargo run --release --example deit

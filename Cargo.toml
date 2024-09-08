@@ -4,7 +4,7 @@ members = [
   "crates/session",
   "crates/session-cpu",
   "crates/session-interpreter",
-  "crates/altius-py",
+  "crates/altius_py",
   "crates/wasm"
 ]
 resolver = "2"

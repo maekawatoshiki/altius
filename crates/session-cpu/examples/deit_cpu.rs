@@ -43,7 +43,7 @@ fn main() {
 
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mut model = load_onnx(root.join("deit.onnx"))
-        .expect("Failed to load model. Have you run altius-py/deit.py?");
+        .expect("Failed to load model. Have you run altius_py/deit.py?");
     fuse_layer_norm(&mut model);
     fuse_gelu(&mut model);
     fuse_elemwise_ops(&mut model).unwrap();

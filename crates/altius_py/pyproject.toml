@@ -1,5 +1,5 @@
 [project]
-name = "altius-py"
+name = "altius_py"
 version = "0.1.0"
 authors = [
     { name = "maekawatoshiki" }

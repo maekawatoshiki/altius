@@ -13,7 +13,7 @@ const THREADS: usize = 1;
 fn without_gelu(c: &mut Criterion) {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let model = load_onnx(root.join("deit.onnx"))
-        .expect("Failed to load model. Have you run altius-py/deit.py?");
+        .expect("Failed to load model. Have you run altius_py/deit.py?");
 
     let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
 
@@ -27,7 +27,7 @@ fn without_gelu(c: &mut Criterion) {
 fn with_gelu(c: &mut Criterion) {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mut model = load_onnx(root.join("deit.onnx"))
-        .expect("Failed to load model. Have you run altius-py/deit.py?");
+        .expect("Failed to load model. Have you run altius_py/deit.py?");
     fuse_gelu(&mut model);
 
     let input = Tensor::rand::<f32>(vec![1, 3, 224, 224].into());
@@ -42,7 +42,7 @@ fn with_gelu(c: &mut Criterion) {
 fn with_gelu_ln(c: &mut Criterion) {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mut model = load_onnx(root.join("deit.onnx"))
-        .expect("Failed to load model. Have you run altius-py/deit.py?");
+        .expect("Failed to load model. Have you run altius_py/deit.py?");
     fuse_layer_norm(&mut model);
     fuse_gelu(&mut model);
 
@@ -60,7 +60,7 @@ fn with_gelu_ln(c: &mut Criterion) {
 fn with_gelu_ln2(c: &mut Criterion) {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
     let mut model = load_onnx(root.join("deit.onnx"))
-        .expect("Failed to load model. Have you run altius-py/deit.py?");
+        .expect("Failed to load model. Have you run altius_py/deit.py?");
     fuse_gelu(&mut model);
     fuse_layer_norm(&mut model);
 

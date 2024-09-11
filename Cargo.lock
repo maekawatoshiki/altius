@@ -71,7 +71,7 @@ version = "0.1.0"
 dependencies = [
  "altius-core",
  "altius_session",
- "altius_session_cpu",
+ "altius_session_clang",
  "altius_session_interpreter",
  "cargo-util",
  "numpy",
@@ -100,7 +100,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "altius_session_cpu"
+name = "altius_session_clang"
 version = "0.1.0"
 dependencies = [
  "altius-core",

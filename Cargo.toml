@@ -2,7 +2,7 @@
 members = [
   "crates/core",
   "crates/session",
-  "crates/session_cpu",
+  "crates/session_clang",
   "crates/session_interpreter",
   "crates/altius_py",
   "crates/wasm"

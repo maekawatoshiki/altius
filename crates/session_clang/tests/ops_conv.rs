@@ -8,7 +8,7 @@ use altius_core::{
     op::{Conv2d, Op},
     tensor::{Tensor, TensorElemType, TypedFixedShape},
 };
-use altius_session_cpu::CPUSessionBuilder;
+use altius_session_clang::CPUSessionBuilder;
 use ndarray::CowArray;
 use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
 

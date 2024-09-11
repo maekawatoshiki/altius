@@ -10,7 +10,7 @@ pub struct Opt {
 fn main() {
     use altius_core::onnx::load_onnx;
     use altius_core::tensor::*;
-    use altius_session_cpu::CPUSessionBuilder;
+    use altius_session_clang::CPUSessionBuilder;
     use std::cmp::Ordering;
     use std::fs;
     use std::path::Path;

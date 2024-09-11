@@ -29,7 +29,7 @@ fn main() {
     use altius_core::optimize::gelu_fusion::fuse_gelu;
     use altius_core::optimize::layer_norm_fusion::fuse_layer_norm;
     use altius_core::{onnx::load_onnx, tensor::Tensor};
-    use altius_session_cpu::CPUSessionBuilder;
+    use altius_session_clang::CPUSessionBuilder;
     use std::fs;
 
     env_logger::init();

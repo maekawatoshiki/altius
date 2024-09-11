@@ -31,7 +31,7 @@ dependencies = [
     "netron>=7.8.3",
     "patchelf>=0.17.2.1; sys_platform == 'linux'",
 ]
-requires-python = ">=3.12"
+requires-python = "==3.12"
 
 [build-system]
 requires = ["maturin>=1.1.0"]

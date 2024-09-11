@@ -1,5 +1,5 @@
 [package]
-name = "altius-session-interpreter"
+name = "altius_session_interpreter"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 log = { workspace = true }
 rustc-hash = { workspace = true }
 altius-core = { path = "../core" }
-altius-session = { path = "../session" }
+altius_session = { path = "../session" }
 ndarray = "0.15.6"
 core_affinity = "^0.7.6"
 matrixmultiply = "0.3.2"

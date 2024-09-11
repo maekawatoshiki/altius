@@ -1,5 +1,5 @@
 [package]
-name = "altius-session"
+name = "altius_session"
 version = "0.1.0"
 edition = "2021"
 

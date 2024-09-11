@@ -2,8 +2,8 @@
 members = [
   "crates/core",
   "crates/session",
-  "crates/session-cpu",
-  "crates/session-interpreter",
+  "crates/session_cpu",
+  "crates/session_interpreter",
   "crates/altius_py",
   "crates/wasm"
 ]

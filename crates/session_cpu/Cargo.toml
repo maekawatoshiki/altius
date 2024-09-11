@@ -1,5 +1,5 @@
 [package]
-name = "altius-session-cpu"
+name = "altius_session_cpu"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 log = { workspace = true }
 rustc-hash = { workspace = true }
 altius-core = { path = "../core" }
-altius-session = { path = "../session" }
+altius_session = { path = "../session" }
 cranelift = { workspace = true }
 cranelift-module = { workspace = true }
 cranelift-object = { workspace = true }

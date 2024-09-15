@@ -1,0 +1,3 @@
+coremltools==8.0b2
+torch==2.3.0
+torchvision

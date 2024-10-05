@@ -53,6 +53,7 @@ pub(super) struct Translator<'a> {
     reshaped_values: HashSet<ValueId>,
     propagated_inits: HashSet<ValueId>,
     pub used_op_names: HashSet<String>,
+    pub node_names: Vec<String>,
     pub target_dir: PathBuf,
     enable_profiling: bool,
     intra_op_num_threads: usize,
@@ -64,6 +65,7 @@ pub(super) struct Translator<'a> {
 pub(super) struct TranslationProduct<'a> {
     pub model: &'a Model,
     pub used_op_names: HashSet<String>,
+    pub node_names: Vec<String>,
     pub target_dir: PathBuf,
 }
 
@@ -113,6 +115,7 @@ impl<'a> Translator<'a> {
             reshaped_values: HashSet::default(),
             propagated_inits: HashSet::default(),
             used_op_names: HashSet::default(),
+            node_names: Vec::new(),
             target_dir,
             enable_profiling: false,
             intra_op_num_threads: 1,
@@ -167,6 +170,7 @@ impl<'a> Translator<'a> {
             return Ok(TranslationProduct {
                 model: self.model,
                 used_op_names: self.used_op_names,
+                node_names: self.node_names,
                 target_dir: self.target_dir,
             });
         }
@@ -281,6 +285,7 @@ impl<'a> Translator<'a> {
         Ok(TranslationProduct {
             model: self.model,
             used_op_names: self.used_op_names,
+            node_names: self.node_names,
             target_dir: self.target_dir,
         })
     }
@@ -382,7 +387,19 @@ static struct timespec now() {{
                         profile = self
                             .used_op_names
                             .iter()
-                            .map(|name| format!("double elapsed_{};", name))
+                            .map(|name| format!("double elapsed_op_{};", name))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )
+                    .as_bytes(),
+                )?;
+                writer.write_all(
+                    format!(
+                        "{profile}\n\n",
+                        profile = self
+                            .node_names
+                            .iter()
+                            .map(|name| format!("double interval_start_node_{name}, interval_end_node_{name};"))
                             .collect::<Vec<_>>()
                             .join("\n")
                     )
@@ -405,7 +422,7 @@ static struct timespec now() {{
                             profile = self
                                 .used_op_names
                                 .iter()
-                                .map(|name| format!("extern double elapsed_{};", name))
+                                .map(|name| format!("extern double elapsed_op_{};", name))
                                 .collect::<Vec<_>>()
                                 .join("\n")
                         )
@@ -477,7 +494,10 @@ static struct timespec now() {{
 
             if self.enable_profiling {
                 for name in &self.used_op_names {
-                    writer.write_all(format!("    elapsed_{} = 0.0;\n", name).as_bytes())?;
+                    writer.write_all(format!("    elapsed_op_{} = 0.0;\n", name).as_bytes())?;
+                }
+                for name in &self.node_names {
+                    writer.write_all(format!("    interval_start_node_{name} = interval_end_node_{name} = 0.0;\n").as_bytes())?;
                 }
                 writer.write_all(b"\n")?;
             }
@@ -552,6 +572,7 @@ static struct timespec now() {{
             .clone()
             .unwrap_or_else(|| format!("{}_noname_{}", node.op.name(), node_id.index()));
         let node_name = escape_name(node_name);
+        self.node_names.push(node_name.clone());
         // log::debug!("Translating node: {}", node_name);
 
         let args = node
@@ -589,7 +610,10 @@ static struct timespec now() {{
                         "const struct timespec _end = now();
 const double start_in_sec = (double)_start.tv_sec + (double)_start.tv_nsec / 1e9;
 const double end_in_sec = (double)_end.tv_sec + (double)_end.tv_nsec / 1e9;
-elapsed_{opname} += end_in_sec - start_in_sec;",
+elapsed_op_{opname} += end_in_sec - start_in_sec;
+interval_start_node_{node_name} = start_in_sec;
+interval_end_node_{node_name} = end_in_sec;
+",
                         opname = op.name()
                     ),
                 )
@@ -597,11 +621,7 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
                 String::new()
             };
             created_calls.push(format!(
-                "{{
-{start_profiling}
-    {node_name}({});
-{end_profiling}
-}}",
+                "{{\n{start_profiling}\n    {node_name}({});\n{end_profiling}\n}}",
                 args.join(", ")
             ));
         }
@@ -681,12 +701,7 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
                 .define_function(id, &mut self.clif_ctx.ctx)?;
             self.clif_ctx.module.clear_context(&mut self.clif_ctx.ctx);
         } else {
-            let kernel = format!(
-                "{decl} {{
-{body}
-}}",
-                body = indent_all_by(4, kernel),
-            );
+            let kernel = format!("{decl} {{\n{body}\n}}", body = indent_all_by(4, kernel),);
             self.created_kernels.push(kernel);
         }
 

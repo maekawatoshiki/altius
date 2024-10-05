@@ -113,6 +113,7 @@ dependencies = [
  "cranelift-object",
  "criterion",
  "env_logger",
+ "gecko_profile",
  "glob",
  "image",
  "indent",
@@ -123,6 +124,7 @@ dependencies = [
  "ort",
  "rayon",
  "rustc-hash",
+ "serde_json",
  "sha1",
  "structopt",
  "target-lexicon",
@@ -827,6 +829,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "debugid"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bef552e6f588e446098f6ba40d89ac146c8c7b64aade83c051ee00bb5d2bc18d"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -972,6 +983,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "gecko_profile"
+version = "0.4.0"
+source = "git+https://github.com/mstange/samply#bae59e576d5e710f2258dd29b496c60407680b56"
+dependencies = [
+ "debugid",
+ "serde",
+ "serde_derive",
+ "serde_json",
 ]
 
 [[package]]
@@ -2536,6 +2558,12 @@ dependencies = [
  "idna",
  "percent-encoding",
 ]
+
+[[package]]
+name = "uuid"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81dfa00651efa65069b0b6b651f4aaa31ba9e3c3ce0137aaad053604ee7e0314"
 
 [[package]]
 name = "vec_map"

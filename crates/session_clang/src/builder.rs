@@ -3,6 +3,8 @@ use rustc_hash::FxHashMap;
 
 use altius_session::SessionError;
 
+use crate::session::Profile;
+
 use super::{session::CPUSession, translator::Translator};
 
 pub struct CPUSessionBuilder {
@@ -67,11 +69,24 @@ impl CPUSessionBuilder {
             unsafe { *entry.cast_mut() = tensor.data_as_ptr() };
         }
 
+        let mut profile = Profile::default();
+
         if self.enable_profiling {
             for name in product.used_op_names {
                 let symbol: libloading::Symbol<*const f64> =
-                    unsafe { lib.get(format!("elapsed_{}", name).as_bytes())? };
+                    unsafe { lib.get(format!("elapsed_op_{}", name).as_bytes())? };
                 profile_symbols.insert(name, unsafe { *symbol.into_raw() });
+            }
+            for name in product.node_names {
+                let start: libloading::Symbol<*const f64> =
+                    unsafe { lib.get(format!("interval_start_node_{name}").as_bytes())? };
+                let end: libloading::Symbol<*const f64> =
+                    unsafe { lib.get(format!("interval_end_node_{name}").as_bytes())? };
+                profile
+                    .events
+                    .push((name, unsafe { *start.into_raw() }, unsafe {
+                        *end.into_raw()
+                    }));
             }
         }
 
@@ -83,6 +98,7 @@ impl CPUSessionBuilder {
             trampoline,
             enable_profiling: self.enable_profiling,
             profile_symbols,
+            profile,
         })
     }
 }

@@ -1732,25 +1732,53 @@ for (int outer = 0; outer < {outer}; outer++) {{
 
             Ok(kernel)
         } else if input_0.dims.len() == 4 && input_1.dims.len() == 4 {
-            let [one, batch, m, _k] = input_0.dims.to_fixed_dims::<4>();
-            let [one_, batch_, k, n] = input_1.dims.to_fixed_dims::<4>();
-            assert_eq!(one, 1);
-            assert_eq!(one_, 1);
-            assert_eq!(batch, batch_);
+            let [b0, b1, m, _k] = input_0.dims.to_fixed_dims::<4>();
+            let [b0_, b1_, k, n] = input_1.dims.to_fixed_dims::<4>();
+            assert_eq!(b0, b0_);
+            assert_eq!(b1, b1_);
+            let batch = b0 * b1;
 
+            let input_0 = &input_names[0];
+            let input_1 = &input_names[1];
+            let output = &output_names[0];
+
+            fn repeat<F: Fn(usize) -> String>(f: F, batch: usize) -> String {
+                (0..batch).map(f).collect::<Vec<_>>().join(", ")
+            }
+            let input_0_ptrs_init = repeat(|i| format!("{input_0} + {i} * ({m} * {k})"), batch);
+            let input_1_ptrs_init = repeat(|i| format!("{input_1} + {i} * ({k} * {n})"), batch);
+            let output_ptrs_init = repeat(|i| format!("{output} + {i} * ({m} * {n})"), batch);
+            let m_array_init = repeat(|_| format!("{m}"), batch);
+            let n_array_init = repeat(|_| format!("{n}"), batch);
+            let k_array_init = repeat(|_| format!("{k}"), batch);
+            let alpha_array_init = repeat(|_| String::from("1.0f"), batch);
+            let beta_array_init = repeat(|_| String::from("0.0f"), batch);
+            let trans_a_init = repeat(|_| String::from("CblasNoTrans"), batch);
+            let trans_b_init = repeat(|_| String::from("CblasNoTrans"), batch);
+            let group_size_init = repeat(|_| String::from("1"), batch);
             let kernel = format!(
-                "for (int i = 0; i < {batch}; i++) {{
-    const float *input_0_ptr = {input_0} + i * ({m} * {k});
-    const float *input_1_ptr = {input_1} + i * ({k} * {n});
-    float *output_ptr = {output} + i * ({m} * {n});
-    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-        {m}, {n}, {k}, 1.,
-        input_0_ptr, {k}, input_1_ptr, {n}, 0., output_ptr, {n});
-}}",
-                input_0 = input_names[0],
-                input_1 = input_names[1],
-                output = output_names[0],
-            );
+                "const float *input_0_ptrs[{batch}] = {{ {input_0_ptrs_init} }};
+    const float *input_1_ptrs[{batch}] = {{ {input_1_ptrs_init} }};
+    float *output_ptrs[{batch}] = {{ {output_ptrs_init} }};
+    int m_array[{batch}] = {{ {m_array_init} }};
+    int n_array[{batch}] = {{ {n_array_init} }};
+    int k_array[{batch}] = {{ {k_array_init} }};
+    int lda_array[{batch}] = {{ {k_array_init} }};
+    int ldb_array[{batch}] = {{ {n_array_init} }};
+    int ldc_array[{batch}] = {{ {n_array_init} }};
+    float alpha_array[{batch}] = {{ {alpha_array_init} }};
+    float beta_array[{batch}] = {{ {beta_array_init} }};
+    int group_size[{batch}] = {{ {group_size_init} }};
+    enum CBLAS_TRANSPOSE trans_a[{batch}] = {{ {trans_a_init} }};
+    enum CBLAS_TRANSPOSE trans_b[{batch}] = {{ {trans_b_init} }};
+
+    cblas_sgemm_batch(CblasRowMajor,
+        trans_a, trans_b,
+        m_array, n_array, k_array,
+        alpha_array, (const float **)input_0_ptrs, lda_array,
+        (const float **)input_1_ptrs, ldb_array,
+        beta_array, output_ptrs, ldc_array,
+        {batch}, group_size);");
 
             Ok(kernel)
         } else {

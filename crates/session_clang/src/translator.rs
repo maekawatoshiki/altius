@@ -1699,11 +1699,26 @@ for (int outer = 0; outer < {outer}; outer++) {{
         } else if input_0.dims.len() == 3 && input_1.dims.len() == 2 {
             let [batch, m, _k] = input_0.dims.to_fixed_dims::<3>();
             let [k, n] = input_1.dims.to_fixed_dims::<2>();
+            log::info!("batch = {}, m = {}, k = {}, n = {}", batch, m, k, n);
 
             let kernel = format!(
-                "cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-    {batchm}, {n}, {k}, 1.,
-    {in0}, {k}, {in1}, {n}, 0., {out}, {n});",
+                "
+                static float *buf_b;
+                static int done = 0;
+                if (!done) {{
+                err_t err = BLIS_SUCCESS;
+                size_t buf_size_b = cblas_sgemm_pack_get_size(CblasBMatrix, {batchm}, {n}, {k});
+                buf_b = bli_malloc_user(buf_size_b, &err);
+
+                cblas_sgemm_pack(CblasRowMajor, CblasBMatrix, CblasNoTrans,
+                    {batchm}, {n}, {k}, 1.,
+                    {in1}, {n}, buf_b);
+                done=1;
+                }}
+
+                cblas_sgemm_compute(CblasRowMajor, CblasNoTrans, CblasPacked,
+    {batchm}, {n}, {k},
+    {in0}, {k}, buf_b, {n}, 0., {out}, {n});",
                 batchm = batch * m,
                 in0 = input_names[0],
                 in1 = input_names[1],
@@ -1715,20 +1730,53 @@ for (int outer = 0; outer < {outer}; outer++) {{
             let [batch, m, _k] = input_0.dims.to_fixed_dims::<3>();
             let [batch_, k, n] = input_1.dims.to_fixed_dims::<3>();
             assert_eq!(batch, batch_);
+            assert!(false);
 
             let kernel = format!(
-                "for (int i = 0; i < {batch}; i++) {{
-    const float *input_0_ptr = {input_0} + i * ({m} * {k});
-    const float *input_1_ptr = {input_1} + i * ({k} * {n});
-    float *output_ptr = {output} + i * ({m} * {n});
-    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-        {m}, {n}, {k}, 1.,
-        input_0_ptr, {k}, input_1_ptr, {n}, 0., output_ptr, {n});
-}}",
+                "const float *input_0_ptrs[{batch}] = {{ {input_0}, {input_0} + 1 * ({m} * {k}), {input_0} + 2 * ({m} * {k}) }};
+    const float *input_1_ptrs[{batch}] = {{ {input_1}, {input_1} + 1 * ({k} * {n}), {input_1} + 2 * ({k} * {n}) }};
+    float *output_ptrs[{batch}] = {{ {output}, {output} + 1 * ({m} * {n}), {output} + 2 * ({m} * {n}) }};
+    int m_array[{batch}] = {{ {m}, {m}, {m} }};
+    int n_array[{batch}] = {{ {n}, {n}, {n} }};
+    int k_array[{batch}] = {{ {k}, {k}, {k} }};
+    int lda_array[{batch}] = {{ {k}, {k}, {k} }};
+    int ldb_array[{batch}] = {{ {n}, {n}, {n} }};
+    int ldc_array[{batch}] = {{ {n}, {n}, {n} }};
+    float alpha_array[{batch}] = {{ 1.0, 1.0, 1.0 }};
+    float beta_array[{batch}] = {{ 0.0, 0.0, 0.0 }};
+    int group_size[1] = {{ 3 }};
+    enum CBLAS_TRANSPOSE a[{batch}] = {{ CblasNoTrans, CblasNoTrans, CblasNoTrans }};
+    enum CBLAS_TRANSPOSE b[{batch}] = {{ CblasNoTrans, CblasNoTrans, CblasNoTrans }};
+
+    cblas_sgemm_batch(CblasRowMajor,
+        a, b,
+        m_array, n_array, k_array,
+        alpha_array, (const float **)input_0_ptrs, lda_array,
+        (const float **)input_1_ptrs, ldb_array,
+        beta_array, output_ptrs, ldc_array,
+        1, group_size);",
                 input_0 = input_names[0],
                 input_1 = input_names[1],
                 output = output_names[0],
+                m = m,
+                n = n,
+                k = k,
+                batch = batch
             );
+
+            //             let kernel = format!(
+            //                 "for (int i = 0; i < {batch}; i++) {{
+            //     const float *input_0_ptr = {input_0} + i * ({m} * {k});
+            //     const float *input_1_ptr = {input_1} + i * ({k} * {n});
+            //     float *output_ptr = {output} + i * ({m} * {n});
+            //     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            //         {m}, {n}, {k}, 1.,
+            //         input_0_ptr, {k}, input_1_ptr, {n}, 0., output_ptr, {n});
+            // }}",
+            //                 input_0 = input_names[0],
+            //                 input_1 = input_names[1],
+            //                 output = output_names[0],
+            //             );
 
             Ok(kernel)
         } else if input_0.dims.len() == 4 && input_1.dims.len() == 4 {

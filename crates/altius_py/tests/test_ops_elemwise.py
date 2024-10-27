@@ -18,25 +18,25 @@ def test_identity_1(backend):
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Identity", [1, 2], backend)
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_relu_1(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Relu", [1, 2], backend)
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_relu_2(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Relu", [3, 1, 28, 28], backend)
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_hardsigmoid_1(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "HardSigmoid", [1, 2], backend)
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_hardsigmoid_2(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(
@@ -58,13 +58,13 @@ def test_leakyrelu_2(backend):
         )
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_sigmoid_1(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(os.path.join(tmpdir, "model.onnx"), "Sigmoid", [1, 2], backend)
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_sigmoid_2(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(
@@ -72,7 +72,7 @@ def test_sigmoid_2(backend):
         )
 
 
-@pytest.mark.parametrize("backend", ["interpreter"])
+@pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_sigmoid_3(backend):
     with tempfile.TemporaryDirectory() as tmpdir:
         op_elemwise(

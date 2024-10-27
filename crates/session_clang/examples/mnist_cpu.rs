@@ -10,7 +10,7 @@ pub struct Opt {
 fn main() {
     use altius_core::onnx::load_onnx;
     use altius_core::tensor::*;
-    use altius_session_clang::CPUSessionBuilder;
+    use altius_session_clang::ClangSessionBuilder;
     use std::cmp::Ordering;
     use std::fs;
     use std::path::Path;
@@ -44,7 +44,7 @@ fn main() {
     }
 
     let validation_count = 10000;
-    let sess = CPUSessionBuilder::new(model)
+    let sess = ClangSessionBuilder::new(model)
         .with_profiling_enabled(false)
         .build()
         .unwrap();

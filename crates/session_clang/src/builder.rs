@@ -3,15 +3,15 @@ use rustc_hash::FxHashMap;
 
 use altius_session::SessionError;
 
-use super::{session::CPUSession, translator::Translator};
+use super::{session::ClangSession, translator::Translator};
 
-pub struct CPUSessionBuilder {
+pub struct ClangSessionBuilder {
     model: Model,
     intra_op_num_threads: usize,
     enable_profiling: bool,
 }
 
-impl CPUSessionBuilder {
+impl ClangSessionBuilder {
     pub const fn new(model: Model) -> Self {
         Self {
             model,
@@ -30,7 +30,7 @@ impl CPUSessionBuilder {
         self
     }
 
-    pub fn build(self) -> Result<CPUSession, SessionError> {
+    pub fn build(self) -> Result<ClangSession, SessionError> {
         let mut inferred_shapes = FxHashMap::default();
         let mut value_shapes = FxHashMap::default();
         infer_shapes(&self.model, &mut inferred_shapes, &mut value_shapes)?;
@@ -75,7 +75,7 @@ impl CPUSessionBuilder {
             }
         }
 
-        Ok(CPUSession {
+        Ok(ClangSession {
             target_dir: product.target_dir,
             model: self.model,
             lib,

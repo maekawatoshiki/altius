@@ -22,7 +22,7 @@ fn main() {
     use altius_core::optimize::gelu_fusion::fuse_gelu;
     use altius_core::optimize::layer_norm_fusion::fuse_layer_norm;
     use altius_core::{onnx::load_onnx, tensor::Tensor};
-    use altius_session_clang::CPUSessionBuilder;
+    use altius_session_clang::ClangSessionBuilder;
     use std::cmp::Ordering;
     use std::fs;
     use std::path::Path;
@@ -46,7 +46,7 @@ fn main() {
     });
     let input = Tensor::new(vec![1, 3, 224, 224].into(), image.into_raw_vec());
 
-    let i = CPUSessionBuilder::new(model)
+    let i = ClangSessionBuilder::new(model)
         .with_profiling_enabled(opt.profile)
         .with_intra_op_num_threads(opt.threads)
         .build()

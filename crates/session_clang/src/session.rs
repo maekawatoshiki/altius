@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 
 use std::{path::PathBuf, time::Instant};
 
-pub struct CPUSession {
+pub struct ClangSession {
     pub(super) model: Model,
     #[allow(dead_code)]
     pub(super) target_dir: PathBuf,
@@ -22,9 +22,9 @@ pub struct CPUSession {
 }
 
 // TODO: Is this really safe?
-unsafe impl Send for CPUSession {}
+unsafe impl Send for ClangSession {}
 
-impl CPUSession {
+impl ClangSession {
     pub fn model(&self) -> &Model {
         &self.model
     }

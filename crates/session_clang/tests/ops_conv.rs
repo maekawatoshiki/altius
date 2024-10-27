@@ -8,7 +8,7 @@ use altius_core::{
     op::{Conv2d, Op},
     tensor::{Tensor, TensorElemType, TypedFixedShape},
 };
-use altius_session_clang::CPUSessionBuilder;
+use altius_session_clang::ClangSessionBuilder;
 use ndarray::CowArray;
 use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
 
@@ -42,7 +42,7 @@ fn cpu_ops_conv() {
     let ort_z = z.view();
     assert!(ort_z.shape() == &[1, 8, 28, 28]);
 
-    let sess = CPUSessionBuilder::new(load_onnx(path).unwrap())
+    let sess = ClangSessionBuilder::new(load_onnx(path).unwrap())
         .build()
         .unwrap();
     let altius_z = &sess.run(vec![x_]).unwrap()[0];

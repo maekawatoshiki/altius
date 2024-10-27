@@ -8,7 +8,7 @@ use altius_core::tensor::{TensorElemType, TensorElemTypeExt};
 use altius_core::value::ValueId;
 use altius_core::{model::Model, tensor::Tensor};
 use altius_session::SessionError;
-use altius_session_clang::{CPUSession, CPUSessionBuilder};
+use altius_session_clang::{ClangSession, ClangSessionBuilder};
 use altius_session_interpreter::{InterpreterSession, InterpreterSessionBuilder};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyDict};
 
@@ -26,7 +26,7 @@ pub struct PyInterpreterSession(pub InterpreterSession);
 
 #[pyclass]
 #[repr(transparent)]
-pub struct PyCPUSession(pub CPUSession);
+pub struct PyClangSession(pub ClangSession);
 
 #[pyfunction]
 fn load(path: String) -> PyResult<PyModel> {
@@ -72,9 +72,9 @@ fn session(
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?,
         )
         .into_py(py)),
-        "cpu" => Ok(PyCPUSession(
+        "cpu" => Ok(PyClangSession(
             py.allow_threads(|| {
-                CPUSessionBuilder::new(model)
+                ClangSessionBuilder::new(model)
                     .with_profiling_enabled(enable_profiling)
                     .with_intra_op_num_threads(intra_op_num_threads)
                     .build()
@@ -190,7 +190,7 @@ impl Session for PyInterpreterSession {
     }
 }
 
-impl Session for PyCPUSession {
+impl Session for PyClangSession {
     fn model(&self) -> &Model {
         self.0.model()
     }
@@ -208,7 +208,7 @@ impl PyInterpreterSession {
 }
 
 #[pymethods]
-impl PyCPUSession {
+impl PyClangSession {
     fn run(&self, py: Python, inputs: &PyDict) -> PyResult<Vec<Py<PyAny>>> {
         Session::run(self, py, inputs)
     }

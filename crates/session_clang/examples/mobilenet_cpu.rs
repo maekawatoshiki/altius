@@ -24,7 +24,7 @@ struct Opt {
 
 fn main() {
     use altius_core::{onnx::load_onnx, tensor::Tensor};
-    use altius_session_clang::CPUSessionBuilder;
+    use altius_session_clang::ClangSessionBuilder;
     use std::cmp::Ordering;
     use std::fs;
     use std::path::Path;
@@ -81,7 +81,7 @@ fn main() {
         }
     } else {
         let model = load_onnx(root.join("mobilenetv3.onnx")).unwrap();
-        let session = CPUSessionBuilder::new(model)
+        let session = ClangSessionBuilder::new(model)
             .with_profiling_enabled(opt.profile)
             .with_intra_op_num_threads(opt.threads)
             .build()

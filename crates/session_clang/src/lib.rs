@@ -7,5 +7,5 @@ mod builder;
 mod session;
 mod translator;
 
-pub use builder::CPUSessionBuilder;
-pub use session::CPUSession;
+pub use builder::ClangSessionBuilder;
+pub use session::ClangSession;

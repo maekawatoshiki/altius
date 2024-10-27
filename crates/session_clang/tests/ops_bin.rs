@@ -8,7 +8,7 @@ use altius_core::{
     op::Op,
     tensor::{Tensor, TensorElemType, TypedFixedShape},
 };
-use altius_session_clang::CPUSessionBuilder;
+use altius_session_clang::ClangSessionBuilder;
 use ndarray::CowArray;
 use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -53,7 +53,7 @@ fn cpu_ops_bin() {
             let ort_z = z.view();
             assert!(ort_z.shape() == &[4, 2]);
 
-            let sess = CPUSessionBuilder::new(load_onnx(path).unwrap())
+            let sess = ClangSessionBuilder::new(load_onnx(path).unwrap())
                 .build()
                 .unwrap();
             let altius_z = &sess.run(vec![x_, y_]).unwrap()[0];

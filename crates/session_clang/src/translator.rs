@@ -45,15 +45,15 @@ use sha1::{Digest, Sha1};
 use target_lexicon::Triple;
 
 pub(super) struct Translator<'a> {
-    pub model: &'a Model,
+    model: &'a Model,
     inferred_shapes: &'a HashMap<NodeId, (Op, Vec<TypedFixedShape>)>,
     value_shapes: &'a HashMap<ValueId, TypedFixedShape>,
     created_kernels: Vec<String>,
     created_kernel_protos: Vec<String>,
     reshaped_values: HashSet<ValueId>,
     propagated_inits: HashSet<ValueId>,
-    pub used_op_names: HashSet<String>,
-    pub target_dir: PathBuf,
+    used_op_names: HashSet<String>,
+    target_dir: PathBuf,
     enable_profiling: bool,
     intra_op_num_threads: usize,
     prev_code_hash: Option<[u8; 20]>,

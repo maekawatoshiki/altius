@@ -44,7 +44,7 @@ pub fn fuse_conv_act(model: &mut Model) {
     let count = list.len();
 
     for (fused_act, conv_id, conv_out, act) in list {
-        if let Op::Conv2d(ref mut c) = &mut model.graph.nodes[conv_id].op {
+        if let Op::Conv2d(c) = &mut model.graph.nodes[conv_id].op {
             c.activation = Some(fused_act);
         }
 

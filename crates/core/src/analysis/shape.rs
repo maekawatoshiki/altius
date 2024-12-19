@@ -612,7 +612,7 @@ impl Model {
                 let input = inputs[0];
                 shapes.push(TypedFixedShape::new(input.dims().clone(), cast.to));
             }
-            Op::FusedElemwise(ref mut f) => {
+            Op::FusedElemwise(f) => {
                 let mut map = FxHashMap::default();
                 for (i, val_id) in f.input_map.iter().enumerate() {
                     map.insert(*val_id, inputs[i]);

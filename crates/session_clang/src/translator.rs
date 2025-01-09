@@ -223,11 +223,11 @@ impl<'a> Translator<'a> {
                             .arg("-fopenmp")
                             .arg("-fvectorize")
                             .arg("-fPIC");
+                        #[cfg(target_os = "macos")]
+                        cmd.args(&["-DACCELERATE_NEW_LAPACK", "-DACCELERATE_LAPACK_ILP64"]);
                         #[cfg(target_os = "linux")]
-                        {
-                            cmd.arg("-march=native");
-                            cmd.arg(format!("-I{}", blis_include_dir));
-                        }
+                        cmd.arg("-march=native")
+                            .arg(format!("-I{}", blis_include_dir));
                         if !cmd.status()?.success() {
                             return Err(SessionError::Message(
                                 "Failed to compile the model".into(),
@@ -1757,7 +1757,8 @@ for (int outer = 0; outer < {outer}; outer++) {{
             let trans_b_init = repeat(|_| String::from("CblasNoTrans"), batch);
             let group_size_init = repeat(|_| String::from("1"), batch);
             let kernel = format!(
-                "const float *input_0_ptrs[{batch}] = {{ {input_0_ptrs_init} }};
+                "#ifdef BLIS_ENABLE_CBLAS
+    const float *input_0_ptrs[{batch}] = {{ {input_0_ptrs_init} }};
     const float *input_1_ptrs[{batch}] = {{ {input_1_ptrs_init} }};
     float *output_ptrs[{batch}] = {{ {output_ptrs_init} }};
     int m_array[{batch}] = {{ {m_array_init} }};
@@ -1778,7 +1779,18 @@ for (int outer = 0; outer < {outer}; outer++) {{
         alpha_array, (const float **)input_0_ptrs, lda_array,
         (const float **)input_1_ptrs, ldb_array,
         beta_array, output_ptrs, ldc_array,
-        {batch}, group_size);");
+        {batch}, group_size);
+#else
+    for (size_t i = 0; i < {batch}; i++) {{
+        const float *input_0_ptr = {input_0} + i * ({m} * {k});
+        const float *input_1_ptr = {input_1} + i * ({k} * {n});
+        float *output_ptr = {output} + i * ({m} * {n});
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            {m}, {n}, {k}, 1.,
+            input_0_ptr, {k}, input_1_ptr, {n}, 0., output_ptr, {n});
+    }}
+#endif"
+            );
 
             Ok(kernel)
         } else {

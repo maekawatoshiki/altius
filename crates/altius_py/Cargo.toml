@@ -6,6 +6,7 @@ edition = "2021"
 [lib]
 name = "altius_py"
 crate-type = ["cdylib"]
+test = false
 
 [dependencies]
 altius-core = { path = "../core" }

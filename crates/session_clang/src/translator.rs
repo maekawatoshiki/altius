@@ -88,7 +88,7 @@ impl<'a> Translator<'a> {
         value_shapes: &'a HashMap<ValueId, TypedFixedShape>,
     ) -> Result<Self, SessionError> {
         let target_dir = std::env::var("ALTIUS_MODEL_OUT_DIR").map_or_else(
-            |_| Ok::<_, SessionError>(tempfile::TempDir::new()?.into_path()),
+            |_| Ok::<_, SessionError>(tempfile::TempDir::new()?.keep()),
             |dir| Ok(PathBuf::from(dir)),
         )?;
         let mut prev_code_hash = None;

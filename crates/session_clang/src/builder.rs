@@ -70,7 +70,7 @@ impl ClangSessionBuilder {
         if self.enable_profiling {
             for name in product.used_op_names {
                 let symbol: libloading::Symbol<*const f64> =
-                    unsafe { lib.get(format!("elapsed_{}", name).as_bytes())? };
+                    unsafe { lib.get(format!("elapsed_{name}").as_bytes())? };
                 profile_symbols.insert(name, unsafe { *symbol.into_raw() });
             }
         }

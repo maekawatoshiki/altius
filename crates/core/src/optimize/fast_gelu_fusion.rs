@@ -30,9 +30,12 @@ pub fn fuse_fast_gelu(model: &mut Model) {
             continue;
         };
         let pow = &model.graph.nodes[pow_id];
-        if model.graph.inits.get(&pow.inputs[1]).map_or(true, |rhs| {
-            !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 3.
-        }) {
+        if model
+            .graph
+            .inits
+            .get(&pow.inputs[1])
+            .is_none_or(|rhs| !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 3.)
+        {
             continue;
         }
         if value_users[&pow.outputs[0]].len() != 1 {
@@ -48,7 +51,7 @@ pub fn fuse_fast_gelu(model: &mut Model) {
             .graph
             .inits
             .get(&mul1.inputs[1])
-            .map_or(true, |rhs| !rhs.allclose(&[0.044714998453855515]))
+            .is_none_or(|rhs| !rhs.allclose(&[0.044714998453855515]))
         {
             continue;
         }
@@ -81,7 +84,7 @@ pub fn fuse_fast_gelu(model: &mut Model) {
             .graph
             .inits
             .get(&mul2.inputs[1])
-            .map_or(true, |rhs| !rhs.allclose(&[0.7978845834732056]))
+            .is_none_or(|rhs| !rhs.allclose(&[0.7978845834732056]))
         {
             continue;
         }
@@ -111,9 +114,12 @@ pub fn fuse_fast_gelu(model: &mut Model) {
         if !matches!(add.op, Op::Add) {
             continue;
         }
-        if model.graph.inits.get(&add.inputs[1]).map_or(true, |rhs| {
-            !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 1.
-        }) {
+        if model
+            .graph
+            .inits
+            .get(&add.inputs[1])
+            .is_none_or(|rhs| !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 1.)
+        {
             continue;
         }
         if value_users[&add.outputs[0]].len() != 1 {
@@ -135,9 +141,12 @@ pub fn fuse_fast_gelu(model: &mut Model) {
         if mul4.inputs[0] != x {
             continue;
         }
-        if model.graph.inits.get(&mul4.inputs[1]).map_or(true, |rhs| {
-            !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 0.5
-        }) {
+        if model
+            .graph
+            .inits
+            .get(&mul4.inputs[1])
+            .is_none_or(|rhs| !rhs.elem_ty().is_f32() || rhs.data::<f32>()[0] != 0.5)
+        {
             continue;
         }
         if value_users[&mul4.outputs[0]].len() != 1 {

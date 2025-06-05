@@ -3,7 +3,7 @@ use std::time::Instant;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    analysis::shape::{infer_shapes, ShapeError},
+    analysis::shape::{ShapeError, infer_shapes},
     model::Model,
     node::{Node, NodeId},
     op::{FusedElemwise, Op},
@@ -42,7 +42,7 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
                         || (last_node_id.is_some() && Some(value_parents[id]) == last_node_id)
                         || last_node_id.is_none()
                 })
-                && (last_node_id.map_or(true, |last_node_id| {
+                && (last_node_id.is_none_or(|last_node_id| {
                     let last_node = &model.graph.nodes[last_node_id];
                     last_node.inputs.len() == 2
                         && last_node.outputs[0] == node.inputs[0]
@@ -54,7 +54,7 @@ pub fn fuse_elemwise_ops(model: &mut Model) -> Result<(), ShapeError> {
             let end_of_chain = fusible
                 && value_users
                     .get(&node.outputs[0])
-                    .map_or(true, |users| users.len() != 1);
+                    .is_none_or(|users| users.len() != 1);
             if fusible {
                 fusible_nodes.push(cur_node_id);
                 last_node_id = Some(cur_node_id);

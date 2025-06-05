@@ -87,8 +87,8 @@ impl Deref for Dimensions {
 impl fmt::Debug for Dimension {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Dimension::Fixed(d) => write!(f, "{}", d),
-            Dimension::Dynamic(s) => write!(f, "{}", s),
+            Dimension::Fixed(d) => write!(f, "{d}"),
+            Dimension::Dynamic(s) => write!(f, "{s}"),
         }
     }
 }

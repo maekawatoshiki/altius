@@ -21,7 +21,7 @@ fn extract_gelu(
             .graph
             .inits
             .get(&div.inputs[1])
-            .map_or(true, |rhs| !rhs.allclose(&[approx_sqrt_two]))
+            .is_none_or(|rhs| !rhs.allclose(&[approx_sqrt_two]))
     {
         return None;
     }
@@ -42,9 +42,7 @@ fn extract_gelu(
         .graph
         .inits
         .get(&add.inputs[is_erf_add_lhs as usize])
-        .map_or(true, |one| {
-            !one.elem_ty().is_f32() || one.data::<f32>()[0] != 1.
-        })
+        .is_none_or(|one| !one.elem_ty().is_f32() || one.data::<f32>()[0] != 1.)
     {
         return None;
     }
@@ -69,9 +67,7 @@ fn extract_gelu(
         .graph
         .inits
         .get(&mul2.inputs[is_mul1_mul2_lhs as usize])
-        .map_or(true, |half| {
-            !half.elem_ty().is_f32() || half.data::<f32>()[0] != 0.5
-        })
+        .is_none_or(|half| !half.elem_ty().is_f32() || half.data::<f32>()[0] != 0.5)
     {
         return None;
     }

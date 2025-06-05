@@ -121,7 +121,7 @@ impl InterpreterSession {
                 profile.values().sum::<Duration>()
             );
             log::info!("Total execution time: {:#?}", start.elapsed());
-            log::info!("Profile: {:#?}", profile);
+            log::info!("Profile: {profile:#?}");
         }
 
         Ok(self

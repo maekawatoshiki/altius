@@ -6,7 +6,7 @@ use crate::{
 };
 use ndarray::{CowArray, IxDyn};
 use rand::{
-    distributions::Standard, prelude::Distribution, rngs::StdRng, thread_rng, Rng, SeedableRng,
+    Rng, SeedableRng, distributions::Standard, prelude::Distribution, rngs::StdRng, thread_rng,
 };
 
 thread_local!(static RNG: RefCell<StdRng> =

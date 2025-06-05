@@ -222,9 +222,10 @@ impl Model {
                     assert!(inputs.len() == 3);
                     let x = &inputs[Op::RESIZE_IN_X];
                     assert!(x.dims().len() == 4);
-                    let _roi = &inputs[Op::RESIZE_IN_ROI].data::<f32>(); // TODO: According to https://github.com/onnx/onnx/blob/main/docs/Operators.md#Resize,
-                                                                         // it only takes effect when coordinate_transformation_mode is "tf_crop_and_resize".
-                                                                         // Since we assume coordinate_transformation_mode is "asymmetric" for now, just ignore roi.
+                    // TODO: According to https://github.com/onnx/onnx/blob/main/docs/Operators.md#Resize,
+                    // it only takes effect when coordinate_transformation_mode is "tf_crop_and_resize".
+                    // Since we assume coordinate_transformation_mode is "asymmetric" for now, just ignore roi.
+                    let _roi = &inputs[Op::RESIZE_IN_ROI].data::<f32>();
                     let scales = &inputs[Op::RESIZE_IN_SCALES].data::<f32>();
                     shapes.push(TypedFixedShape::new(
                         vec![
@@ -524,7 +525,7 @@ impl Model {
             Op::NonMaxSuppression => {
                 return Err(ShapeError::Message(
                     "NonMaxSuppression: Unsupported op".into(),
-                ))
+                ));
             }
             Op::MatMul => {
                 let in_a = &inputs[Op::MATMUL_IN_A].dims();

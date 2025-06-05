@@ -77,7 +77,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             domain => {
                 return Err(ModelLoadError::Todo(
                     format!("Custom domain ('{domain}') not supported yet").into(),
-                ))
+                ));
             }
         }
     }
@@ -104,10 +104,10 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             let TensorType(tensor) = x
                 .r#type
                 .as_ref()
-                .ok_or_else(|| ModelLoadError::NoValueType)?
+                .ok_or(ModelLoadError::NoValueType)?
                 .value
                 .as_ref()
-                .ok_or_else(|| ModelLoadError::NoValueType)?
+                .ok_or(ModelLoadError::NoValueType)?
             else {
                 return Err(ModelLoadError::Todo(
                     "Graph input must be tensor type".into(),
@@ -117,7 +117,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             let dims: Vec<Dimension> = tensor
                 .shape
                 .as_ref()
-                .ok_or_else(|| ModelLoadError::NoValueShape)?
+                .ok_or(ModelLoadError::NoValueShape)?
                 .dim
                 .iter()
                 .map(|d| match d.value.as_ref().unwrap() {
@@ -328,14 +328,14 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             "Gemm" => Op::Gemm(Gemm {
                 alpha: get_attribute(&node.attribute, "alpha").map_or(1.0, |a| a.f()),
                 beta: get_attribute(&node.attribute, "beta").map_or(1.0, |a| a.f()),
-                trans_a: get_attribute(&node.attribute, "transA").map_or(false, |a| a.i() == 1),
-                trans_b: get_attribute(&node.attribute, "transB").map_or(false, |a| a.i() == 1),
+                trans_a: get_attribute(&node.attribute, "transA").is_ok_and(|a| a.i() == 1),
+                trans_b: get_attribute(&node.attribute, "transB").is_ok_and(|a| a.i() == 1),
             }),
             "BatchNormalization" => Op::BatchNormalization(BatchNormalization {
                 epsilon: get_attribute(&node.attribute, "epsilon").map_or(1e-5, |a| a.f()),
                 momentum: get_attribute(&node.attribute, "momentum").map_or(1e-5, |a| a.f()),
                 training_mode: get_attribute(&node.attribute, "training_mode")
-                    .map_or(false, |a| a.i() != 0),
+                    .is_ok_and(|a| a.i() != 0),
             }),
             "LayerNormalization" => Op::LayerNormalization(LayerNormalization {
                 axis: get_attribute(&node.attribute, "axis").map_or(-1, |a| a.i()),
@@ -378,7 +378,7 @@ fn get_attribute<'a>(
     attrs
         .iter()
         .find(|x| x.name() == name)
-        .ok_or_else(|| ModelLoadError::NoAttribute(name))
+        .ok_or(ModelLoadError::NoAttribute(name))
 }
 
 fn get_tensor(tensor: &TensorProto) -> Result<Tensor, ModelLoadError> {
@@ -418,7 +418,7 @@ fn get_tensor(tensor: &TensorProto) -> Result<Tensor, ModelLoadError> {
         t => {
             return Err(ModelLoadError::Todo(
                 format!("Unsupported data type for tensor: {t:?}").into(),
-            ))
+            ));
         }
     })
 }

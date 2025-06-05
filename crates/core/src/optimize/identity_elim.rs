@@ -33,7 +33,7 @@ pub fn eliminate_identity(model: &mut Model) {
             //     if *output == id_out {
             //         *output = id_in;
             //     }
-            // } 
+            // }
         };
 
         model.graph.nodes[node_id].deleted = true;

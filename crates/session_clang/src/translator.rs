@@ -224,7 +224,7 @@ impl<'a> Translator<'a> {
                             .arg("-fvectorize")
                             .arg("-fPIC");
                         #[cfg(target_os = "macos")]
-                        cmd.args(&["-DACCELERATE_NEW_LAPACK", "-DACCELERATE_LAPACK_ILP64"]);
+                        cmd.args(["-DACCELERATE_NEW_LAPACK", "-DACCELERATE_LAPACK_ILP64"]);
                         #[cfg(target_os = "linux")]
                         cmd.arg("-march=native")
                             .arg(format!("-I{}", blis_include_dir));
@@ -382,7 +382,7 @@ static struct timespec now() {{
                         profile = self
                             .used_op_names
                             .iter()
-                            .map(|name| format!("double elapsed_{};", name))
+                            .map(|name| format!("double elapsed_{name};"))
                             .collect::<Vec<_>>()
                             .join("\n")
                     )
@@ -405,7 +405,7 @@ static struct timespec now() {{
                             profile = self
                                 .used_op_names
                                 .iter()
-                                .map(|name| format!("extern double elapsed_{};", name))
+                                .map(|name| format!("extern double elapsed_{name};"))
                                 .collect::<Vec<_>>()
                                 .join("\n")
                         )
@@ -477,7 +477,7 @@ static struct timespec now() {{
 
             if self.enable_profiling {
                 for name in &self.used_op_names {
-                    writer.write_all(format!("    elapsed_{} = 0.0;\n", name).as_bytes())?;
+                    writer.write_all(format!("    elapsed_{name} = 0.0;\n").as_bytes())?;
                 }
                 writer.write_all(b"\n")?;
             }
@@ -935,14 +935,13 @@ elapsed_{opname} += end_in_sec - start_in_sec;",
         );
 
         let kernel = format!(
-            "{}
+            "{code_fill_bias}
 
-{}
+{code_im2col}
 
-{}
+{code_gemm}
 
-free(col);",
-            code_fill_bias, code_im2col, code_gemm
+free(col);"
         );
 
         Ok(kernel)
@@ -2013,10 +2012,7 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
         }
 
         let kernel = if num_blocks == 1 {
-            format!(
-                "memcpy({}, {}, sizeof(float) * {});",
-                output_name, input_name, num_elems_in_block
-            )
+            format!("memcpy({output_name}, {input_name}, sizeof(float) * {num_elems_in_block});")
         } else {
             let indices = (0..num_blocks)
                 .scan(0, |src_idx, _| {
@@ -2027,22 +2023,20 @@ cblas_sgemm(CblasRowMajor, {transa}, {transb},
                 .collect::<Vec<_>>()
                 .join(", ");
             if num_elems_in_block == 1 {
-                format!("int src_indices[{num_blocks}] = {{ {indices} }};
+                format!(
+                    "int src_indices[{num_blocks}] = {{ {indices} }};
 for (int i = 0; i < {num_blocks}; i++) {{
-    {out}[i] = {in}[src_indices[i]];
+    {output_name}[i] = {input_name}[src_indices[i]];
 }}",
-                    out = output_name,
-                    in = input_name,
                 )
             } else {
-                format!("int src_indices[{num_blocks}] = {{ {indices} }};
+                format!(
+                    "int src_indices[{num_blocks}] = {{ {indices} }};
 for (int i = 0; i < {num_blocks}; i++) {{
-    memcpy({out} + i * {num_elems_in_block},
-            {in} + src_indices[i],
+    memcpy({output_name} + i * {num_elems_in_block},
+            {input_name} + src_indices[i],
             sizeof(float) * {num_elems_in_block});
 }}",
-                    out = output_name,
-                    in = input_name,
                 )
             }
         };
@@ -2462,8 +2456,9 @@ for (int i = 0; i < {outer}; i++) {{
             builder.switch_to_block(entry);
             builder.append_block_params_for_function_params(entry);
             let zero = builder.ins().iconst(I64, 0);
-            input_params = builder.block_params(entry)[..inputs.len()]
-                .to_vec()
+            #[allow(clippy::unnecessary_to_owned)]
+            let params = builder.block_params(entry)[..inputs.len()].to_vec();
+            input_params = params
                 .into_iter()
                 .map(|i| self.clif_ctx.create_var(ptr, i, &mut builder))
                 .collect::<Vec<_>>();
@@ -2619,8 +2614,9 @@ for (int i = 0; i < {outer}; i++) {{
             {
                 builder.switch_to_block(entry);
                 builder.append_block_params_for_function_params(entry);
-                let [var_data, var_indices] = builder.block_params(entry)[..inputs.len()]
-                    .to_vec()
+                #[allow(clippy::unnecessary_to_owned)]
+                let params = builder.block_params(entry)[..inputs.len()].to_vec();
+                let [var_data, var_indices] = params
                     .into_iter()
                     .map(|i| self.clif_ctx.create_var(ptr, i, &mut builder))
                     .collect::<Vec<_>>()[..]
@@ -2684,6 +2680,7 @@ for (int i = 0; i < {outer}; i++) {{
             {
                 builder.switch_to_block(entry);
                 builder.append_block_params_for_function_params(entry);
+                #[allow(clippy::unnecessary_to_owned)]
                 let var_inputs = builder.block_params(entry)[..inputs.len()]
                     .to_vec()
                     .into_iter()
@@ -3432,7 +3429,7 @@ fn value_name(model: &Model, id: ValueId) -> String {
 fn escape_name(s: impl Into<String>) -> String {
     fn add_prefix(s: String) -> String {
         if s.starts_with(|c: char| c.is_ascii_digit()) {
-            format!("_{}", s)
+            format!("_{s}")
         } else {
             s
         }

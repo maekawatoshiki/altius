@@ -21,11 +21,17 @@ pub enum SessionError {
     Libloading(#[from] libloading::Error),
 
     #[error("Cranelift: {0}")]
-    Cranelift(#[from] ModuleError),
+    Cranelift(#[from] Box<ModuleError>),
 
     /// General error messages (including TODOs).
     #[error("Something went wrong: {0}")]
     Message(Cow<'static, str>),
+}
+
+impl From<ModuleError> for SessionError {
+    fn from(err: ModuleError) -> Self {
+        SessionError::Cranelift(Box::new(err))
+    }
 }
 
 pub trait Session {

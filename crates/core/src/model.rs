@@ -19,7 +19,7 @@ pub struct Model {
 impl Model {
     pub fn lookup_named_value(&self, name: &str) -> Option<ValueId> {
         self.graph.values.inner().iter().find_map(|(id, value)| {
-            if value.name.as_ref().map_or(false, |nm| nm == name) {
+            if value.name.as_ref().is_some_and(|nm| nm == name) {
                 Some(id)
             } else {
                 None
@@ -75,9 +75,7 @@ impl Model {
             }
 
             let mut inputs = &node.inputs.clone().into_iter().collect::<FxHashSet<_>>() - &consts;
-            inputs.retain(|i| value_parents.contains_key(i)); // NOTE: Some of node inputs might be
-                                                              // optional (so they don't have their
-                                                              // parents).
+            inputs.retain(|i| value_parents.contains_key(i)); // NOTE: Some of the node inputs might be optional (so they don't have their parents).
             num_node_inputs.insert(id, inputs.len());
             if inputs.is_empty() {
                 que.push(id);
@@ -161,9 +159,11 @@ impl fmt::Debug for Model {
         let mut debug_nodes = vec![];
         for &node_id in &node_ids {
             let node = &self.graph.nodes[node_id];
-            let mut debug_node = DebugNode::default();
-            debug_node.op = node.op.name();
-            debug_node.name = node.name.as_ref().map_or("", |s| s);
+            let mut debug_node = DebugNode {
+                op: node.op.name(),
+                name: node.name.as_ref().map_or("", |s| s),
+                ..Default::default()
+            };
             for &input in &node.inputs {
                 let dtype = value_shapes[&input].elem_ty;
                 let dims = &value_shapes[&input].dims;

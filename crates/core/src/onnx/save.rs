@@ -13,7 +13,7 @@ use crate::{
 include!(concat!(env!("OUT_DIR"), "/onnx.rs"));
 
 use tensor_proto::DataType;
-use tensor_shape_proto::{dimension::Value as DimValue, Dimension};
+use tensor_shape_proto::{Dimension, dimension::Value as DimValue};
 use type_proto::Value::TensorType;
 
 use self::attribute_proto::AttributeType;
@@ -103,7 +103,7 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
                     Dim::Dynamic(_d) => todo!(),
                 })
                 .collect::<Vec<_>>(),
-            float_data: tensor.data::<f32>().iter().copied().collect::<Vec<_>>(),
+            float_data: tensor.data::<f32>().to_vec(),
             ..Default::default()
         });
     }
@@ -150,22 +150,19 @@ fn encode_graph(model: &Model) -> Result<GraphProto, ModelSaveError> {
     // TODO: We need to cover all ops.
     fn attrs(op: &Op) -> Vec<AttributeProto> {
         let mut attrs = vec![];
-        match op {
-            Op::Conv2d(c) => {
-                attrs.push(AttributeProto {
-                    name: "auto_pad".to_string().into(),
-                    s: "SAME_UPPER".to_string().into_bytes().into(),
-                    r#type: Some(AttributeType::String as i32),
-                    ..Default::default()
-                });
-                attrs.push(AttributeProto {
-                    name: "kernel_shape".to_string().into(),
-                    ints: c.kernel_shape.iter().map(|x| *x as i64).collect::<Vec<_>>(),
-                    r#type: Some(AttributeType::Ints as i32),
-                    ..Default::default()
-                });
-            }
-            _ => {}
+        if let Op::Conv2d(c) = op {
+            attrs.push(AttributeProto {
+                name: "auto_pad".to_string().into(),
+                s: "SAME_UPPER".to_string().into_bytes().into(),
+                r#type: Some(AttributeType::String as i32),
+                ..Default::default()
+            });
+            attrs.push(AttributeProto {
+                name: "kernel_shape".to_string().into(),
+                ints: c.kernel_shape.iter().map(|x| *x as i64).collect::<Vec<_>>(),
+                r#type: Some(AttributeType::Ints as i32),
+                ..Default::default()
+            });
         };
         attrs
     }

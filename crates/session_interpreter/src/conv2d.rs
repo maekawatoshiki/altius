@@ -234,6 +234,7 @@ fn im2col(
 
                 if pad_t > ih || ih >= input_h + pad_t {
                     // Faster than col[..output_w].fill(0.);
+                    #[allow(clippy::needless_range_loop)]
                     for i in 0..output_w {
                         col[i] = 0.;
                     }
@@ -259,6 +260,7 @@ fn im2col(
 
                 if ow < output_w {
                     // Faster than col[ow..output_w].fill(0.);
+                    #[allow(clippy::needless_range_loop)]
                     for i in ow..output_w {
                         col[i] = 0.;
                     }

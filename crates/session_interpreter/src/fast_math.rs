@@ -43,7 +43,7 @@ use std::{
 //         let vals = m.mul_add(Simd::splat(LOG2HIGH), vals);
 //         let vals = m.mul_add(Simd::splat(LOG2LOW), vals);
 //
-//         let overflow = unsafe { transmute::<_, Simd<i32, SIMD_LEN>>(biased) } << Simd::splat(23);
+//         let overflow = unsafe { transmute::<Simd<f32, SIMD_LEN>, Simd<i32, SIMD_LEN>>(biased) } << Simd::splat(23);
 //         let normal = overflow.simd_min(Simd::splat(MAXIMUM_EXPONENT));
 //         let normal = normal.simd_max(Simd::splat(MINIMUM_EXPONENT));
 //         let overflow = overflow - normal;
@@ -57,11 +57,11 @@ use std::{
 //         let p = p.mul_add(vals, Simd::splat(POLY_4));
 //         let p = p.mul_add(vals, Simd::splat(POLY_56));
 //
-//         let vals = vals * unsafe { transmute::<_, Simd<f32, SIMD_LEN>>(overflow) };
+//         let vals = vals * unsafe { transmute::<Simd<i32, SIMD_LEN>, Simd<f32, SIMD_LEN>>(overflow) };
 //         let p = p.mul_add(vals, unsafe {
-//             transmute::<_, Simd<f32, SIMD_LEN>>(overflow)
+//             transmute::<Simd<i32, SIMD_LEN>, Simd<f32, SIMD_LEN>>(overflow)
 //         });
-//         let p = p * unsafe { transmute::<_, Simd<f32, SIMD_LEN>>(normal) };
+//         let p = p * unsafe { transmute::<Simd<i32, SIMD_LEN>, Simd<f32, SIMD_LEN>>(normal) };
 //         output[0..SIMD_LEN].copy_from_slice(p.as_ref());
 //
 //         (input, output) = (&input[SIMD_LEN..], &mut output[SIMD_LEN..]);
@@ -147,7 +147,7 @@ pub fn fast_sum_exp(output: &mut [f32], input: &[f32]) -> f32 {
         let p = p.mul_add(vals, Simd::splat(POLY_56));
         let p = p.mul_add(vals, Simd::splat(POLY_56));
 
-        let p = p * unsafe { transmute::<_, Simd<f32, SIMD_LEN>>(normal) };
+        let p = p * unsafe { transmute::<Simd<i32, SIMD_LEN>, Simd<f32, SIMD_LEN>>(normal) };
         sum += p;
         output[0..SIMD_LEN].copy_from_slice(p.as_ref());
 
@@ -220,7 +220,8 @@ pub fn fast_sigmoid(output: &mut [f32], input: &[f32]) {
         let vals = m.mul_add(Simd::splat(LOG2HIGH), vals);
         let vals = m.mul_add(Simd::splat(LOG2LOW), vals);
 
-        let overflow = unsafe { transmute::<_, Simd<i32, SIMD_LEN>>(biased) } << Simd::splat(23);
+        let overflow = unsafe { transmute::<Simd<f32, SIMD_LEN>, Simd<i32, SIMD_LEN>>(biased) }
+            << Simd::splat(23);
         let normal = overflow.simd_min(Simd::splat(MAXIMUM_EXPONENT));
         let normal = normal.simd_max(Simd::splat(MINIMUM_EXPONENT));
         let overflow = overflow - normal;
@@ -234,11 +235,12 @@ pub fn fast_sigmoid(output: &mut [f32], input: &[f32]) {
         let p = p.mul_add(vals, Simd::splat(POLY_4));
         let p = p.mul_add(vals, Simd::splat(POLY_56));
 
-        let vals = vals * unsafe { transmute::<_, Simd<f32, SIMD_LEN>>(overflow) };
+        let vals =
+            vals * unsafe { transmute::<Simd<i32, SIMD_LEN>, Simd<f32, SIMD_LEN>>(overflow) };
         let p = p.mul_add(vals, unsafe {
-            transmute::<_, Simd<f32, SIMD_LEN>>(overflow)
+            transmute::<Simd<i32, SIMD_LEN>, Simd<f32, SIMD_LEN>>(overflow)
         });
-        let p = p * unsafe { transmute::<_, Simd<f32, SIMD_LEN>>(normal) };
+        let p = p * unsafe { transmute::<Simd<i32, SIMD_LEN>, Simd<f32, SIMD_LEN>>(normal) };
         output[0..SIMD_LEN].copy_from_slice((Simd::splat(1.) / (Simd::splat(1.) + p)).as_ref());
 
         (input, output) = (&input[SIMD_LEN..], &mut output[SIMD_LEN..]);

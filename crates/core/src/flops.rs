@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use crate::{
-    analysis::shape::{infer_shapes, ShapeError},
+    analysis::shape::{ShapeError, infer_shapes},
     model::Model,
     op::Op,
 };

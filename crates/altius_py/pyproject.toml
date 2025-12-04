@@ -10,7 +10,7 @@ dependencies = [
     "maturin>=1.1.0",
     "onnx>=1.15.0",
     "transformers==4.41.2",
-    "onnxsim==0.4.17",
+    "onnxslim>=0.1.77",
     "numpy>=1.25.2",
     "onnxruntime>=1.15.1",
     "pytest>=7.4.4",
@@ -31,7 +31,12 @@ dependencies = [
     "netron>=7.8.3",
     "patchelf>=0.17.2.1; sys_platform == 'linux'",
 ]
-requires-python = "==3.12.*"
+requires-python = ">=3.12,<3.13"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning:onnxscript.*",
+]
 
 [build-system]
 requires = ["maturin>=1.1.0"]

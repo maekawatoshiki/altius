@@ -6,14 +6,14 @@ edition = "2024"
 [dependencies]
 id-arena = "^2.2.1"
 rustc-hash =  { workspace = true }
-prost = "^0.10"
+prost = "^0.14"
 thiserror = { workspace = true }
 log = { workspace = true }
 rand = "^0.8.5"
 ndarray = { workspace = true }
 
 [build-dependencies]
-prost-build = "^0.10"
+prost-build = "^0.14"
 
 [dev-dependencies]
 insta = "^1.14.1"

@@ -1,5 +1,5 @@
 use ndarray::CowArray;
-use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
+use ort::{session::Session, value::Tensor as OrtTensor};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -49,29 +49,22 @@ fn main() {
         .unwrap()
         .into_dimensionality()
         .unwrap();
+    let input_vec = image.as_slice().unwrap().to_vec();
 
     if opt.ort {
-        let env = Environment::builder()
-            .with_execution_providers(&[ExecutionProvider::CPU(Default::default())])
-            .build()
-            .unwrap()
-            .into_arc();
-        let sess = SessionBuilder::new(&env)
-            .unwrap()
-            .with_optimization_level(ort::GraphOptimizationLevel::Level3)
+        let mut sess = Session::builder()
             .unwrap()
             .with_intra_threads(8)
             .unwrap()
-            .with_model_from_file(root.join("mobilenetv3.onnx"))
+            .commit_from_file(root.join("mobilenetv3.onnx"))
             .unwrap();
         for _ in 0..opt.iters {
-            let x = Value::from_array(sess.allocator(), &input).unwrap();
+            let x = OrtTensor::from_array(([1, 3, 224, 224], input_vec.clone())).unwrap();
             use std::time::Instant;
             let start = Instant::now();
-            let out = &sess.run(vec![x]).unwrap()[0];
+            let out = &sess.run(ort::inputs![x]).unwrap()[0];
             log::info!("ort: {:?}", start.elapsed());
-            let out = out.try_extract::<f32>().unwrap();
-            let out = out.view();
+            let out = out.try_extract_array::<f32>().unwrap();
             let out = out.as_slice().unwrap();
             let mut out = out.iter().enumerate().collect::<Vec<_>>();
             out.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));

@@ -31,17 +31,23 @@ jobs:
     - name: Add llvm-tools-preview
       run: rustup component add llvm-tools-preview
     - name: Install grcov
-      run: cargo install grcov
+      run: cargo install grcov --locked
     - name: Install dependencies
-      run: sudo apt install libomp-dev xz-utils
+      run: sudo apt install libomp-dev xz-utils protobuf-compiler
     - name: Install uv
       uses: astral-sh/setup-uv@v6
     - name: Free up disk
       run: sudo rm -rf /usr/local/lib/android || true
-    - name: Test
+    - name: Test (Rust)
       run: |
         cargo test --release
         ALTIUS_ENABLE_CLIF=1 cargo test --release
+      env:
+        RUSTFLAGS: -Cinstrument-coverage
+        LLVM_PROFILE_FILE: coverage-%p-%m.profraw
+    - name: Test (Python)
+      working-directory: ./crates/altius_py
+      run: ./test.sh build
       env:
         RUSTFLAGS: -Cinstrument-coverage
         LLVM_PROFILE_FILE: coverage-%p-%m.profraw
@@ -88,7 +94,7 @@ jobs:
       run: ./download.sh CI
     - name: Install dependencies
       run: |
-        brew install llvm libomp
+        brew install llvm libomp protobuf coreutils
         echo "PATH=$(brew --prefix llvm)/bin:${PATH}" >> $GITHUB_ENV
         echo "CPPFLAGS=-I$(brew --prefix libomp)/include" >> $GITHUB_ENV
         echo "LDFLAGS=-L$(brew --prefix libomp)/lib" >> $GITHUB_ENV
@@ -97,10 +103,16 @@ jobs:
     - name: Setup Python environment
       working-directory: ./crates/altius_py
       run: uv sync
-    - name: Test
+    - name: Test (Rust)
       run: |
         cargo test --release
         ALTIUS_ENABLE_CLIF=1 cargo test --release
+      env:
+        RUSTFLAGS: "-C target-cpu=apple-m1"
+        PYO3_PYTHON: ${{ github.workspace }}/crates/altius_py/.venv/bin/python
+    - name: Test (Python)
+      working-directory: ./crates/altius_py
+      run: ./test.sh build
       env:
         RUSTFLAGS: "-C target-cpu=apple-m1"
         PYO3_PYTHON: ${{ github.workspace }}/crates/altius_py/.venv/bin/python

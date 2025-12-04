@@ -9,8 +9,7 @@ use altius_core::{
     tensor::{Tensor, TensorElemType, TypedFixedShape},
 };
 use altius_session_clang::ClangSessionBuilder;
-use ndarray::CowArray;
-use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
+use ort::{session::Session, value::Tensor as OrtTensor};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 #[test]
@@ -27,30 +26,11 @@ fn cpu_ops_bin() {
             let x_ = Tensor::rand_of_type(TensorElemType::F32, vec![4, 2].into());
             let y_ = Tensor::rand_of_type(TensorElemType::F32, vec![4, 2].into());
 
-            let env = Environment::builder()
-                .with_execution_providers(&[ExecutionProvider::CPU(Default::default())])
-                .build()
-                .unwrap()
-                .into_arc();
-            let sess = SessionBuilder::new(&env)
-                .unwrap()
-                .with_model_from_file(path)
-                .unwrap();
-            let x = CowArray::from(x_.data::<f32>())
-                .into_shape((4, 2))
-                .unwrap()
-                .into_dimensionality()
-                .unwrap();
-            let y = CowArray::from(y_.data::<f32>())
-                .into_shape((4, 2))
-                .unwrap()
-                .into_dimensionality()
-                .unwrap();
-            let x = Value::from_array(sess.allocator(), &x).unwrap();
-            let y = Value::from_array(sess.allocator(), &y).unwrap();
-            let z = &sess.run(vec![x, y]).unwrap()[0];
-            let z = z.try_extract::<f32>().unwrap();
-            let ort_z = z.view();
+            let mut sess = Session::builder().unwrap().commit_from_file(path).unwrap();
+            let x = OrtTensor::from_array(([4, 2], x_.data::<f32>().to_vec())).unwrap();
+            let y = OrtTensor::from_array(([4, 2], y_.data::<f32>().to_vec())).unwrap();
+            let z = &sess.run(ort::inputs![x, y]).unwrap()[0];
+            let ort_z = z.try_extract_array::<f32>().unwrap();
             assert!(ort_z.shape() == &[4, 2]);
 
             let sess = ClangSessionBuilder::new(load_onnx(path).unwrap())

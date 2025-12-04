@@ -1,7 +1,6 @@
 use std::{cmp::Ordering, fs::read_to_string, path::Path, time::Instant};
 
-use ndarray::CowArray;
-use ort::{Environment, GraphOptimizationLevel, SessionBuilder, Value};
+use ort::{session::Session, value::Tensor};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -76,18 +75,11 @@ fn main() {
 
 fn run_on_ort(opt: &Opt) {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models");
-    let env = Environment::builder()
-        .with_name("altius")
-        .build()
+    let mut session = Session::builder()
         .unwrap()
-        .into_arc();
-    let session = SessionBuilder::new(&env)
+        .with_intra_threads(opt.threads as usize)
         .unwrap()
-        .with_optimization_level(GraphOptimizationLevel::Level3)
-        .unwrap()
-        .with_intra_threads(opt.threads as i16)
-        .unwrap()
-        .with_model_from_file(root.join("deit.onnx"))
+        .commit_from_file(root.join("deit.onnx"))
         .unwrap();
 
     let image = image::open(root.join("cat.png")).unwrap().to_rgb8();
@@ -97,22 +89,19 @@ fn run_on_ort(opt: &Opt) {
         let std = [0.5, 0.5, 0.5][c];
         (resized[(x as _, y as _)][c] as f32 / 255.0 - mean) / std
     });
-    let input = CowArray::from(image)
-        .into_shape((1, 3, 224, 224))
-        .unwrap()
-        .into_dimensionality()
-        .unwrap();
+    let input_vec = image.into_raw_vec();
 
     let classes = read_to_string(Path::new(&root).join("imagenet_classes.txt")).unwrap();
     for _ in 0..opt.iters {
-        let input = Value::from_array(session.allocator(), &input).unwrap();
+        let input_tensor = Tensor::from_array(([1, 3, 224, 224], input_vec.clone())).unwrap();
         let now = Instant::now();
-        let output = &session.run(vec![input]).unwrap()[0];
+        let output = &session.run(ort::inputs![input_tensor]).unwrap()[0];
         let elapsed = now.elapsed();
-        let output = output.try_extract::<f32>().unwrap();
-        let output = output.view();
+        let output = output.try_extract_array::<f32>().unwrap();
         let mut output = output.iter().enumerate().collect::<Vec<_>>();
-        output.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+        output.sort_by(|(_, a): &(_, &f32), (_, b): &(_, &f32)| {
+            b.partial_cmp(a).unwrap_or(Ordering::Equal)
+        });
 
         println!(
             "inferred: {} (in {elapsed:?})",

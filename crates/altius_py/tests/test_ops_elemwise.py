@@ -7,7 +7,7 @@ import os
 
 import numpy as np
 
-import onnxsim
+import onnxslim
 from onnx import helper, ValueInfoProto, TensorProto
 from onnxscript import FLOAT, script, opset12 as op
 
@@ -169,8 +169,7 @@ def gelu(x: FLOAT[1, 2, 3]) -> FLOAT[1, 2, 3]:
 @pytest.mark.parametrize("backend", ["interpreter", "cpu"])
 def test_gelu_1(backend):
     model = gelu.to_model_proto()
-    model, ok = onnxsim.simplify(model)
-    assert ok
+    model = onnxslim.slim(model)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         filepath = os.path.join(tmpdir, "model.onnx")

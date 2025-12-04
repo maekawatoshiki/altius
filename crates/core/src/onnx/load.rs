@@ -132,7 +132,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
                     x.name(),
                     TypedShape::new(
                         dims.into(),
-                        DataType::from_i32(tensor.elem_type()).unwrap().try_into()?,
+                        DataType::try_from(tensor.elem_type()).unwrap().try_into()?,
                     ),
                 )),
             };
@@ -294,7 +294,7 @@ pub fn load_onnx_from_model_proto(model_proto: ModelProto) -> Result<Model, Mode
             }
             "Cast" => {
                 let to = TensorElemType::try_from(
-                    DataType::from_i32(get_attribute(&node.attribute, "to")?.i() as i32)
+                    DataType::try_from(get_attribute(&node.attribute, "to")?.i() as i32)
                         .expect("Invalid ONNX"),
                 )?;
                 Op::Cast(Cast { to })
@@ -382,7 +382,7 @@ fn get_attribute<'a>(
 }
 
 fn get_tensor(tensor: &TensorProto) -> Result<Tensor, ModelLoadError> {
-    Ok(match DataType::from_i32(tensor.data_type()).unwrap() {
+    Ok(match DataType::try_from(tensor.data_type()).unwrap() {
         DataType::Float if tensor.raw_data().is_empty() => Tensor::new(
             FixedDimensions::from_i64(&tensor.dims),
             tensor.float_data.clone(),

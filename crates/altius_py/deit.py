@@ -29,15 +29,14 @@ def main():
     onnx_path = "../../models/deit.onnx"
 
     if not os.path.exists(onnx_path):
-        import onnxsim
+        import onnxslim
         from transformers import ViTImageProcessor, ViTForImageClassification
 
         model = ViTForImageClassification.from_pretrained(
             "facebook/deit-small-patch16-224"
         )
         torch.onnx.export(model, torch.randn(1, 3, 224, 224), onnx_path)
-        simplified_model, success = onnxsim.simplify(onnx_path)
-        assert success
+        simplified_model = onnxslim.slim(onnx_path)
         onnx.save(simplified_model, onnx_path)
 
     altius_model = altius_py.InferenceSession(

@@ -2,7 +2,6 @@
 rustflags = ["-Ctarget-cpu=native"]
 
 [env]
-RUST_LOG = "debug"
 CC = "clang"
 CXX = "clang++"
 GOMP_CPU_AFFINITY='0-7'

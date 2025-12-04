@@ -9,8 +9,7 @@ use altius_core::{
     tensor::{Tensor, TensorElemType, TypedFixedShape},
 };
 use altius_session_clang::ClangSessionBuilder;
-use ndarray::CowArray;
-use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
+use ort::{session::Session, value::Tensor as OrtTensor};
 
 #[test]
 fn cpu_ops_conv() {
@@ -22,24 +21,10 @@ fn cpu_ops_conv() {
 
     let x_ = Tensor::rand_of_type(TensorElemType::F32, vec![1, 1, 28, 28].into());
 
-    let env = Environment::builder()
-        .with_execution_providers(&[ExecutionProvider::CPU(Default::default())])
-        .build()
-        .unwrap()
-        .into_arc();
-    let sess = SessionBuilder::new(&env)
-        .unwrap()
-        .with_model_from_file(path)
-        .unwrap();
-    let x = CowArray::from(x_.data::<f32>())
-        .into_shape((1, 1, 28, 28))
-        .unwrap()
-        .into_dimensionality()
-        .unwrap();
-    let x = Value::from_array(sess.allocator(), &x).unwrap();
-    let z = &sess.run(vec![x]).unwrap()[0];
-    let z = z.try_extract::<f32>().unwrap();
-    let ort_z = z.view();
+    let mut sess = Session::builder().unwrap().commit_from_file(path).unwrap();
+    let x = OrtTensor::from_array(([1, 1, 28, 28], x_.data::<f32>().to_vec())).unwrap();
+    let z = &sess.run(ort::inputs![x]).unwrap()[0];
+    let ort_z = z.try_extract_array::<f32>().unwrap();
     assert!(ort_z.shape() == &[1, 8, 28, 28]);
 
     let sess = ClangSessionBuilder::new(load_onnx(path).unwrap())

@@ -66,3 +66,9 @@ uv sync
 uv run maturin develop -r
 uv run python mobilenet.py
 ```
+
+# Test
+
+```sh
+make test
+```

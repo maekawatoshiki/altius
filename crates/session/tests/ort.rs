@@ -6,38 +6,20 @@ use altius_core::{
     op::Op,
     tensor::{TensorElemType, TypedFixedShape},
 };
-use ndarray::CowArray;
-use ort::{Environment, ExecutionProvider, SessionBuilder, Value};
+use ort::{session::Session, value::Tensor};
 
 #[test]
 fn ort_add() {
     let path = tempfile::NamedTempFile::new().unwrap();
     export_onnx(path.path().to_str().unwrap());
 
-    let env = Environment::builder()
-        .with_execution_providers(&[ExecutionProvider::CPU(Default::default())])
-        .build()
-        .unwrap()
-        .into_arc();
-    let sess = SessionBuilder::new(&env)
-        .unwrap()
-        .with_model_from_file(path)
-        .unwrap();
-    let x = CowArray::from(&[1.0f32, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0])
-        .into_shape((4, 2))
-        .unwrap()
-        .into_dimensionality()
-        .unwrap();
-    let y = CowArray::from(&[2.0f32, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0])
-        .into_shape((4, 2))
-        .unwrap()
-        .into_dimensionality()
-        .unwrap();
-    let x = Value::from_array(sess.allocator(), &x).unwrap();
-    let y = Value::from_array(sess.allocator(), &y).unwrap();
-    let z = &sess.run(vec![x, y]).unwrap()[0];
-    let z = z.try_extract::<f32>().unwrap();
-    let z = z.view();
+    let mut sess = Session::builder().unwrap().commit_from_file(path).unwrap();
+    let x =
+        Tensor::from_array(([4, 2], vec![1.0f32, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0])).unwrap();
+    let y =
+        Tensor::from_array(([4, 2], vec![2.0f32, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0])).unwrap();
+    let z = &sess.run(ort::inputs![x, y]).unwrap()[0];
+    let z = z.try_extract_array::<f32>().unwrap();
 
     assert!(z.shape() == &[4, 2]);
     assert!(z.as_slice() == Some(&[3.0f32, 7.0, 11.0, 15.0, 19.0, 23.0, 27.0, 31.0]));

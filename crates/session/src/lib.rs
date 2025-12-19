@@ -5,7 +5,10 @@ pub mod plan;
 use std::borrow::Cow;
 
 use altius_core::{analysis::shape::ShapeError, tensor::Tensor};
+#[cfg(not(target_arch = "wasm32"))]
 use cranelift_module::ModuleError;
+#[cfg(not(target_arch = "wasm32"))]
+use libloading;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -17,9 +20,11 @@ pub enum SessionError {
     #[error("Io: {0}")]
     Io(#[from] std::io::Error),
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[error("Libloading: {0}")]
     Libloading(#[from] libloading::Error),
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[error("Cranelift: {0}")]
     Cranelift(#[from] Box<ModuleError>),
 
@@ -28,6 +33,7 @@ pub enum SessionError {
     Message(Cow<'static, str>),
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl From<ModuleError> for SessionError {
     fn from(err: ModuleError) -> Self {
         SessionError::Cranelift(Box::new(err))

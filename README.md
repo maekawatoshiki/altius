@@ -51,10 +51,10 @@ cargo run --release --example deit_cpu      -- --iters 10 --threads 8 --profile
 Currently, mobilenet v3 runs on web browsers.
 
 ```sh
-cd wasm
+cd crates/wasm
 cargo install wasm-pack
 wasm-pack build --target web
-yarn
+yarn install
 yarn serve
 ```
 

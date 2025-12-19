@@ -15,7 +15,7 @@ fastapprox = "^0.3.0"
 thread_local = "^1.1"
 paste = "1.0.11"
 threadpool = "^1.8.1"
-cblas-sys = "0.1.4"
+cblas-sys = { version = "0.1.4", optional = true }
 cudnn = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA", optional = true }
 
@@ -32,7 +32,7 @@ blas-src = { version = "0.8", features = ["accelerate"] }
 [features]
 default = ["cblas"]
 matrixmultiply-threading = ["matrixmultiply/threading"]
-cblas = []
+cblas = ["dep:cblas-sys"]
 heavy-log = []
 cuda = ["cudnn", "cust"]
 

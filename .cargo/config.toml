@@ -6,3 +6,6 @@ CC = "clang"
 CXX = "clang++"
 GOMP_CPU_AFFINITY='0-7'
 MACOSX_DEPLOYMENT_TARGET = "14.0"
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+reference-types", "--cfg", "wbg_reference_types"]

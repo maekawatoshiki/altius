@@ -10,7 +10,7 @@ altius-core = { path = "../core" }
 altius_session = { path = "../session" }
 ndarray = "0.15.6"
 core_affinity = "^0.7.6"
-matrixmultiply = "0.3.2"
+matrixmultiply = "0.3.10"
 fastapprox = "^0.3.0"
 thread_local = "^1.1"
 paste = "1.0.11"
